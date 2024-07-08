@@ -165,3 +165,16 @@ static inline uint32_t highbit_pos(uint64_t val) {
     return 8 * sizeof(val) - __builtin_ia32_lzcnt_u64(val) - 1;
 }
 
+
+__attribute__((always_inline))
+static inline void set_bitmap_bit(uint64_t *bitmap, const uint32_t pos) {
+    bitmap[pos / 64] |= 1ULL << (pos % 64);
+}
+
+
+__attribute__((always_inline))
+static inline uint64_t get_bitmap_bit(const uint64_t *bitmap, const uint32_t pos) {
+    return (bitmap[pos / 64] >> (pos % 64)) & 1ULL;
+}
+
+
