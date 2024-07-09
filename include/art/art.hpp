@@ -12,6 +12,8 @@
 #include "node_4.hpp"
 #include "tree_it.hpp"
 #include <algorithm>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <stack>
 
@@ -30,16 +32,40 @@ public:
   T get(const char *key) const;
 
   /**
+   * Finds the value associated with the given key.
+   *
+   * @param key - The key to find.
+   * @param key_len - The length of the key string.
+   * @return the value associated with the key or a default constructed value.
+   */
+  T get(const char *key, const uint32_t key_len) const;
+
+
+  /**
    * Associates the given key with the given value.
    * If another value is already associated with the given key,
    * since the method consumer is the resource owner.
    *
    * @param key - The key to associate with the value.
    * @param value - The value to be associated with the key.
-   * @return a nullptr if no other value is associated with they or the
+   * @return a nullptr if no other value is associated with the or the
    * previously associated value.
    */
   T set(const char *key, T value);
+
+  /**
+   * Associates the given key with the given value.
+   * If another value is already associated with the given key,
+   * since the method consumer is the resource owner.
+   *
+   * @param key - The key to associate with the value.
+   * @param key_len - The length of the key string.
+   * @param value - The value to be associated with the key.
+   * @return a nullptr if no other value is associated with the or the
+   * previously associated value.
+   */
+  T set(const char *key, const uint32_t key_len, T value);
+
 
   /**
    * Deletes the given key and returns it's associated value.
@@ -47,10 +73,23 @@ public:
    * since the method consumer is the resource owner.
    * If no value is associated with the given key, nullptr is returned.
    *
-   * @param key - The key to delete.
-   * @return the values assciated with they key or a nullptr otherwise.
+   * @param key - The key to delete. 
+   * @return the values assciated with the key or a nullptr otherwise.
    */
   T del(const char *key);
+
+  /**
+   * Deletes the given key and returns it's associated value.
+   * The associated value is returned,
+   * since the method consumer is the resource owner.
+   * If no value is associated with the given key, nullptr is returned.
+   *
+   * @param key - The key to delete. 
+   * @param key_len - The length of the key string.
+   * @return the values assciated with the key or a nullptr otherwise.
+   */
+  T del(const char *key, const uint32_t key_len);
+
 
   /**
    * Forward iterator that traverses the tree in lexicographic order.
@@ -62,6 +101,13 @@ public:
    * from the provided key.
    */
   tree_it<T> begin(const char *key);
+
+  /**
+   * Forward iterator that traverses the tree in lexicographic order starting
+   * from the provided key.
+   */
+  tree_it<T> begin(const char *key, const uint32_t key_len);
+
 
   /**
    * Iterator to the end of the lexicographic order.
@@ -99,8 +145,13 @@ template <class T> art<T>::~art() {
 
 template <class T> 
 T art<T>::get(const char *key) const {
+  return get(key, std::strlen(key) + 1);
+}
+
+template <class T> 
+T art<T>::get(const char *key, const uint32_t key_len) const {
   node<T> *cur = root_, **child;
-  int depth = 0, key_len = std::strlen(key) + 1;
+  int depth = 0;
   while (cur != nullptr) {
     if (cur->prefix_len_ != cur->check_prefix(key + depth, key_len - depth)) {
       /* prefix mismatch */
@@ -117,9 +168,15 @@ T art<T>::get(const char *key) const {
   return T{};
 }
 
+
 template <class T> 
 T art<T>::set(const char *key, T value) {
-  int key_len = std::strlen(key) + 1, depth = 0, prefix_match_len;
+  return set(key, std::strlen(key) + 1, value);
+}
+
+template <class T> 
+T art<T>::set(const char *key, const uint32_t key_len, T value) {
+  int depth = 0, prefix_match_len;
   if (root_ == nullptr) {
     root_ = new leaf_node<T>(value);
     root_->prefix_ = new char[key_len];
@@ -255,7 +312,12 @@ T art<T>::set(const char *key, T value) {
 
 template <class T> 
 T art<T>::del(const char *key) {
-  int depth = 0, key_len = std::strlen(key) + 1;
+    return del(key, std::strlen(key) + 1);
+}
+
+template <class T> 
+T art<T>::del(const char *key, const uint32_t key_len) {
+  int depth = 0;
 
   if (root_ == nullptr) {
     return T{};
@@ -386,6 +448,10 @@ template <class T> tree_it<T> art<T>::begin() {
 
 template <class T> tree_it<T> art<T>::begin(const char *key) {
   return tree_it<T>::greater_equal(this->root_, key);
+}
+
+template <class T> tree_it<T> art<T>::begin(const char *key, const uint32_t key_len) {
+  return tree_it<T>::greater_equal(this->root_, key, key_len);
 }
 
 template <class T> tree_it<T> art<T>::end() { 

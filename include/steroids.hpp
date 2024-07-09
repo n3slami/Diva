@@ -2,10 +2,20 @@
 
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <random>
+#include <tuple>
 
 #include "art.hpp"
+#include "art/tree_it.hpp"
 #include "util.hpp"
+
+static void print_key(const char *key, const uint32_t key_len) {
+    for (int32_t i = 0; i < key_len; i++) {
+        std::cerr << std::setfill(' ') << std::setw(3) << +key[i] << ' ';
+    }
+    std::cerr << std::endl;
+}
 
 class Steroids {
     friend class SteroidsTests;
@@ -17,7 +27,7 @@ public:
         SetupScaleFactors();
     }
 
-    void Insert(const char *key);
+    void Insert(const char *key, const uint32_t key_len);
 
 private:
     static const uint32_t infix_store_target_size = 512;
@@ -41,9 +51,7 @@ private:
         InfixStore(const InfixStore &other) = default;
         InfixStore(InfixStore &&other) = default;
         InfixStore &operator=(const InfixStore &other) = default;
-        ~InfixStore() {
-            delete ptr;
-        }
+        ~InfixStore() = default;
     };
 
     const uint32_t infix_size_;
@@ -52,8 +60,10 @@ private:
     const float load_factor_ = 0.95;
     uint64_t scale_factors_[scale_factor_count], scaled_sizes_[scale_factor_count];
 
-    inline void AddTreeKey(const char *key);
+    inline void AddTreeKeySplitInfixStore(const char *key, const uint32_t key_len);
     inline void SetupScaleFactors();
+    inline std::tuple<uint32_t, uint32_t, uint32_t> 
+        GetSharedIgnoreImplicitInfixLengths(const char *key_1, const char *key_2, const uint32_t key_len);
 
     inline uint64_t ScaleValue(const uint64_t value, const uint32_t grade);
 
@@ -91,15 +101,62 @@ inline void Steroids::SetupScaleFactors() {
 }
 
 
-void Steroids::Insert(const char *key) {
-    if (rng_() % infix_store_target_size == 0)
-        AddTreeKey(key);
+void Steroids::Insert(const char *key, const uint32_t key_len) {
+    if (rng_() % infix_store_target_size == 0) {
+        AddTreeKeySplitInfixStore(key, key_len);
+        return;
+    }
+
+    auto it = tree_.begin(key, key_len);
+    std::cerr << "key=";
+    print_key(it.key().c_str(), key_len);
 }
 
 
-inline void Steroids::AddTreeKey(const char *key) {
+inline void Steroids::AddTreeKeySplitInfixStore(const char *key, const uint32_t key_len) {
+    std::cerr << "adding key to tree key=";
+    print_key(key, key_len);
+
     InfixStore infix_store(scaled_sizes_[0], infix_size_);
-    tree_.set(key, infix_store);
+    tree_.set(key, key_len, infix_store);
+
+    std::cerr << "added: ";
+    auto it = tree_.begin(key, key_len);
+    print_key(it.key().c_str(), key_len);
+}
+
+
+inline std::tuple<uint32_t, uint32_t, uint32_t> 
+Steroids::GetSharedIgnoreImplicitInfixLengths(const char *key_1, const char *key_2, const uint32_t key_len) {
+    const uint64_t *ptr_1 = reinterpret_cast<const uint64_t *>(key_1);
+    const uint64_t *ptr_2 = reinterpret_cast<const uint64_t *>(key_2);
+    uint32_t shared = 0, ignore = 0, implicit = 0;
+
+    uint32_t ind = key_len / 8, delta;
+    do {
+        delta = __builtin_ia32_lzcnt_u64(ptr_1[ind] ^ ptr_2[ind]);
+        shared += delta;
+        ind--;
+    } while (delta == 64);
+
+    ind++;
+    do {
+        const uint32_t offset = (key_len / 8 - ind > shared / 64 ? 0 : shared % 64);
+        delta = __builtin_ia32_lzcnt_u64(((~ptr_1[ind]) | ptr_2[ind]) & BITMASK(64 - offset));
+        ignore += delta - offset;
+        ind--;
+    } while (delta == 64);
+
+    uint64_t lower_val = 0, upper_val = 1;
+    while (upper_val - lower_val <= infix_store_target_size) {
+        const uint32_t bit_pos = key_len * 8 - shared - ignore - implicit - 1;
+        lower_val = (lower_val << 1) | ((ptr_1[bit_pos / 64] >> (bit_pos % 64)) & 1ULL);
+        upper_val = (upper_val << 1) | ((ptr_2[bit_pos / 64] >> (bit_pos % 64)) & 1ULL);
+        implicit++;
+    }
+    implicit--;
+
+    return {shared, ignore, implicit};
 }
 
 

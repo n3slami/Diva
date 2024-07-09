@@ -8,6 +8,7 @@
 
 #include "child_it.hpp"
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <iterator>
@@ -53,6 +54,7 @@ public:
 
   static tree_it<T> min(node<T> *root);
   static tree_it<T> greater_equal(node<T> *root, const char *key);
+  static tree_it<T> greater_equal(node<T> *root, const char *key, const uint32_t key_len);
 
   using iterator_category = std::forward_iterator_tag;
   using value_type = T;
@@ -236,14 +238,20 @@ template <class T> tree_it<T> tree_it<T>::min(node<T> *root) {
 
 template <class T>
 tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key) {
+    return greater_equal(root, key, std::strlen(key));
+}
+
+int cnt = 0;
+template <class T>
+tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key, const uint32_t key_len) {
   assert(root != nullptr);
 
-  int key_len = std::strlen(key);
   std::vector<tree_it<T>::step> traversal_stack;
 
   // sentinel child iterator for root
   traversal_stack.push_back({root, 0, nullptr, {nullptr, -2}, {nullptr, -2}, {nullptr, -1}});
 
+  bool ignore = false;
   while (true) {
     tree_it<T>::step &cur_step = traversal_stack.back();
     node<T> *cur_node = cur_step.child_node_;
@@ -255,11 +263,14 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key) {
         return tree_it<T>(root, traversal_stack);
     }
     // if search key is "greater than" the prefix
-    if (prefix_match_len < cur_node->prefix_len_ &&  key[cur_depth + prefix_match_len] > cur_node->prefix_[prefix_match_len]) {
+    if (prefix_match_len < cur_node->prefix_len_ && key[cur_depth + prefix_match_len] > cur_node->prefix_[prefix_match_len]) {
       ++cur_step;
       return tree_it<T>(root, traversal_stack);
     }
     if (cur_node->is_leaf()) {
+        cnt++;
+        if (cnt == 10)
+            exit(1);
       continue;
     }
     // seek subtree where search key is "lesser than or equal" the subtree partial key
@@ -269,9 +280,8 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key) {
     child_it<T> c_it_end = cur_inner_node->end();
     // TODO more efficient with specialized node search method?
     for (; c_it != c_it_end; ++c_it) {
-      if (key[cur_depth + cur_node->prefix_len_] <= c_it.get_partial_key()) {
+      if (key[cur_depth + cur_node->prefix_len_] <= c_it.get_partial_key())
         break;
-      }
     }
     int depth = cur_depth + cur_node->prefix_len_ + 1;
     tree_it<T>::step child(depth, c_it, c_it_begin, c_it_end);
@@ -280,6 +290,9 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key) {
     std::copy_n(cur_node->prefix_, cur_node->prefix_len_, child.key_ + cur_depth);
     child.key_[cur_depth + cur_node->prefix_len_] = c_it.get_partial_key();
     traversal_stack.push_back(child);
+
+    if (key[cur_depth + cur_node->prefix_len_] < c_it.get_partial_key())
+      return tree_it<T>(root, traversal_stack);
   }
 }
 

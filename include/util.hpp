@@ -178,3 +178,20 @@ static inline uint64_t get_bitmap_bit(const uint64_t *bitmap, const uint32_t pos
 }
 
 
+__attribute__((always_inline))
+inline auto to_big_endian_order(uint64_t const &key) {
+	return __bswap_64(key);
+};
+
+
+__attribute__((always_inline))
+inline auto to_big_endian_order(uint32_t const &key) {
+	return __bswap_32(key);
+};
+
+
+__attribute__((always_inline))
+inline auto to_big_endian_order(uint16_t const &key) {
+	return __bswap_16(key);
+};
+
