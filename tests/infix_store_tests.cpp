@@ -247,52 +247,64 @@ public:
         Steroids s(infix_size, seed, load_factor);
         Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
         uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        uint64_t inserts[100];
 
         // Insertion and shifting of a single run
+        inserts[0] = 0b010000000001011;
+        inserts[1] = 0b010000000001101;
+        inserts[2] = 0b010000000001110;
+        inserts[3] = 0b010000000001100;
         assert(s.GetSlot(store, 269) == 0b00000);
-        s.InsertRawIntoInfixStore(store, 0b010000000001011);
-        assert(s.GetSlot(store, 269) == 0b01011);
-        s.InsertRawIntoInfixStore(store, 0b010000000001100);
-        s.InsertRawIntoInfixStore(store, 0b010000000001101);
-        s.InsertRawIntoInfixStore(store, 0b010000000001110);
-        assert(s.GetSlot(store, 269) == 0b01011);
-        assert(s.GetSlot(store, 270) == 0b01100);
-        assert(s.GetSlot(store, 271) == 0b01101);
-        assert(s.GetSlot(store, 272) == 0b01110);
+        s.InsertRawIntoInfixStore(store, inserts[0]);
+        assert(s.GetSlot(store, 269) == (inserts[0] & BITMASK(infix_size)));
+        s.InsertRawIntoInfixStore(store, inserts[3]);
+        s.InsertRawIntoInfixStore(store, inserts[1]);
+        s.InsertRawIntoInfixStore(store, inserts[2]);
+        for (int32_t i = 0; i < 4; i++)
+            assert(s.GetSlot(store, 269 + i) == (inserts[i] & BITMASK(infix_size)));
         for (int32_t i = 269; i < 272; i++)
             assert(get_bitmap_bit(runends, i) == 0);
         assert(get_bitmap_bit(runends, 272) == 1);
 
         // Insertion and shifting of a new run that shifts an old run
+        inserts[4] = 0b001111111100001;
+        inserts[5] = 0b001111111100010;
+        inserts[6] = 0b001111111100011;
+        inserts[7] = 0b001111111100100;
         assert(s.GetSlot(store, 268) == 0b00000);
-        s.InsertRawIntoInfixStore(store, 0b001111111100001);
-        assert(s.GetSlot(store, 268) == 0b00001);
-        s.InsertRawIntoInfixStore(store, 0b001111111100010);
-        s.InsertRawIntoInfixStore(store, 0b001111111100011);
-        s.InsertRawIntoInfixStore(store, 0b001111111100100);
+        s.InsertRawIntoInfixStore(store, inserts[4]);
+        assert(s.GetSlot(store, 268) == (inserts[4] & BITMASK(infix_size)));
+        s.InsertRawIntoInfixStore(store, inserts[6]);
+        s.InsertRawIntoInfixStore(store, inserts[5]);
+        s.InsertRawIntoInfixStore(store, inserts[7]);
+        PrintStore(s, store);
         for (int32_t i = 268; i < 271; i++) { 
-            assert(s.GetSlot(store, i) == i - 267);
+            assert(s.GetSlot(store, i) == (inserts[i - 268 + 4] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 271) == 0b00100);
+        assert(s.GetSlot(store, 271) == (inserts[7] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 271) == 1);
         for (int32_t i = 272; i < 275; i++) { 
-            assert(s.GetSlot(store, i) == 0b01011 + i - 272);
+            assert(s.GetSlot(store, i) == (inserts[i - 272] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 275) == 0b01110);
+        assert(s.GetSlot(store, 275) == (inserts[3] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 275) == 1);
 
         // Insertion and shifting at the very beginning of the array
-        s.InsertRawIntoInfixStore(store, 0b000000000000001);
-        s.InsertRawIntoInfixStore(store, 0b000000000000011);
-        s.InsertRawIntoInfixStore(store, 0b000000000000010);
-        s.InsertRawIntoInfixStore(store, 0b000000000000001);
+        inserts[0] = 0b000000000000001;
+        inserts[1] = 0b000000000000001;
+        inserts[2] = 0b000000000000010;
+        inserts[3] = 0b000000000000011;
+        s.InsertRawIntoInfixStore(store, inserts[0]);
+        s.InsertRawIntoInfixStore(store, inserts[3]);
+        s.InsertRawIntoInfixStore(store, inserts[2]);
+        s.InsertRawIntoInfixStore(store, inserts[1]);
         for (int32_t i = 0; i < 3; i++) {
-            assert(s.GetSlot(store, i) == std::max(i, 1));
+            assert(s.GetSlot(store, i) == (inserts[i] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 3) == 0b00011);
+        assert(s.GetSlot(store, 3) == (inserts[3] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 3) == 1);
 
         // Inserting new runs in between two touching runs
@@ -301,62 +313,74 @@ public:
         assert(s.GetSlot(store, 5) == 0b00000);
         assert(get_bitmap_bit(runends, 5) == 0);
 
-        s.InsertRawIntoInfixStore(store, 0b000000001111111);
+        inserts[5] = 0b000000001111111;
+        s.InsertRawIntoInfixStore(store, inserts[5]);
 
-        assert(s.GetSlot(store, 4) == 0b11111);
+        assert(s.GetSlot(store, 4) == (inserts[5] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 4) == 1);
         assert(s.GetSlot(store, 5) == 0b00000);
         assert(get_bitmap_bit(runends, 5) == 0);
 
-        s.InsertRawIntoInfixStore(store, 0b000000000110101);
+        inserts[4] = 0b000000000110101;
+        s.InsertRawIntoInfixStore(store, inserts[4]);
 
-        assert(s.GetSlot(store, 4) == 0b10101);
+        assert(s.GetSlot(store, 4) == (inserts[4] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 4) == 1);
-        assert(s.GetSlot(store, 5) == 0b11111);
+        assert(s.GetSlot(store, 5) == (inserts[5] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 5) == 1);
 
         // Insertion and shifting at the very end of the array
-        s.InsertRawIntoInfixStore(store, 0b011111110100011);
-        s.InsertRawIntoInfixStore(store, 0b011111110100001);
-        s.InsertRawIntoInfixStore(store, 0b011111110100010);
-        s.InsertRawIntoInfixStore(store, 0b011111110100111);
-        s.InsertRawIntoInfixStore(store, 0b011111111100010);
-        s.InsertRawIntoInfixStore(store, 0b011111111100001);
-        s.InsertRawIntoInfixStore(store, 0b011111111100001);
+        inserts[0] = 0b011111110100001;
+        inserts[1] = 0b011111110100010;
+        inserts[2] = 0b011111110100011;
+        inserts[3] = 0b011111110100111;
+        inserts[4] = 0b011111111100001;
+        inserts[5] = 0b011111111100001;
+        inserts[6] = 0b011111111100010;
+        s.InsertRawIntoInfixStore(store, inserts[1]);
+        s.InsertRawIntoInfixStore(store, inserts[0]);
+        s.InsertRawIntoInfixStore(store, inserts[2]);
+        s.InsertRawIntoInfixStore(store, inserts[3]);
+        s.InsertRawIntoInfixStore(store, inserts[6]);
+        s.InsertRawIntoInfixStore(store, inserts[4]);
+        s.InsertRawIntoInfixStore(store, inserts[5]);
         for (int32_t i = 531; i < 534; i++) {
-            assert(s.GetSlot(store, i) == i - 530);
+            assert(s.GetSlot(store, i) == (inserts[i - 531] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 534) == 0b00111);
+        assert(s.GetSlot(store, 534) == (inserts[3] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 534) == 1);
         for (int32_t i = 535; i < 537; i++) {
-            assert(s.GetSlot(store, i) == 0b00001);
+            assert(s.GetSlot(store, i) == (inserts[i - 535 + 4] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 537) == 0b00010);
+        assert(s.GetSlot(store, 537) == (inserts[6] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 537) == 1);
 
         // Insertion and shifting in between touching runs at the very end of the array
-        s.InsertRawIntoInfixStore(store, 0b011111111011111);
-        s.InsertRawIntoInfixStore(store, 0b011111111011101);
-        s.InsertRawIntoInfixStore(store, 0b011111111011110);
+        inserts[7] = 0b011111111011101;
+        inserts[8] = 0b011111111011110;
+        inserts[9] = 0b011111111011111;
+        s.InsertRawIntoInfixStore(store, inserts[9]);
+        s.InsertRawIntoInfixStore(store, inserts[7]);
+        s.InsertRawIntoInfixStore(store, inserts[8]);
         for (int32_t i = 528; i < 531; i++) {
-            assert(s.GetSlot(store, i) == i - 527);
+            assert(s.GetSlot(store, i) == (inserts[i - 528] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 531) == 0b00111);
+        assert(s.GetSlot(store, 531) == (inserts[3] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 537) == 1);
         for (int32_t i = 532; i < 534; i++) {
-            assert(s.GetSlot(store, i) == i - 532 + 0b11101);
+            assert(s.GetSlot(store, i) == (inserts[i - 532 + 7] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 534) == 0b11111);
+        assert(s.GetSlot(store, 534) == (inserts[9] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 534) == 1);
         for (int32_t i = 535; i < 537; i++) {
-            assert(s.GetSlot(store, i) == 0b00001);
+            assert(s.GetSlot(store, i) == (inserts[i - 535 + 4] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
         }
-        assert(s.GetSlot(store, 537) == 0b00010);
+        assert(s.GetSlot(store, 537) == (inserts[6] & BITMASK(infix_size)));
         assert(get_bitmap_bit(runends, 537) == 1);
     }
 
@@ -400,7 +424,6 @@ public:
                                    0b011111111000001, 0b011111111000010, 0b011111111000010,
                                    0b011111111100001, 0b011111111100010, 0b011111111100010};
         s.LoadListToInfixStore(store, keys, 27);
-        PrintStore(s, store);
         uint64_t res[28];
         const uint32_t len = s.GetInfixList(store, res);
         assert(len == 27);

@@ -195,3 +195,9 @@ inline auto to_big_endian_order(uint16_t const &key) {
 	return __bswap_16(key);
 };
 
+
+__attribute__((always_inline))
+inline uint64_t get_string_kth_bit(const char *str, const uint32_t k) {
+	return (str[k / 8] >> (7 - k % 8)) & 1;
+};
+

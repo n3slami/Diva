@@ -64,6 +64,7 @@ public:
 
   /* reference operator*(); */
   value_type operator*();
+  value_type& ref();
   pointer operator->();
   tree_it<T> &operator++();
   tree_it<T> operator++(int);
@@ -241,7 +242,6 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key) {
     return greater_equal(root, key, std::strlen(key));
 }
 
-int cnt = 0;
 template <class T>
 tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key, const uint32_t key_len) {
   assert(root != nullptr);
@@ -251,27 +251,25 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const char *key, const uint3
   // sentinel child iterator for root
   traversal_stack.push_back({root, 0, nullptr, {nullptr, -2}, {nullptr, -2}, {nullptr, -1}});
 
-  bool ignore = false;
   while (true) {
     tree_it<T>::step &cur_step = traversal_stack.back();
     node<T> *cur_node = cur_step.child_node_;
     int cur_depth = cur_step.depth_;
-
+    
     int prefix_match_len = std::min<int>(cur_node->check_prefix(key + cur_depth, key_len - cur_depth), key_len - cur_depth);
     // if search key "equals" the prefix
     if (key_len == cur_depth + prefix_match_len) {
         return tree_it<T>(root, traversal_stack);
     }
     // if search key is "greater than" the prefix
-    if (prefix_match_len < cur_node->prefix_len_ && key[cur_depth + prefix_match_len] > cur_node->prefix_[prefix_match_len]) {
+    const uint8_t diff_key_char = key[cur_depth + prefix_match_len];
+    const uint8_t diff_node_char = cur_node->prefix_[prefix_match_len];
+    if (prefix_match_len < cur_node->prefix_len_ && diff_key_char > diff_node_char) {
       ++cur_step;
       return tree_it<T>(root, traversal_stack);
     }
     if (cur_node->is_leaf()) {
-        cnt++;
-        if (cnt == 10)
-            exit(1);
-      continue;
+      return tree_it<T>(root, traversal_stack);
     }
     // seek subtree where search key is "lesser than or equal" the subtree partial key
     inner_node<T> *cur_inner_node = static_cast<inner_node<T> *>(cur_node);
@@ -300,6 +298,13 @@ template <class T> typename tree_it<T>::value_type tree_it<T>::operator*() {
   assert(get_node()->is_leaf());
   return static_cast<leaf_node<T> *>(get_node())->value_;
 }
+
+
+template <class T> typename tree_it<T>::value_type& tree_it<T>::ref() {
+  assert(get_node()->is_leaf());
+  return static_cast<leaf_node<T> *>(get_node())->value_;
+}
+
 
 template <class T> typename tree_it<T>::pointer tree_it<T>::operator->() {
   assert(get_node()->is_leaf());
@@ -365,7 +370,7 @@ int tree_it<T>::get_key_len() const {
 
 template <class T>
 const std::string tree_it<T>::key() const {
-  std::string str(get_depth() + get_node()->prefix_len_ - 1, 0);
+  std::string str(get_depth() + get_node()->prefix_len_, 0);
   key(str.begin());
   return str;
 }
