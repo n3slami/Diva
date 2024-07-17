@@ -56,7 +56,7 @@ public:
   static tree_it<T> greater_equal(node<T> *root, const char *key);
   static tree_it<T> greater_equal(node<T> *root, const char *key, const uint32_t key_len);
 
-  using iterator_category = std::forward_iterator_tag;
+  using iterator_category = std::bidirectional_iterator_tag;
   using value_type = T;
   using difference_type = int;
   using pointer = value_type *;

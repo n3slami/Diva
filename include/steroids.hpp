@@ -40,6 +40,9 @@ public:
     }
 
     void Insert(const char *key, const uint32_t key_len);
+    bool RangeQuery(const char *l_key, const uint32_t l_key_len, const char *r_key, const uint32_t r_key_len);
+    bool PointQuery(const char *key, const uint32_t key_len);
+    void ShrinkInfixSize(const uint32_t new_infix_size);
 
 private:
     static const uint32_t infix_store_target_size = 512;
@@ -49,18 +52,19 @@ private:
     static const uint32_t size_scalar_count = 50;
 
     struct InfixStore {
-        static constexpr uint32_t elem_count_bit_count = 12;
+        static const uint32_t size_grade_bit_count = 8;
+        static const uint32_t elem_count_bit_count = 20;
 
-        uint16_t size_grade_elem_count = 0;
+        uint32_t status = 0;
         uint64_t *ptr = nullptr;
 
-        InfixStore(const uint32_t slot_count, const uint32_t slot_size, const uint32_t size_grade=0): 
-                                            size_grade_elem_count(size_grade << elem_count_bit_count) {
+        InfixStore(const uint32_t slot_count, const uint32_t slot_size, const uint32_t size_grade=0) {
+            SetSizeGrade(size_grade);
             const uint32_t word_count = GetPtrWordCount(slot_count, slot_size);
             ptr = new uint64_t[word_count];
             memset(ptr, 0, sizeof(uint64_t) * word_count);
         }
-        InfixStore(uint64_t *ptr): size_grade_elem_count(0), ptr(ptr) {};
+        InfixStore(uint64_t *ptr): status(0), ptr(ptr) {};
         InfixStore() = default;
         InfixStore(const InfixStore &other) = default;
         InfixStore(InfixStore &&other) = default;
@@ -74,9 +78,51 @@ private:
         static uint32_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size) {
             return Steroids::infix_store_target_size + (slot_count * (slot_size + 1) + 63) / 64;
         }
+
+        inline uint32_t GetElemCount() const {
+            return status & BITMASK(elem_count_bit_count);
+        }
+
+        inline void SetElemCount(const int32_t elem_count) {
+            status &= ~BITMASK(elem_count_bit_count);
+            status |= elem_count;
+        }
+
+        inline void UpdateElemCount(const int32_t delta) {
+            status += delta;
+        }
+
+        inline uint32_t GetSizeGrade() const {
+            return (status >> elem_count_bit_count) & BITMASK(size_grade_bit_count);
+        }
+
+        inline void SetSizeGrade(const uint32_t size_grade) {
+            status &= ~(BITMASK(size_grade_bit_count) << elem_count_bit_count);
+            status |= size_grade << elem_count_bit_count;
+        }
+
+        inline uint32_t GetInvalidBits() const {
+            return status >> (elem_count_bit_count + size_grade_bit_count) & 7U;
+        }
+
+        inline void SetInvalidBits(const uint32_t invalid_bits) {
+            status &= ~(7U << (elem_count_bit_count + size_grade_bit_count));
+            status |= invalid_bits << (elem_count_bit_count + size_grade_bit_count);
+        }
+
+        inline bool IsPartialKey() const {
+            return status >> 31;
+        }
+
+        inline void SetPartialKey(bool val) {
+            if (val)
+                status |= (1U << 31);
+            else 
+                status &= ~(1U << 31);
+        }
     };
 
-    const uint32_t infix_size_;
+    uint32_t infix_size_;
     art::art<InfixStore> tree_;
     std::mt19937 rng_;
     std::string zero_padding;
@@ -85,38 +131,43 @@ private:
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
 
     inline void AddTreeKey(const char *key, const uint32_t key_len);
-    inline void AddTreeKeySplitInfixStore(const char *key, const uint32_t key_len);
+    inline void InsertSplitInfixStore(const char *key, const uint32_t key_len);
     inline void SetupScaleFactors();
     inline std::tuple<uint32_t, uint32_t> GetSharedIgnoreLengths(const char *key_1, const char *key_2,
                                                                  const uint32_t key_len);
     inline uint64_t ExtractPartialKey(const char *key, const uint32_t shared,
                                       const uint32_t ignore, const uint64_t msb);
 
-    inline uint32_t RankOccupieds(const InfixStore &store, const uint32_t pos);
-    inline uint32_t SelectRunends(const InfixStore &store, const uint32_t rank);
-    inline int32_t NextRunend(const InfixStore &store, const uint32_t pos);
-    inline int32_t NextOccupied(const InfixStore &store, const uint32_t pos);
-    inline int32_t PreviousRunend(const InfixStore &store, const uint32_t pos);
+    inline uint32_t RankOccupieds(const InfixStore &store, const uint32_t pos) const;
+    inline uint32_t SelectRunends(const InfixStore &store, const uint32_t rank) const;
+    inline int32_t NextRunend(const InfixStore &store, const uint32_t pos) const;
+    inline int32_t NextOccupied(const InfixStore &store, const uint32_t pos) const;
+    inline int32_t PreviousRunend(const InfixStore &store, const uint32_t pos) const;
 
-    inline uint64_t GetSlot(const InfixStore &store, const uint32_t pos);
-    inline void SetSlot(const InfixStore &store, const uint32_t pos, const uint64_t value);
+    inline uint64_t GetSlot(const InfixStore &store, const uint32_t pos) const;
+    inline void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value);
 
-    inline void ShiftBitmapRight(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt);
-    inline void ShiftBitmapLeft(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt);
     inline void ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
     inline void ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
     inline void ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
     inline void ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
 
-    inline int32_t FindEmptySlotAfter(InfixStore &store, const uint32_t runend_pos);
-    inline int32_t FindEmptySlotBefore(InfixStore &store, const uint32_t runend_pos);
+    inline int32_t FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const;
+    inline int32_t FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const;
     inline void InsertRawIntoInfixStore(InfixStore &store, const uint64_t key,
                                         const uint32_t total_implicit=infix_store_target_size);
+    inline bool RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
+                                     const uint32_t total_implicit=infix_store_target_size);
+    inline bool PointQueryInfixStore(InfixStore &store, const uint64_t key,
+                                     const uint32_t total_implicit=infix_store_target_size);
+    inline void ResizeInfixStore(InfixStore &store, const bool expand=true,
+                                 const uint32_t total_implicit=infix_store_target_size);
+    inline void ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size);
     inline void LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
                                      const uint32_t total_implicit=infix_store_target_size, const bool zero_out=false);
     inline InfixStore AllocateInfixStoreWithList(const uint64_t *list, const uint32_t list_len,
                                                  const uint32_t total_implicit=infix_store_target_size);
-    inline uint32_t GetInfixList(InfixStore &store, uint64_t *res);
+    inline uint32_t GetInfixList(const InfixStore &store, uint64_t *res) const;
 };
 
 
@@ -138,18 +189,24 @@ inline void Steroids::SetupScaleFactors() {
 
 void Steroids::Insert(const char *key, const uint32_t key_len) {
     if (rng_() % infix_store_target_size == 0) {
-        std::cerr << "NOT YET BUCKO" << std::endl;
-        //AddTreeKeySplitInfixStore(key, key_len);
-        //return;
+        InsertSplitInfixStore(key, key_len);
+        return;
     }
 
-    print_key(key, key_len, true);
-
     auto it = tree_.begin(key, key_len);
-    std::string next_key = it.key();
+    std::string next_key, prev_key;
+    next_key = it.key();
+    if (key_len == next_key.size() && memcmp(key, next_key.c_str(), key_len) == 0) {
+        prev_key = next_key;
+        it++;
+        next_key = it.key();
+        it--;
+    }
+    else {
+        it--;
+        prev_key = it.key();
+    }
     InfixStore &infix_store = it.ref();
-    it--;
-    std::string prev_key = it.key();
 
     next_key += zero_padding;
     prev_key += zero_padding;
@@ -158,8 +215,9 @@ void Steroids::Insert(const char *key, const uint32_t key_len) {
 
     const uint32_t padded_key_len = std::max(max_len, key_len);
     char padded_key[padded_key_len];
-    memcpy(padded_key, key, key_len);
-    memset(padded_key + key_len, 0, padded_key_len - key_len);
+    memcpy(padded_key, key, std::min(padded_key_len, key_len));
+    if (key_len < padded_key_len)
+        memset(padded_key + key_len, 0, padded_key_len - key_len);
 
     const uint64_t extraction = ExtractPartialKey(padded_key, shared, ignore, get_string_kth_bit(padded_key, shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key.c_str(), shared, ignore, 1) >> infix_size_;
@@ -167,6 +225,70 @@ void Steroids::Insert(const char *key, const uint32_t key_len) {
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t insertee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
     InsertRawIntoInfixStore(infix_store, insertee, total_implicit);
+}
+
+
+bool Steroids::RangeQuery(const char *l_key, const uint32_t l_key_len, const char *r_key, const uint32_t r_key_len) {
+    auto it = tree_.begin(l_key, l_key_len);
+    const std::string next_key = it.key();
+    const int32_t cmp_result = memcmp(next_key.c_str(), r_key, std::min(static_cast<uint32_t>(next_key.size()), r_key_len));
+    if (cmp_result < 0 || (cmp_result == 0 && next_key.size() < r_key_len))
+        return true;
+    it--;
+    const std::string prev_key = it.key();
+    const std::string padded_next_key = next_key + zero_padding;
+    const std::string padded_prev_key = prev_key + zero_padding;
+    InfixStore &infix_store = it.ref();
+
+    const uint32_t max_len = std::max(prev_key.size(), next_key.size());
+    auto [shared, ignore] = GetSharedIgnoreLengths(padded_prev_key.c_str(), padded_next_key.c_str(), max_len);
+
+    const uint32_t padded_key_len = max_len + 8;
+    char l_padded_key[padded_key_len], r_padded_key[padded_key_len];
+    memcpy(l_padded_key, l_key, std::min(padded_key_len, l_key_len));
+    if (l_key_len < padded_key_len)
+        memset(l_padded_key + l_key_len, 0, padded_key_len - l_key_len);
+    memcpy(r_padded_key, r_key, std::min(padded_key_len, r_key_len));
+    if (r_key_len < padded_key_len)
+        memset(r_padded_key + r_key_len, 0, padded_key_len - r_key_len);
+
+    const uint64_t l_extraction = ExtractPartialKey(l_padded_key, shared, ignore, get_string_kth_bit(l_padded_key, shared));
+    const uint64_t r_extraction = ExtractPartialKey(r_padded_key, shared, ignore, get_string_kth_bit(r_padded_key, shared));
+    const uint64_t next_implicit = ExtractPartialKey(next_key.c_str(), shared, ignore, 1) >> infix_size_;
+    const uint64_t prev_implicit = ExtractPartialKey(prev_key.c_str(), shared, ignore, 0) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    const uint64_t l_val = ((l_extraction | 1ULL) - (prev_implicit << infix_size_));
+    const uint64_t r_val = ((l_extraction | 1ULL) - (prev_implicit << infix_size_));
+    return RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+}
+
+
+bool Steroids::PointQuery(const char *key, const uint32_t key_len) {
+    auto it = tree_.begin(key, key_len);
+    const std::string next_key = it.key();
+    if (key_len == next_key.size() && memcmp(key, next_key.c_str(), key_len) == 0)
+        return true;
+    it--;
+    const std::string prev_key = it.key();
+    const std::string padded_next_key = next_key + zero_padding;
+    const std::string padded_prev_key = prev_key + zero_padding;
+    InfixStore &infix_store = it.ref();
+
+    const uint32_t max_len = std::max(prev_key.size(), next_key.size());
+    auto [shared, ignore] = GetSharedIgnoreLengths(padded_prev_key.c_str(), padded_next_key.c_str(), max_len);
+
+    const uint32_t padded_key_len = max_len + 8;
+    char padded_key[padded_key_len];
+    memcpy(padded_key, key, std::min(padded_key_len, key_len));
+    if (key_len < padded_key_len)
+        memset(padded_key + key_len, 0, padded_key_len - key_len);
+
+    const uint64_t extraction = ExtractPartialKey(padded_key, shared, ignore, get_string_kth_bit(padded_key, shared));
+    const uint64_t next_implicit = ExtractPartialKey(next_key.c_str(), shared, ignore, 1) >> infix_size_;
+    const uint64_t prev_implicit = ExtractPartialKey(prev_key.c_str(), shared, ignore, 0) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    const uint64_t query_key = (extraction - (prev_implicit << infix_size_));
+    return PointQueryInfixStore(infix_store, query_key, total_implicit);
 }
 
 
@@ -179,41 +301,69 @@ inline void Steroids::AddTreeKey(const char *key, const uint32_t key_len) {
 }
 
 
-inline void Steroids::AddTreeKeySplitInfixStore(const char *key, const uint32_t key_len) {
+inline void Steroids::InsertSplitInfixStore(const char *key, const uint32_t key_len) {
     auto it = tree_.begin(key, key_len);
-    const std::string next_key = it.key();
-    InfixStore &infix_store = it.ref();
-    it--;
+    std::string next_key, prev_key;
+    next_key = it.key();
+    std::cerr << "WAAAAAAAAAAH next_key=";
+    print_key(next_key.c_str(), next_key.size(), true);
+    if (key_len == next_key.size() && memcmp(key, next_key.c_str(), key_len) == 0) {
+        std::cerr << "A" << std::endl;
+        prev_key = next_key;
+        it++;
+        next_key = it.key();
+        it--;
+    }
+    else {
+        std::cerr << "B" << std::endl;
+        it--;
+        prev_key = it.key();
+    }
     const std::string padded_next_key = next_key + zero_padding;
-    const std::string padded_prev_key = it.key() + zero_padding;
+    const std::string padded_prev_key = prev_key + zero_padding;
+    InfixStore &infix_store = it.ref();
 
     const uint32_t max_len = std::max(padded_prev_key.size(), padded_next_key.size());
     auto [shared, ignore] = GetSharedIgnoreLengths(padded_prev_key.c_str(), padded_next_key.c_str(), max_len);
+    std::cerr << "shared=" << shared << " ignore=" << ignore << std::endl;
     const uint32_t real_diff_pos = shared + ignore;
 
     const uint32_t padded_key_len = std::max(max_len, key_len);
     char padded_key[padded_key_len];
-    memcpy(padded_key, key, key_len);
-    memset(padded_key + key_len, 0, padded_key_len - key_len);
+    memcpy(padded_key, key, std::min(padded_key_len, key_len));
+    if (key_len < padded_key_len)
+        memset(padded_key + key_len, 0, padded_key_len - key_len);
     uint64_t extraction = ExtractPartialKey(padded_key, shared, ignore, get_string_kth_bit(padded_key, shared));
     uint64_t prev_extraction = ExtractPartialKey(padded_prev_key.c_str(), shared, ignore, 0);
     uint64_t next_extraction = ExtractPartialKey(padded_next_key.c_str(), shared, ignore, 1);
     const uint64_t separator = (extraction | 1ULL) - (prev_extraction & (BITMASK(implicit_size) << infix_size_));
 
-    uint64_t infix_list[(infix_store.size_grade_elem_count & BITMASK(InfixStore::elem_count_bit_count)) + 1];
+    uint64_t infix_list[infix_store.GetElemCount() + 1];
     const uint32_t infix_count = GetInfixList(infix_store, infix_list);
-    uint64_t separated_list[infix_count + 1];
-    uint32_t separated_ind = 0;
-    for (int32_t i = 0; i < infix_count; i++) {
-        const bool cond = infix_list[i] - (infix_list[i] & (-infix_list[i])) < separator - 1;
-        if (cond)
-            separated_list[separated_ind++] = infix_list[i];
+    int32_t sep_l = -1, sep_r = infix_count, sep_mid;
+    while (sep_r - sep_l > 1) {
+        sep_mid = (sep_l + sep_r) / 2;
+        std::cerr << "sep_l=" << sep_l << " sep_r=" << sep_r << " sep_mid=" << sep_mid << " --- " << infix_list[sep_mid] << " vs. separator=" << separator << std::endl;
+        const uint64_t val = infix_list[sep_mid] - (infix_list[sep_mid] & (-infix_list[sep_mid]));
+        if (val < separator - 1)
+            sep_l = sep_mid;
+        else
+            sep_r = sep_mid;
     }
-    const uint32_t split_pos = separated_ind;
-    for (int32_t i = 0; i < infix_count; i++) {
-        const bool cond = infix_list[i] - (infix_list[i] & (-infix_list[i])) < separator - 1;
-        if (!cond)
-            separated_list[separated_ind++] = infix_list[i];
+    uint32_t split_pos = sep_r;
+    bool intersecting_range = false;
+    int32_t zero_pos = -1;
+    for (int32_t i = split_pos; i >= 0; i--) {
+        const uint64_t mask = ((infix_list[i] & (-infix_list[i])) << 1) - 1;
+        if ((infix_list[i] | mask) != (separator | mask))
+            break;
+        split_pos = i;
+        zero_pos = shared + ignore + implicit_size + infix_size_ - lowbit_pos(infix_list[i]) - 1;
+    }
+    std::cerr << "ZEEEEEEEEROOOOOOOOOOOOOOOO zero_pos=" << zero_pos << std::endl;
+    if (zero_pos != -1) {
+        padded_key[zero_pos / 8] &= ~BITMASK(7 - zero_pos % 8);
+        memset(padded_key + zero_pos / 8 + 1, 0, padded_key_len - zero_pos / 8 - 1);
     }
 
     const uint32_t shared_word_byte = (shared / 64) * 8;
@@ -221,28 +371,32 @@ inline void Steroids::AddTreeKeySplitInfixStore(const char *key, const uint32_t 
                                                          padded_key + shared_word_byte,
                                                          padded_key_len);
     shared_lt += shared_word_byte * 8;
+    std::cerr << "shared_lt=" << shared_lt << " ignore_lt=" << ignore_lt << std::endl;
     auto [shared_gt, ignore_gt] = GetSharedIgnoreLengths(padded_key + shared_word_byte,
                                                          padded_next_key.c_str() + shared_word_byte,
                                                          padded_key_len);
     shared_gt += shared_word_byte * 8;
+    std::cerr << "shared_gt=" << shared_gt << " ignore_gt=" << ignore_gt << std::endl;
     
     const int32_t shamt_lt = shared_lt + ignore_lt - shared - ignore;
+    std::cerr << "shared_lt=" << shared_lt << " ignore_lt=" << ignore_lt << " --- shamt_lt=" << shamt_lt << std::endl;
     for (int32_t i = 0; i < split_pos; i++) {
         const uint64_t delta = prev_extraction & (BITMASK(shamt_lt) << (infix_size_ - shamt_lt));
-        const int32_t infix_len = infix_size_ - lowbit_pos(separated_list[i]);
+        const int32_t infix_len = infix_size_ - lowbit_pos(infix_list[i]);
         assert(infix_len - shamt_lt > 0);
-        separated_list[i] -= delta;
-        separated_list[i] <<= shamt_lt;
+        infix_list[i] -= delta;
+        infix_list[i] <<= shamt_lt;
     }
 
     const int32_t shamt_gt = shared_gt + ignore_gt - shared - ignore;
+    std::cerr << "shared_gt=" << shared_gt << " ignore_gt=" << ignore_gt << " --- shamt_gt=" << shamt_gt << std::endl;
     for (int32_t i = split_pos; i < infix_count; i++) {
-        const int32_t infix_len = infix_size_ - lowbit_pos(separated_list[i]);
+        const int32_t infix_len = infix_size_ - lowbit_pos(infix_list[i]);
         assert(infix_len - shamt_gt > 0);
-        separated_list[i] += prev_extraction & (BITMASK(implicit_size) << infix_size_);
-        separated_list[i] -= extraction & (BITMASK(implicit_size) << infix_size_);
-        separated_list[i] -= extraction & (BITMASK(shamt_gt) << (infix_size_ - shamt_gt));
-        separated_list[i] <<= shamt_gt;
+        infix_list[i] += prev_extraction & (BITMASK(implicit_size) << infix_size_);
+        infix_list[i] -= extraction & (BITMASK(implicit_size) << infix_size_);
+        infix_list[i] -= extraction & (BITMASK(shamt_gt) << (infix_size_ - shamt_gt));
+        infix_list[i] <<= shamt_gt;
     }
 
     extraction = ExtractPartialKey(padded_key, shared_lt, ignore_lt, get_string_kth_bit(padded_key, shared_lt));
@@ -253,10 +407,27 @@ inline void Steroids::AddTreeKeySplitInfixStore(const char *key, const uint32_t 
     next_extraction = ExtractPartialKey(padded_next_key.c_str(), shared_gt, ignore_gt, 1);
     const uint32_t total_implicit_gt = (next_extraction >> infix_size_) - (extraction >> infix_size_) + 1;
 
-    InfixStore store_lt = AllocateInfixStoreWithList(separated_list, split_pos, total_implicit_lt);
-    InfixStore store_gt = AllocateInfixStoreWithList(separated_list + split_pos, infix_count - split_pos, total_implicit_gt);
-    tree_.set(next_key.c_str(), next_key.size(), store_gt);
-    tree_.set(key, key_len, store_lt);
+    InfixStore store_lt = AllocateInfixStoreWithList(infix_list,
+                                                     split_pos,
+                                                     total_implicit_lt);
+    store_lt.SetInvalidBits(infix_store.GetInvalidBits());
+    store_lt.SetPartialKey(infix_store.IsPartialKey());
+    InfixStore store_gt = AllocateInfixStoreWithList(infix_list + split_pos + (zero_pos != -1),
+                                                     infix_count - split_pos - (zero_pos != -1),
+                                                     total_implicit_gt);
+    std::cerr << "SETTING TREE prev_key=";
+    print_key(prev_key.c_str(), prev_key.size());
+    tree_.set(prev_key.c_str(), prev_key.size(), store_lt);
+    std::cerr << "SETTING TREE padded_key=";
+    print_key(padded_key, (zero_pos + 7) / 8);
+    if (zero_pos != -1) {
+        InsertRawIntoInfixStore(store_gt, (extraction & BITMASK(infix_size_)) | 1, total_implicit_gt);
+        store_gt.SetInvalidBits(7 - zero_pos % 8);
+        store_gt.SetPartialKey(true);
+        tree_.set(padded_key, (zero_pos + 7) / 8, store_gt);
+    }
+    else
+        tree_.set(padded_key, key_len, store_gt);
 }
 
 
@@ -285,6 +456,18 @@ Steroids::GetSharedIgnoreLengths(const char *key_1, const char *key_2, const uin
 }
 
 
+void Steroids::ShrinkInfixSize(const uint32_t new_infix_size) {
+    auto it = tree_.begin();
+    do {
+        InfixStore &store = it.ref();
+        ShrinkInfixStoreInfixSize(store, new_infix_size);
+        it++;
+    } while (it != tree_.end());
+
+    infix_size_ = new_infix_size;
+}
+
+
 __attribute__((always_inline))
 inline uint64_t Steroids::ExtractPartialKey(const char *key, const uint32_t shared,
                                             const uint32_t ignore, const uint64_t msb) {
@@ -300,7 +483,7 @@ inline uint64_t Steroids::ExtractPartialKey(const char *key, const uint32_t shar
 
 
 __attribute__((always_inline))
-inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t pos) {
+inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr;
     uint32_t res = 0;
     for (int32_t i = 0; i < pos / 64; i++)
@@ -310,8 +493,8 @@ inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t 
 
 
 __attribute__((always_inline))
-inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t rank) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t rank) const {
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_words = (scaled_sizes_[size_grade] + 63) / 64;
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
     uint32_t i = 0, old_total_set_bits = 0, total_set_bits = 0;
@@ -326,20 +509,20 @@ inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t 
 
 
 __attribute__((always_inline))
-inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos) {
+inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t runends_size = scaled_sizes_[size_grade];
     int32_t res = pos + 1, lb_pos;
     do {
-        lb_pos = lowbit_pos(runends[res / 64] & (~BITMASK(res % 64 + 1)));
+        lb_pos = lowbit_pos(runends[res / 64] & (~BITMASK(res % 64)));
         res += lb_pos - res % 64;
     } while (lb_pos == 64 && res < runends_size);
     return res;
 }
 
 
-inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t pos) {
+inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr;
     int32_t res = pos + 1, lb_pos;
     do {
@@ -351,7 +534,7 @@ inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t po
 
 
 __attribute__((always_inline))
-inline int32_t Steroids::PreviousRunend(const InfixStore &store, const uint32_t pos) {
+inline int32_t Steroids::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
     int32_t res = pos, hb_pos;
     do {
@@ -364,8 +547,8 @@ inline int32_t Steroids::PreviousRunend(const InfixStore &store, const uint32_t 
 
 
 __attribute__((always_inline))
-inline uint64_t Steroids::GetSlot(const InfixStore &store, const uint32_t pos) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+inline uint64_t Steroids::GetSlot(const InfixStore &store, const uint32_t pos) const {
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
     const uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
     uint64_t value;
@@ -375,8 +558,8 @@ inline uint64_t Steroids::GetSlot(const InfixStore &store, const uint32_t pos) {
 
 
 __attribute__((always_inline))
-inline void Steroids::SetSlot(const InfixStore &store, const uint32_t pos, const uint64_t value) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
     uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
     uint64_t stamp;
@@ -384,70 +567,6 @@ inline void Steroids::SetSlot(const InfixStore &store, const uint32_t pos, const
     stamp &= ~(BITMASK(infix_size_) << (bit_pos % 8));
     stamp |= value << (bit_pos % 8);
     memcpy(ptr, &stamp, sizeof(stamp));
-}
-
-
-__attribute__((always_inline))
-inline void Steroids::ShiftBitmapRight(uint64_t *ptr, const uint32_t l, const uint32_t r,
-                                       const uint32_t shamt) {
-    const int32_t l_src_bit_pos = l;
-    int32_t r_src_bit_pos = r;
-    int32_t dst_bit_pos = r_src_bit_pos + shamt;
-    while (r_src_bit_pos >= l_src_bit_pos) {
-        const int32_t src_offset = r_src_bit_pos % 64;
-        const int32_t dst_offset = dst_bit_pos % 64;
-        const int32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
-                                             std::min(src_offset, dst_offset)) + 1;
-        const uint64_t move_mask = BITMASK(move_amount);
-        const uint64_t payload = (ptr[r_src_bit_pos / 64] >> (src_offset - move_amount + 1)) & move_mask;
-
-        ptr[dst_bit_pos / 64] &= ~(move_mask << (dst_offset - move_amount + 1));
-        ptr[dst_bit_pos / 64] |= payload << (dst_offset - move_amount + 1);
-
-        r_src_bit_pos -= move_amount;
-        dst_bit_pos -= move_amount;
-    }
-    
-    // Zero out shifted part
-    r_src_bit_pos = l_src_bit_pos + shamt - 1;
-    while (r_src_bit_pos >= l_src_bit_pos) {
-        const int32_t offset = r_src_bit_pos % 64;
-        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, offset) + 1;
-        ptr[r_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << (offset - erase_amount + 1));
-        r_src_bit_pos -= erase_amount;
-    }
-}
-
-
-__attribute__((always_inline))
-inline void Steroids::ShiftBitmapLeft(uint64_t *ptr, const uint32_t l, const uint32_t r,
-                                      const uint32_t shamt) {
-    int32_t l_src_bit_pos = l;
-    const int32_t r_src_bit_pos = r;
-    int32_t dst_bit_pos = l_src_bit_pos - shamt;
-    while (l_src_bit_pos <= r_src_bit_pos) {
-        const int32_t src_offset = l_src_bit_pos % 64;
-        const int32_t dst_offset = dst_bit_pos % 64;
-        const uint32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
-                                              63 - std::max(src_offset, dst_offset)) + 1;
-        const uint64_t move_mask = BITMASK(move_amount);
-        const uint64_t payload = (ptr[l_src_bit_pos / 64] >> src_offset) & move_mask;
-
-        ptr[dst_bit_pos / 64] &= ~(move_mask << dst_offset);
-        ptr[dst_bit_pos / 64] |= payload << dst_offset;
-
-        l_src_bit_pos += move_amount;
-        dst_bit_pos += move_amount;
-    }
-
-    // Zero out shifted part
-    l_src_bit_pos = r_src_bit_pos - shamt + 1;
-    while (l_src_bit_pos <= r_src_bit_pos) {
-        const int32_t offset = l_src_bit_pos % 64;
-        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, 63 - offset) + 1;
-        ptr[l_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << offset);
-        l_src_bit_pos += erase_amount;
-    }
 }
 
 
@@ -460,10 +579,10 @@ inline void Steroids::ShiftSlotsRight(const InfixStore &store, const uint32_t l,
     for (int32_t i = l; i < l + shamt; i++)
         SetSlot(store, i, 0ULL);
 #else
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t l_bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
     const uint32_t r_bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
-    ShiftBitmapRight(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
+    shift_bitmap_right(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
 #endif
 }
 
@@ -475,10 +594,10 @@ inline void Steroids::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, 
     for (int32_t i = l; i < r; i--)
         SetSlot(store, i - shamt, GetSlot(store, i));
 #else
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t l_bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
     const uint32_t r_bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
-    ShiftBitmapLeft(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
+    shift_bitmap_left(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
 #endif
 }
 
@@ -486,20 +605,20 @@ inline void Steroids::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, 
 __attribute__((always_inline))
 inline void Steroids::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
                                         const uint32_t shamt) {
-    ShiftBitmapRight(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
+    shift_bitmap_right(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
 __attribute__((always_inline))
 inline void Steroids::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
                                        const uint32_t shamt) {
-    ShiftBitmapLeft(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
+    shift_bitmap_left(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
 __attribute__((always_inline))
-inline int32_t Steroids::FindEmptySlotAfter(InfixStore &store, const uint32_t runend_pos) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+inline int32_t Steroids::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
+    const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
     while (current_pos < scaled_sizes_[size_grade] && GetSlot(store, current_pos + 1)) {
         current_pos = NextRunend(store, current_pos);
@@ -509,7 +628,7 @@ inline int32_t Steroids::FindEmptySlotAfter(InfixStore &store, const uint32_t ru
 
 
 __attribute__((always_inline))
-inline int32_t Steroids::FindEmptySlotBefore(InfixStore &store, const uint32_t runend_pos) {
+inline int32_t Steroids::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
         previous_pos = current_pos;
@@ -533,11 +652,10 @@ inline int32_t Steroids::FindEmptySlotBefore(InfixStore &store, const uint32_t r
 
 
 inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
-    const uint32_t elem_count = store.size_grade_elem_count & BITMASK(InfixStore::elem_count_bit_count);
-    if (elem_count == (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size)) {
-        std::cerr << "SHOULD EXPAND" << std::endl;
-    }
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t elem_count = store.GetElemCount();
+    if (elem_count == (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size))
+        ResizeInfixStore(store, true, total_implicit);
 
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
@@ -545,7 +663,7 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
 
     std::cerr << "INSERTING RAW implicit_part=" << implicit_part << " explicit_part=" << explicit_part << std::endl;
     std::cerr << "size_grade=" << size_grade << " size_scalar=" << size_scalars_[size_grade] << std::endl;
-    std::cerr << "total_implicit=" << total_implicit << std::endl;
+    std::cerr << "elem_count=" << elem_count << " total_implicit=" << total_implicit << std::endl;
 
     uint64_t *occupieds = store.ptr;
     uint64_t *runends = store.ptr + infix_store_target_size / 64;
@@ -567,14 +685,14 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
 
         std::cerr << "### runend_pos=" << runend_pos << " next_empty=" << next_empty << " previous_empty=" << previous_empty << std::endl;
 
-        int32_t l = std::max(PreviousRunend(store, runend_pos) + 1, previous_empty);
+        int32_t l = std::max(PreviousRunend(store, runend_pos), previous_empty);
         int32_t r = runend_pos + 1;
         int32_t mid;
         while (r - l > 1) {
             mid = (l + r) / 2;
-            uint64_t range_endpoint = GetSlot(store, mid);
-            range_endpoint |= (range_endpoint - 1);
-            if (range_endpoint <= explicit_part)
+            uint64_t range_l = GetSlot(store, mid);
+            range_l -= range_l & (-range_l);
+            if (range_l < explicit_part)
                 l = mid;
             else 
                 r = mid;
@@ -609,21 +727,158 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
         }
     }
     set_bitmap_bit(occupieds, implicit_part);
-    store.size_grade_elem_count++;
+    store.UpdateElemCount(1);
+}
+
+
+inline bool Steroids::RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
+                                           const uint32_t total_implicit) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t elem_count = store.GetElemCount();
+    if (elem_count == (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size))
+        ResizeInfixStore(store, true, total_implicit);
+
+    const uint64_t l_implicit_part = l_key >> infix_size_;
+    const uint64_t l_explicit_part = l_key & BITMASK(infix_size_);
+    const uint64_t r_implicit_part = r_key >> infix_size_;
+    const uint64_t r_explicit_part = r_key & BITMASK(infix_size_);
+    const uint64_t *occupieds = store.ptr;
+    const uint64_t *runends = store.ptr + infix_store_target_size / 64;
+
+    if (l_implicit_part < r_implicit_part) {
+        if (NextOccupied(store, l_implicit_part) < r_implicit_part)
+            return true;
+
+        if (get_bitmap_bit(occupieds, r_implicit_part)) {
+            const uint32_t r_rank = RankOccupieds(store, r_implicit_part);
+            const uint32_t runend_pos = SelectRunends(store, r_rank);
+            const uint32_t runstart_pos = std::max(r_rank ? static_cast<int32_t>(SelectRunends(store, r_rank - 1)) : -1,
+                                                   static_cast<int32_t>(FindEmptySlotBefore(store, runend_pos))) + 1;
+            const uint64_t slot_value = GetSlot(store, runstart_pos);
+            if (slot_value - (slot_value & (-slot_value)) <= r_explicit_part)
+                return true;
+        }
+        if (get_bitmap_bit(occupieds, l_implicit_part)) {
+            const uint32_t l_rank = RankOccupieds(store, l_implicit_part);
+            const uint32_t runend_pos = SelectRunends(store, l_rank);
+            uint32_t pos = runend_pos;
+            uint64_t slot_value = GetSlot(store, pos);
+            do {
+                if (l_explicit_part <= (slot_value | (slot_value - 1)))
+                    return true;
+                if (pos == 0)
+                    break;
+                slot_value = GetSlot(store, --pos);
+            } while (slot_value && !get_bitmap_bit(runends, pos));
+        }
+    }
+
+    // l_implicit_part == r_implicit_part
+    if (!get_bitmap_bit(occupieds, l_implicit_part))
+        return false;
+    const uint32_t rank = RankOccupieds(store, l_implicit_part);
+    const uint32_t runend_pos = SelectRunends(store, rank);
+    uint32_t pos = runend_pos;
+    uint64_t slot_value = GetSlot(store, pos);
+    // TODO: Faster implementation via binary search?
+    do {
+        if (l_explicit_part <= (slot_value | (slot_value - 1))
+            && (slot_value - (slot_value & (-slot_value))) <= r_explicit_part)
+            return true;
+        if (pos == 0)
+            break;
+        slot_value = GetSlot(store, --pos);
+    } while (slot_value && !get_bitmap_bit(runends, pos));
+    return false;
+}
+
+
+inline bool Steroids::PointQueryInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t elem_count = store.GetElemCount();
+    if (elem_count == (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size))
+        ResizeInfixStore(store, true, total_implicit);
+
+    const uint64_t implicit_part = key >> infix_size_;
+    const uint64_t explicit_part = key & BITMASK(infix_size_);
+    const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
+
+    const uint64_t *occupieds = store.ptr;
+    const uint64_t *runends = store.ptr + infix_store_target_size / 64;
+
+    if (!get_bitmap_bit(occupieds, implicit_part))
+        return false;
+
+    const uint32_t rank = RankOccupieds(store, implicit_part);
+    const uint32_t runend_pos = SelectRunends(store, rank);
+    uint32_t pos = runend_pos;
+    uint64_t slot_value = GetSlot(store, pos);
+    // TODO: Faster implementation via binary search?
+    do {
+        const uint64_t mask = ((slot_value & (-slot_value)) << 1) - 1;
+        if ((explicit_part | mask) == (slot_value | mask))
+            return true;
+        if (pos == 0)
+            break;
+        slot_value = GetSlot(store, --pos);
+    } while (slot_value && !get_bitmap_bit(runends, pos));
+    return false;
+}
+
+
+inline void Steroids::ResizeInfixStore(InfixStore &store, const bool expand, const uint32_t total_implicit) {
+    // TODO: Optimize further?
+    uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t infix_count = store.GetElemCount();
+    const uint32_t current_size = scaled_sizes_[size_grade];
+    const int32_t delta = expand ? 1 : -1;
+    size_grade += delta;
+    store.SetSizeGrade(size_grade);
+    const uint32_t next_size = scaled_sizes_[size_grade];
+
+    uint64_t infix_list[infix_count];
+    GetInfixList(store, infix_list);
+    delete store.ptr;
+
+    const uint32_t word_count = InfixStore::GetPtrWordCount(next_size, infix_size_);
+    store.ptr = new uint64_t[word_count];
+    LoadListToInfixStore(store, infix_list, infix_count, total_implicit, true);
+}
+
+
+inline void Steroids::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t infix_count = store.GetElemCount();
+    const uint32_t slot_count = scaled_sizes_[size_grade];
+
+    InfixStore new_store(slot_count, new_infix_size);
+    for (int32_t i = 0; i < slot_count; i++) {
+        const uint64_t old_slot = GetSlot(store, i);
+        const uint64_t new_slot = (old_slot >> (infix_size_ - new_infix_size))
+                                | (infix_size_ - lowbit_pos(old_slot) > new_infix_size ? 1ULL : 0ULL);
+        SetSlot(new_store, i, new_slot);
+    }
+    const uint64_t *old_runends = store.ptr;
+    uint64_t *new_runends = new_store.ptr;
+    for (int32_t bit_pos = 0; bit_pos < slot_count; bit_pos += 64) {
+        const uint32_t move_amount = std::min(slot_count - bit_pos, 64U);
+        new_runends[bit_pos / 64] |= old_runends[bit_pos / 64] & BITMASK(move_amount);
+    }
+    delete store.ptr;
+    store.ptr = new_store.ptr;
 }
 
 
 inline void Steroids::LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
                                            const uint32_t total_implicit, const bool zero_out) {
     const uint32_t scaled_len = (size_scalars_[0] * list_len) >> scale_shift;
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_size = scaled_sizes_[size_grade];
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
 
     if (zero_out)
         store.Reset(total_size, infix_size_);
-    store.size_grade_elem_count &= ~BITMASK(InfixStore::elem_count_bit_count);
-    store.size_grade_elem_count |= list_len;
+    store.SetElemCount(list_len);
 
     int32_t l[list_len + 1], r[list_len + 1], ind = 0;
 
@@ -641,7 +896,6 @@ inline void Steroids::LoadListToInfixStore(InfixStore &store, const uint64_t *li
                                                             >> (scale_shift + scale_implicit_shift)));
             const uint64_t baseline = (size_scalars_[size_grade] * implicit_scalar * implicit_part) 
                                                 >> (scale_shift + scale_implicit_shift);
-            std::cerr << "@ind=" << ind << " l=" << l[ind] << " vs. baseline=" << baseline << " --- implicit_part=" << implicit_part << std::endl;
             r[ind] = l[ind];
         }
         r[ind]++;
@@ -682,8 +936,8 @@ inline Steroids::InfixStore Steroids::AllocateInfixStoreWithList(const uint64_t 
 }
 
 
-inline uint32_t Steroids::GetInfixList(InfixStore &store, uint64_t *res) {
-    const uint32_t size_grade = store.size_grade_elem_count >> InfixStore::elem_count_bit_count;
+inline uint32_t Steroids::GetInfixList(const InfixStore &store, uint64_t *res) const {
+    const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t list_size = scaled_sizes_[size_grade];
     const uint64_t *occupieds = store.ptr;
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;

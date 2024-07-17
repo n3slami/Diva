@@ -250,16 +250,16 @@ public:
         uint64_t inserts[100];
 
         // Insertion and shifting of a single run
-        inserts[0] = 0b010000000001011;
-        inserts[1] = 0b010000000001101;
+        inserts[0] = 0b010000000001100;
+        inserts[1] = 0b010000000001011;
         inserts[2] = 0b010000000001110;
-        inserts[3] = 0b010000000001100;
+        inserts[3] = 0b010000000001101;
         assert(s.GetSlot(store, 269) == 0b00000);
         s.InsertRawIntoInfixStore(store, inserts[0]);
         assert(s.GetSlot(store, 269) == (inserts[0] & BITMASK(infix_size)));
-        s.InsertRawIntoInfixStore(store, inserts[3]);
-        s.InsertRawIntoInfixStore(store, inserts[1]);
         s.InsertRawIntoInfixStore(store, inserts[2]);
+        s.InsertRawIntoInfixStore(store, inserts[1]);
+        s.InsertRawIntoInfixStore(store, inserts[3]);
         for (int32_t i = 0; i < 4; i++)
             assert(s.GetSlot(store, 269 + i) == (inserts[i] & BITMASK(infix_size)));
         for (int32_t i = 269; i < 272; i++)
@@ -269,15 +269,14 @@ public:
         // Insertion and shifting of a new run that shifts an old run
         inserts[4] = 0b001111111100001;
         inserts[5] = 0b001111111100010;
-        inserts[6] = 0b001111111100011;
-        inserts[7] = 0b001111111100100;
+        inserts[6] = 0b001111111100100;
+        inserts[7] = 0b001111111100011;
         assert(s.GetSlot(store, 268) == 0b00000);
         s.InsertRawIntoInfixStore(store, inserts[4]);
         assert(s.GetSlot(store, 268) == (inserts[4] & BITMASK(infix_size)));
-        s.InsertRawIntoInfixStore(store, inserts[6]);
         s.InsertRawIntoInfixStore(store, inserts[5]);
+        s.InsertRawIntoInfixStore(store, inserts[6]);
         s.InsertRawIntoInfixStore(store, inserts[7]);
-        PrintStore(s, store);
         for (int32_t i = 268; i < 271; i++) { 
             assert(s.GetSlot(store, i) == (inserts[i - 268 + 4] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
@@ -298,8 +297,8 @@ public:
         inserts[3] = 0b000000000000011;
         s.InsertRawIntoInfixStore(store, inserts[0]);
         s.InsertRawIntoInfixStore(store, inserts[3]);
-        s.InsertRawIntoInfixStore(store, inserts[2]);
         s.InsertRawIntoInfixStore(store, inserts[1]);
+        s.InsertRawIntoInfixStore(store, inserts[2]);
         for (int32_t i = 0; i < 3; i++) {
             assert(s.GetSlot(store, i) == (inserts[i] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
@@ -337,13 +336,13 @@ public:
         inserts[4] = 0b011111111100001;
         inserts[5] = 0b011111111100001;
         inserts[6] = 0b011111111100010;
-        s.InsertRawIntoInfixStore(store, inserts[1]);
         s.InsertRawIntoInfixStore(store, inserts[0]);
-        s.InsertRawIntoInfixStore(store, inserts[2]);
-        s.InsertRawIntoInfixStore(store, inserts[3]);
-        s.InsertRawIntoInfixStore(store, inserts[6]);
         s.InsertRawIntoInfixStore(store, inserts[4]);
         s.InsertRawIntoInfixStore(store, inserts[5]);
+        s.InsertRawIntoInfixStore(store, inserts[1]);
+        s.InsertRawIntoInfixStore(store, inserts[6]);
+        s.InsertRawIntoInfixStore(store, inserts[2]);
+        s.InsertRawIntoInfixStore(store, inserts[3]);
         for (int32_t i = 531; i < 534; i++) {
             assert(s.GetSlot(store, i) == (inserts[i - 531] & BITMASK(infix_size)));
             assert(get_bitmap_bit(runends, i) == 0);
@@ -432,11 +431,13 @@ public:
     }
 
 private:
-    static void PrintStore(Steroids &s, Steroids::InfixStore &store) {
-        const uint32_t size_grade = store.size_grade_elem_count >> s.infix_size_;
+    static void PrintStore(const Steroids &s, const Steroids::InfixStore &store) {
+        const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
         const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
 
+        std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
+        std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetElemCount() << std::endl;
         std::cerr << "occupieds: ";
         for (int32_t i = 0; i < Steroids::infix_store_target_size; i++) {
             if ((store.ptr[i / 64] >> (i % 64)) & 1ULL)

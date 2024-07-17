@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <immintrin.h>
 
@@ -201,3 +202,64 @@ inline uint64_t get_string_kth_bit(const char *str, const uint32_t k) {
 	return (str[k / 8] >> (7 - k % 8)) & 1;
 };
 
+
+__attribute__((always_inline))
+inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    const int32_t l_src_bit_pos = l;
+    int32_t r_src_bit_pos = r;
+    int32_t dst_bit_pos = r_src_bit_pos + shamt;
+    while (r_src_bit_pos >= l_src_bit_pos) {
+        const int32_t src_offset = r_src_bit_pos % 64;
+        const int32_t dst_offset = dst_bit_pos % 64;
+        const int32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
+                                             std::min(src_offset, dst_offset)) + 1;
+        const uint64_t move_mask = BITMASK(move_amount);
+        const uint64_t payload = (ptr[r_src_bit_pos / 64] >> (src_offset - move_amount + 1)) & move_mask;
+
+        ptr[dst_bit_pos / 64] &= ~(move_mask << (dst_offset - move_amount + 1));
+        ptr[dst_bit_pos / 64] |= payload << (dst_offset - move_amount + 1);
+
+        r_src_bit_pos -= move_amount;
+        dst_bit_pos -= move_amount;
+    }
+    
+    // Zero out shifted part
+    r_src_bit_pos = l_src_bit_pos + shamt - 1;
+    while (r_src_bit_pos >= l_src_bit_pos) {
+        const int32_t offset = r_src_bit_pos % 64;
+        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, offset) + 1;
+        ptr[r_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << (offset - erase_amount + 1));
+        r_src_bit_pos -= erase_amount;
+    }
+}
+
+
+__attribute__((always_inline))
+inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    int32_t l_src_bit_pos = l;
+    const int32_t r_src_bit_pos = r;
+    int32_t dst_bit_pos = l_src_bit_pos - shamt;
+    while (l_src_bit_pos <= r_src_bit_pos) {
+        const int32_t src_offset = l_src_bit_pos % 64;
+        const int32_t dst_offset = dst_bit_pos % 64;
+        const uint32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
+                                              63 - std::max(src_offset, dst_offset)) + 1;
+        const uint64_t move_mask = BITMASK(move_amount);
+        const uint64_t payload = (ptr[l_src_bit_pos / 64] >> src_offset) & move_mask;
+
+        ptr[dst_bit_pos / 64] &= ~(move_mask << dst_offset);
+        ptr[dst_bit_pos / 64] |= payload << dst_offset;
+
+        l_src_bit_pos += move_amount;
+        dst_bit_pos += move_amount;
+    }
+
+    // Zero out shifted part
+    l_src_bit_pos = r_src_bit_pos - shamt + 1;
+    while (l_src_bit_pos <= r_src_bit_pos) {
+        const int32_t offset = l_src_bit_pos % 64;
+        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, 63 - offset) + 1;
+        ptr[l_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << offset);
+        l_src_bit_pos += erase_amount;
+    }
+}
