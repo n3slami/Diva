@@ -33,6 +33,8 @@ target_link_libraries(SteroidsLib PRIVATE ArtLib)
 
 
 if (BUILD_TESTS)
+    # enable testing 
+    include(CTest)
     message(STATUS "Building tests")
     add_subdirectory(tests)
 endif ()

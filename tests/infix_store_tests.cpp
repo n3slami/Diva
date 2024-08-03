@@ -1,14 +1,23 @@
+/**
+ * @file art tests
+ * @author ---
+ *
+ * @author Rafael Kallis <rk@rafaelkallis.com>
+ */
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include "doctest.h"
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
-#include <assert.h>
 #include <string>
 
 #include "steroids.hpp"
 #include "util.hpp"
 
-const std::string ansi_green = "\033[0;32m";
-const std::string ansi_white = "\033[0;97m";
+const char ansi_green[] = "\033[0;32m";
+const char ansi_white[] = "\033[0;97m";
 
 class InfixStoreTests {
 public:
@@ -21,9 +30,7 @@ public:
 
         const uint32_t total_words = (Steroids::infix_store_target_size + (s.infix_size_ + 1) * s.scaled_sizes_[0] + 63) / 64;
         for (int32_t i = 0; i < total_words; i++)
-            assert(store.ptr[i] == 0);
-
-        //PrintStore(s, store);
+            REQUIRE_EQ(store.ptr[i], 0);
     }
 
 
@@ -38,106 +45,111 @@ public:
         for (int32_t i = 0; i < total_slots; i++)
             s.SetSlot(store, i, i & BITMASK(s.infix_size_));
         for (int32_t i = 0; i < total_slots; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+            REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
 
-        // ==== Right Shifting ====
-        // Short Segment + Short Shift
-        s.ShiftSlotsRight(store, 2, 4, 2);
-        assert(s.GetSlot(store, 0) == 0);
-        assert(s.GetSlot(store, 1) == 1);
-        assert(s.GetSlot(store, 2) == 0);
-        assert(s.GetSlot(store, 3) == 0);
-        assert(s.GetSlot(store, 4) == 2);
-        assert(s.GetSlot(store, 5) == 3);
-        for (int32_t i = 6; i < total_slots; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
-        
-        // Long Segment + Short Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsRight(store, 1, 100, 2);
-        assert(s.GetSlot(store, 0) == 0);
-        assert(s.GetSlot(store, 1) == 0);
-        assert(s.GetSlot(store, 2) == 0);
-        for (int32_t i = 1; i < 100; i++)
-            assert(s.GetSlot(store, 2 + i) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 102; i < total_slots; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("right shifting: short segment + short shift") {
+            s.ShiftSlotsRight(store, 2, 4, 2);
+            REQUIRE_EQ(s.GetSlot(store, 0), 0);
+            REQUIRE_EQ(s.GetSlot(store, 1), 1);
+            REQUIRE_EQ(s.GetSlot(store, 2), 0);
+            REQUIRE_EQ(s.GetSlot(store, 3), 0);
+            REQUIRE_EQ(s.GetSlot(store, 4), 2);
+            REQUIRE_EQ(s.GetSlot(store, 5), 3);
+            for (int32_t i = 6; i < total_slots; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // Short Segment + Long Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsRight(store, 3, 7, 150);
-        assert(s.GetSlot(store, 0) == 0);
-        assert(s.GetSlot(store, 1) == 1);
-        assert(s.GetSlot(store, 2) == 2);
-        for (int32_t i = 3; i < 153; i++)
-            assert(s.GetSlot(store, i) == 0);
-        assert(s.GetSlot(store, 153) == 3);
-        assert(s.GetSlot(store, 154) == 4);
-        assert(s.GetSlot(store, 155) == 5);
-        assert(s.GetSlot(store, 156) == 6);
-        for (int32_t i = 157; i < total_slots; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("right shifting: long segment + short shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsRight(store, 1, 100, 2);
+            for (int32_t i = 0; i < 3; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), 0);
+            for (int32_t i = 1; i < 100; i++)
+                REQUIRE_EQ(s.GetSlot(store, 2 + i), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 102; i < total_slots; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // Long Segment + Long Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsRight(store, 0, 110, 200);
-        for (int32_t i = 0; i < 200; i++)
-            assert(s.GetSlot(store, i) == 0);
-        for (int32_t i = 0; i < 110; i++)
-            assert(s.GetSlot(store, i + 200) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 310; i < total_slots; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("right shifting: short segment + long shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsRight(store, 3, 7, 150);
+            REQUIRE_EQ(s.GetSlot(store, 0), 0);
+            REQUIRE_EQ(s.GetSlot(store, 1), 1);
+            REQUIRE_EQ(s.GetSlot(store, 2), 2);
+            for (int32_t i = 3; i < 153; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), 0);
+            REQUIRE_EQ(s.GetSlot(store, 153), 3);
+            REQUIRE_EQ(s.GetSlot(store, 154), 4);
+            REQUIRE_EQ(s.GetSlot(store, 155), 5);
+            REQUIRE_EQ(s.GetSlot(store, 156), 6);
+            for (int32_t i = 157; i < total_slots; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // ==== Left Shifting ====
-        // Short Segment + Short Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsLeft(store, total_slots - 10, total_slots, 2);
-        assert(s.GetSlot(store, total_slots - 1) == 0);
-        assert(s.GetSlot(store, total_slots - 2) == 0);
-        for (int32_t i = total_slots - 10; i < total_slots; i++)
-            assert(s.GetSlot(store, i - 2) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 0; i < total_slots - 12; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("right shifting: long segment + long shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsRight(store, 0, 110, 200);
+            for (int32_t i = 0; i < 200; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), 0);
+            for (int32_t i = 0; i < 110; i++)
+                REQUIRE_EQ(s.GetSlot(store, i + 200), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 310; i < total_slots; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // Short Segment + Long Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsLeft(store, total_slots - 15, total_slots - 2, 210);
-        assert(s.GetSlot(store, total_slots - 1) == ((total_slots - 1) & BITMASK(s.infix_size_)));
-        assert(s.GetSlot(store, total_slots - 2) == ((total_slots - 2) & BITMASK(s.infix_size_)));
-        for (int32_t i = total_slots - 212; i < total_slots - 2; i++)
-            assert(s.GetSlot(store, i) == 0);
-        for (int32_t i = total_slots - 15; i < total_slots - 2; i++)
-            assert(s.GetSlot(store, i - 210) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 0; i < total_slots - 225; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("left shifting: short segment + short shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsLeft(store, total_slots - 10, total_slots, 2);
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 1), 0);
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 2), 0);
+            for (int32_t i = total_slots - 10; i < total_slots; i++)
+                REQUIRE_EQ(s.GetSlot(store, i - 2), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 0; i < total_slots - 12; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // Long Segment + Short Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsLeft(store, total_slots - 250, total_slots - 1, 1);
-        assert(s.GetSlot(store, total_slots - 1) == ((total_slots - 1) & BITMASK(s.infix_size_)));
-        assert(s.GetSlot(store, total_slots - 2) == 0);
-        for (int32_t i = total_slots - 250; i < total_slots - 1; i++)
-            assert(s.GetSlot(store, i - 1) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 0; i < total_slots - 251; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("left shifting: short segment + long shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsLeft(store, total_slots - 15, total_slots - 2, 210);
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 1), ((total_slots - 1) & BITMASK(s.infix_size_)));
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 2), ((total_slots - 2) & BITMASK(s.infix_size_)));
+            for (int32_t i = total_slots - 212; i < total_slots - 2; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), 0);
+            for (int32_t i = total_slots - 15; i < total_slots - 2; i++)
+                REQUIRE_EQ(s.GetSlot(store, i - 210), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 0; i < total_slots - 225; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
 
-        // Long Segment + Long Shift
-        for (int32_t i = 0; i < total_slots; i++)
-            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
-        s.ShiftSlotsLeft(store, total_slots - 100, total_slots - 1, 200);
-        assert(s.GetSlot(store, total_slots - 1) == ((total_slots - 1) & BITMASK(s.infix_size_)));
-        for (int32_t i = total_slots - 201; i < total_slots - 1; i++)
-            assert(s.GetSlot(store, i) == 0);
-        for (int32_t i = total_slots - 100; i < total_slots - 1; i++)
-            assert(s.GetSlot(store, i - 200) == (i & BITMASK(s.infix_size_)));
-        for (int32_t i = 0; i < total_slots - 300; i++)
-            assert(s.GetSlot(store, i) == (i & BITMASK(s.infix_size_)));
+        SUBCASE("left shifting: long segment + short shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsLeft(store, total_slots - 250, total_slots - 1, 1);
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 1), ((total_slots - 1) & BITMASK(s.infix_size_)));
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 2), 0);
+            for (int32_t i = total_slots - 250; i < total_slots - 1; i++)
+                REQUIRE_EQ(s.GetSlot(store, i - 1), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 0; i < total_slots - 251; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
+
+        SUBCASE("left shifting: long segment + long shift") {
+            for (int32_t i = 0; i < total_slots; i++)
+                s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            s.ShiftSlotsLeft(store, total_slots - 100, total_slots - 1, 200);
+            REQUIRE_EQ(s.GetSlot(store, total_slots - 1), ((total_slots - 1) & BITMASK(s.infix_size_)));
+            for (int32_t i = total_slots - 201; i < total_slots - 1; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), 0);
+            for (int32_t i = total_slots - 100; i < total_slots - 1; i++)
+                REQUIRE_EQ(s.GetSlot(store, i - 200), (i & BITMASK(s.infix_size_)));
+            for (int32_t i = 0; i < total_slots - 300; i++)
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+        }
     }
 
 
@@ -149,95 +161,74 @@ public:
         Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
-        // ==== Right Shifting ====
-        // Short Segment + Short Shift
         runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
         runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
         runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
         runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsRight(store, 62, 65, 5);
-        assert(runends[0] == 0b0000100010001000100010001000100010001000100010001000100010001000);
-        assert(runends[1] == 0b0101010101010101010101010101010101010101010101010101010101110000);
-        assert(runends[2] == 0b1010101010101010101010101010101010101010101010101010101010101010);
-        assert(runends[3] == 0b1111111111111111111111111111111100000000000000000000000000000000);
 
-        // Short Segment + Long Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsRight(store, 60, 64, 125);
-        assert(runends[0] == 0b0000100010001000100010001000100010001000100010001000100010001000);
-        assert(runends[1] == 0b0000000000000000000000000000000000000000000000000000000000000000);
-        assert(runends[2] == 0b1011000000000000000000000000000000000000000000000000000000000000);
-        assert(runends[3] == 0b1111111111111111111111111111111100000000000000000000000000000000);
+        SUBCASE("right shifting: short segment + short shift") {
+            s.ShiftRunendsRight(store, 62, 65, 5);
+            REQUIRE_EQ(runends[0], 0b0000100010001000100010001000100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[1], 0b0101010101010101010101010101010101010101010101010101010101110000);
+            REQUIRE_EQ(runends[2], 0b1010101010101010101010101010101010101010101010101010101010101010);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111111100000000000000000000000000000000);
+        }
 
-        // Long Segment + Short Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsRight(store, 1, 123, 3);
-        assert(runends[0] == 0b0100010001000100010001000100010001000100010001000100010001000000);
-        assert(runends[1] == 0b0110101010101010101010101010101010101010101010101010101010101100);
-        assert(runends[2] == 0b1010101010101010101010101010101010101010101010101010101010101010);
-        assert(runends[3] == 0b1111111111111111111111111111111100000000000000000000000000000000);
+        SUBCASE("right shifting: short segment + long shift") {
+            s.ShiftRunendsRight(store, 60, 64, 125);
+            REQUIRE_EQ(runends[0], 0b0000100010001000100010001000100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[1], 0b0000000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[2], 0b1011000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111111100000000000000000000000000000000);
+        }
 
-        // Long Segment + Long Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsRight(store, 2, 127, 100);
-        assert(runends[0] == 0b0000000000000000000000000000000000000000000000000000000000000000);
-        assert(runends[1] == 0b1000100010001000100010001000000000000000000000000000000000000000);
-        assert(runends[2] == 0b0101010101010101010101010101100010001000100010001000100010001000);
-        assert(runends[3] == 0b1111111111111111111111111111110101010101010101010101010101010101);
+        SUBCASE("right shifting: long segment + short shift") {
+            s.ShiftRunendsRight(store, 1, 123, 3);
+            REQUIRE_EQ(runends[0], 0b0100010001000100010001000100010001000100010001000100010001000000);
+            REQUIRE_EQ(runends[1], 0b0110101010101010101010101010101010101010101010101010101010101100);
+            REQUIRE_EQ(runends[2], 0b1010101010101010101010101010101010101010101010101010101010101010);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111111100000000000000000000000000000000);
+        }
 
-        // ==== Left Shifting ====
-        // Short Segment + Short Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsLeft(store, 190, 194, 4);
-        assert(runends[0] == 0b1000100010001000100010001000100010001000100010001000100010001000);
-        assert(runends[1] == 0b0101010101010101010101010101010101010101010101010101010101010101);
-        assert(runends[2] == 0b0000101010101010101010101010101010101010101010101010101010101010);
-        assert(runends[3] == 0b1111111111111111111111111111111100000000000000000000000000000000);
+        SUBCASE("right shifting: long segment + long shift") {
+            s.ShiftRunendsRight(store, 2, 127, 100);
+            REQUIRE_EQ(runends[0], 0b0000000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[1], 0b1000100010001000100010001000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[2], 0b0101010101010101010101010101100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111110101010101010101010101010101010101);
+        }
 
-        // Short Segment + Long Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsLeft(store, 190, 194, 130);
-        assert(runends[0] == 0b0010100010001000100010001000100010001000100010001000100010001000);
-        assert(runends[1] == 0b0000000000000000000000000000000000000000000000000000000000000000);
-        assert(runends[2] == 0b0000000000000000000000000000000000000000000000000000000000000000);
-        assert(runends[3] == 0b1111111111111111111111111111111100000000000000000000000000000000);
+        SUBCASE("left shifting: short segment + short shift") {
+            s.ShiftRunendsLeft(store, 190, 194, 4);
+            REQUIRE_EQ(runends[0], 0b1000100010001000100010001000100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[1], 0b0101010101010101010101010101010101010101010101010101010101010101);
+            REQUIRE_EQ(runends[2], 0b0000101010101010101010101010101010101010101010101010101010101010);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111111100000000000000000000000000000000);
+        }
 
-        // Long Segment + Short Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsLeft(store, 120, 250, 3);
-        assert(runends[0] == 0b1000100010001000100010001000100010001000100010001000100010001000);
-        assert(runends[1] == 0b0100101010110101010101010101010101010101010101010101010101010101);
-        assert(runends[2] == 0b0001010101010101010101010101010101010101010101010101010101010101);
-        assert(runends[3] == 0b1111110001111111111111111111111111100000000000000000000000000000);
+        SUBCASE("left shifting: short segment + long shift") {
+            s.ShiftRunendsLeft(store, 190, 194, 130);
+            REQUIRE_EQ(runends[0], 0b0010100010001000100010001000100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[1], 0b0000000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[2], 0b0000000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(runends[3], 0b1111111111111111111111111111111100000000000000000000000000000000);
+        }
 
-        // Long Segment + Long Shift
-        runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
-        runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
-        runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
-        runends[3] = 0b1111111111111111111111111111111100000000000000000000000000000000;
-        s.ShiftRunendsLeft(store, 120, 250, 100);
-        assert(runends[0] == 0b1010101010101010101010101010101010100101010110001000100010001000);
-        assert(runends[1] == 0b1111000000000000000000000000000000001010101010101010101010101010);
-        assert(runends[2] == 0b0000000000000000000000000000000000000000001111111111111111111111);
-        assert(runends[3] == 0b1111110000000000000000000000000000000000000000000000000000000000);
+        SUBCASE("left shifting: long segment + short shift") {
+            s.ShiftRunendsLeft(store, 120, 250, 3);
+            REQUIRE_EQ(runends[0], 0b1000100010001000100010001000100010001000100010001000100010001000);
+            REQUIRE_EQ(runends[1], 0b0100101010110101010101010101010101010101010101010101010101010101);
+            REQUIRE_EQ(runends[2], 0b0001010101010101010101010101010101010101010101010101010101010101);
+            REQUIRE_EQ(runends[3], 0b1111110001111111111111111111111111100000000000000000000000000000);
+        }
+
+        SUBCASE("left shifting: long segment + long shift") {
+            s.ShiftRunendsLeft(store, 120, 250, 100);
+            REQUIRE_EQ(runends[0], 0b1010101010101010101010101010101010100101010110001000100010001000);
+            REQUIRE_EQ(runends[1], 0b1111000000000000000000000000000000001010101010101010101010101010);
+            REQUIRE_EQ(runends[2], 0b0000000000000000000000000000000000000000001111111111111111111111);
+            REQUIRE_EQ(runends[3], 0b1111110000000000000000000000000000000000000000000000000000000000);
+        }
     }
 
     static void TestInsertRaw() {
@@ -249,48 +240,45 @@ public:
         uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
         uint64_t inserts[100];
 
-        // Insertion and shifting of a single run
         inserts[0] = 0b010000000001100;
         inserts[1] = 0b010000000001011;
-        inserts[2] = 0b010000000001110;
-        inserts[3] = 0b010000000001101;
-        assert(s.GetSlot(store, 269) == 0b00000);
+        inserts[2] = 0b010000000001101;
+        inserts[3] = 0b010000000001110;
         s.InsertRawIntoInfixStore(store, inserts[0]);
-        assert(s.GetSlot(store, 269) == (inserts[0] & BITMASK(infix_size)));
         s.InsertRawIntoInfixStore(store, inserts[2]);
         s.InsertRawIntoInfixStore(store, inserts[1]);
         s.InsertRawIntoInfixStore(store, inserts[3]);
-        for (int32_t i = 0; i < 4; i++)
-            assert(s.GetSlot(store, 269 + i) == (inserts[i] & BITMASK(infix_size)));
-        for (int32_t i = 269; i < 272; i++)
-            assert(get_bitmap_bit(runends, i) == 0);
-        assert(get_bitmap_bit(runends, 272) == 1);
+        SUBCASE("insertion and shifting of a single run") {
+            for (int32_t i = 0; i < 4; i++)
+                REQUIRE_EQ(s.GetSlot(store, 269 + i), (inserts[i] & BITMASK(infix_size)));
+            for (int32_t i = 269; i < 272; i++)
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            REQUIRE_EQ(get_bitmap_bit(runends, 272), 1);
+        }
 
-        // Insertion and shifting of a new run that shifts an old run
         inserts[4] = 0b001111111100001;
         inserts[5] = 0b001111111100010;
         inserts[6] = 0b001111111100100;
         inserts[7] = 0b001111111100011;
-        assert(s.GetSlot(store, 268) == 0b00000);
         s.InsertRawIntoInfixStore(store, inserts[4]);
-        assert(s.GetSlot(store, 268) == (inserts[4] & BITMASK(infix_size)));
         s.InsertRawIntoInfixStore(store, inserts[5]);
         s.InsertRawIntoInfixStore(store, inserts[6]);
         s.InsertRawIntoInfixStore(store, inserts[7]);
-        for (int32_t i = 268; i < 271; i++) { 
-            assert(s.GetSlot(store, i) == (inserts[i - 268 + 4] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
+        SUBCASE("insertion and shifting of a new run that shifts an old run") {
+            for (int32_t i = 268; i < 271; i++) { 
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 268 + 4] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 271), (inserts[7] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 271), 1);
+            for (int32_t i = 272; i < 275; i++) { 
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 272] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 275), (inserts[3] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 275), 1);
         }
-        assert(s.GetSlot(store, 271) == (inserts[7] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 271) == 1);
-        for (int32_t i = 272; i < 275; i++) { 
-            assert(s.GetSlot(store, i) == (inserts[i - 272] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
-        }
-        assert(s.GetSlot(store, 275) == (inserts[3] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 275) == 1);
 
-        // Insertion and shifting at the very beginning of the array
         inserts[0] = 0b000000000000001;
         inserts[1] = 0b000000000000001;
         inserts[2] = 0b000000000000010;
@@ -299,36 +287,40 @@ public:
         s.InsertRawIntoInfixStore(store, inserts[3]);
         s.InsertRawIntoInfixStore(store, inserts[1]);
         s.InsertRawIntoInfixStore(store, inserts[2]);
-        for (int32_t i = 0; i < 3; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
+        SUBCASE("insertion and shifting at the very beginning of the array") {
+            for (int32_t i = 0; i < 3; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 3), (inserts[3] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 3), 1);
         }
-        assert(s.GetSlot(store, 3) == (inserts[3] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 3) == 1);
 
-        // Inserting new runs in between two touching runs
-        assert(s.GetSlot(store, 4) == 0b00000);
-        assert(get_bitmap_bit(runends, 4) == 0);
-        assert(s.GetSlot(store, 5) == 0b00000);
-        assert(get_bitmap_bit(runends, 5) == 0);
+        SUBCASE("inserting new runs in between two touching runs: 0 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), 0b00000);
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 0);
+            REQUIRE_EQ(s.GetSlot(store, 5), 0b00000);
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 0);
+        }
 
         inserts[5] = 0b000000001111111;
         s.InsertRawIntoInfixStore(store, inserts[5]);
-
-        assert(s.GetSlot(store, 4) == (inserts[5] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 4) == 1);
-        assert(s.GetSlot(store, 5) == 0b00000);
-        assert(get_bitmap_bit(runends, 5) == 0);
+        SUBCASE("inserting new runs in between two touching runs: 1 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), (inserts[5] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 1);
+            REQUIRE_EQ(s.GetSlot(store, 5), 0b00000);
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 0);
+        }
 
         inserts[4] = 0b000000000110101;
         s.InsertRawIntoInfixStore(store, inserts[4]);
+        SUBCASE("inserting new runs in between two touching runs: 2 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), (inserts[4] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 1);
+            REQUIRE_EQ(s.GetSlot(store, 5), (inserts[5] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 1);
+        }
 
-        assert(s.GetSlot(store, 4) == (inserts[4] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 4) == 1);
-        assert(s.GetSlot(store, 5) == (inserts[5] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 5) == 1);
-
-        // Insertion and shifting at the very end of the array
         inserts[0] = 0b011111110100001;
         inserts[1] = 0b011111110100010;
         inserts[2] = 0b011111110100011;
@@ -343,44 +335,47 @@ public:
         s.InsertRawIntoInfixStore(store, inserts[6]);
         s.InsertRawIntoInfixStore(store, inserts[2]);
         s.InsertRawIntoInfixStore(store, inserts[3]);
-        for (int32_t i = 531; i < 534; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i - 531] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
+        SUBCASE("insertion and shifting at the very end of the array") {
+            for (int32_t i = 531; i < 534; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 531] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 534), (inserts[3] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 534), 1);
+            for (int32_t i = 535; i < 537; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 535 + 4] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 537), (inserts[6] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 537), 1);
         }
-        assert(s.GetSlot(store, 534) == (inserts[3] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 534) == 1);
-        for (int32_t i = 535; i < 537; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i - 535 + 4] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
-        }
-        assert(s.GetSlot(store, 537) == (inserts[6] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 537) == 1);
 
-        // Insertion and shifting in between touching runs at the very end of the array
         inserts[7] = 0b011111111011101;
         inserts[8] = 0b011111111011110;
         inserts[9] = 0b011111111011111;
         s.InsertRawIntoInfixStore(store, inserts[9]);
         s.InsertRawIntoInfixStore(store, inserts[7]);
         s.InsertRawIntoInfixStore(store, inserts[8]);
-        for (int32_t i = 528; i < 531; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i - 528] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
+        SUBCASE("insertion and shifting in between touching runs at the very end of the array") {
+            for (int32_t i = 528; i < 531; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 528] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 531), (inserts[3] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 537), 1);
+            for (int32_t i = 532; i < 534; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 532 + 7] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 534), (inserts[9] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 534), 1);
+            for (int32_t i = 535; i < 537; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 535 + 4] & BITMASK(infix_size)));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 537), (inserts[6] & BITMASK(infix_size)));
+            REQUIRE_EQ(get_bitmap_bit(runends, 537), 1);
         }
-        assert(s.GetSlot(store, 531) == (inserts[3] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 537) == 1);
-        for (int32_t i = 532; i < 534; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i - 532 + 7] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
-        }
-        assert(s.GetSlot(store, 534) == (inserts[9] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 534) == 1);
-        for (int32_t i = 535; i < 537; i++) {
-            assert(s.GetSlot(store, i) == (inserts[i - 535 + 4] & BITMASK(infix_size)));
-            assert(get_bitmap_bit(runends, i) == 0);
-        }
-        assert(s.GetSlot(store, 537) == (inserts[6] & BITMASK(infix_size)));
-        assert(get_bitmap_bit(runends, 537) == 1);
     }
 
     static void TestGetInfixList() {
@@ -401,9 +396,9 @@ public:
             s.InsertRawIntoInfixStore(store, keys[i]);
         uint64_t res[22];
         const uint32_t len = s.GetInfixList(store, res);
-        assert(len == 21);
+        REQUIRE_EQ(len, 21);
         for (int32_t i = 0; i < 21; i++)
-            assert(res[i] == keys[i]);
+            REQUIRE_EQ(res[i], keys[i]);
     }
 
     static void TestLoadInfixList() {
@@ -425,13 +420,13 @@ public:
         s.LoadListToInfixStore(store, keys, 27);
         uint64_t res[28];
         const uint32_t len = s.GetInfixList(store, res);
-        assert(len == 27);
+        REQUIRE_EQ(len, 27);
         for (int32_t i = 0; i < 27; i++)
-            assert(res[i] == keys[i]);
+            REQUIRE_EQ(res[i], keys[i]);
     }
 
 private:
-    static void PrintStore(const Steroids &s, const Steroids::InfixStore &store) {
+    static void PrintStore(const Steroids& s, const Steroids::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
         const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
@@ -462,16 +457,29 @@ private:
     }
 };
 
-int main(int argc, char **argv) {
-    std::cerr << ansi_green << "===== [ Running Tests ]" << ansi_white << std::endl;
-    InfixStoreTests::TestAllocation();
-    InfixStoreTests::TestShiftingSlots();
-    InfixStoreTests::TestShiftingRunends();
-    InfixStoreTests::TestInsertRaw();
-    InfixStoreTests::TestGetInfixList();
-    InfixStoreTests::TestLoadInfixList();
-    std::cerr << ansi_green << "===== [ Done ]" << ansi_white << std::endl;
+TEST_SUITE("infix_store") {
+    TEST_CASE("allocation") {
+        InfixStoreTests::TestAllocation();
+    }
 
-    return 0;
+    TEST_CASE("shifting slots") {
+        InfixStoreTests::TestShiftingSlots();
+    }
+
+    TEST_CASE("shifting runends") {
+        InfixStoreTests::TestShiftingRunends();
+    }
+
+    TEST_CASE("raw inserts") {
+        InfixStoreTests::TestInsertRaw();
+    }
+
+    TEST_CASE("get infix list") {
+        InfixStoreTests::TestGetInfixList();
+    }
+
+    TEST_CASE("load infix list") {
+        InfixStoreTests::TestLoadInfixList();
+    }
 }
 

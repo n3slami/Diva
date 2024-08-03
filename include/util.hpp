@@ -198,12 +198,6 @@ inline auto to_big_endian_order(uint16_t const &key) {
 
 
 __attribute__((always_inline))
-inline uint64_t get_string_kth_bit(const char *str, const uint32_t k) {
-	return (str[k / 8] >> (7 - k % 8)) & 1;
-};
-
-
-__attribute__((always_inline))
 inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     const int32_t l_src_bit_pos = l;
     int32_t r_src_bit_pos = r;

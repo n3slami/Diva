@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <iterator>
@@ -31,13 +32,20 @@ public:
   bool is_leaf() const override;
 
   /**
+   * Returns the value stored in the node.
+   */
+  T *get_value() const {
+      return nullptr;
+  }
+
+  /**
    * Finds and returns the child node identified by the given partial key.
    *
    * @param partial_key - The partial key associated with the child.
    * @return Child node identified by the given partial key or
    * a null pointer of no child node is associated with the partial key.
    */
-  virtual node<T> **find_child(char partial_key) = 0;
+  virtual node<T> **find_child(uint8_t partial_key) = 0;
 
   /**
    * Adds the given node to the node's children.
@@ -49,14 +57,14 @@ public:
    * @param partial_key - The partial key associated with the child.
    * @param child - The child node.
    */
-  virtual void set_child(char partial_key, node<T> *child) = 0;
+  virtual void set_child(uint8_t partial_key, node<T> *child) = 0;
 
   /**
    * Deletes the child associated with the given partial key.
    *
    * @param partial_key - The partial key associated with the child.
    */
-  virtual node<T> *del_child(char partial_key) = 0;
+  virtual node<T> *del_child(uint8_t partial_key) = 0;
 
   /**
    * Creates and returns a new node with bigger children capacity.
@@ -76,6 +84,25 @@ public:
   virtual inner_node<T> *shrink() = 0;
 
   /**
+   * Creates and returns a new inner node with an associated value.
+   * The current node gets deleted.
+   *
+   * @pre node must be undefull
+   * @param value - The value to store in the node.
+   * @return node with lesser capacity
+   */
+  virtual inner_node<T> *set_value(T &value) = 0;
+
+  /**
+   * Creates and returns a new inner node without an associated value.
+   * The current node gets deleted.
+   *
+   * @pre node must be undefull
+   * @return node with lesser capacity
+   */
+  virtual inner_node<T> *remove_value() = 0;
+
+  /**
    * Determines if the node is full, i.e. can carry no more child nodes.
    */
   virtual bool is_full() const = 0;
@@ -88,9 +115,9 @@ public:
 
   virtual int n_children() const = 0;
 
-  virtual char next_partial_key(char partial_key) const = 0;
+  virtual uint8_t next_partial_key(uint8_t partial_key) const = 0;
 
-  virtual char prev_partial_key(char partial_key) const = 0;
+  virtual uint8_t prev_partial_key(uint8_t partial_key) const = 0;
 
   /**
    * Iterator on the first child node.

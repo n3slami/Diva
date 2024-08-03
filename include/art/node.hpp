@@ -45,14 +45,14 @@ public:
    *           ^^^^*
    * index:    01234
    */
-  int check_prefix(const char *key, int key_len) const;
+  int check_prefix(const uint8_t *key, int key_len) const;
 
-  char *prefix_ = nullptr;
+  uint8_t *prefix_ = nullptr;
   uint16_t prefix_len_ = 0;
 };
 
 template <class T>
-int node<T>::check_prefix(const char *key, int /* key_len */) const {
+int node<T>::check_prefix(const uint8_t *key, int /* key_len */) const {
   return std::mismatch(prefix_, prefix_ + prefix_len_, key).second - key;
 }
 

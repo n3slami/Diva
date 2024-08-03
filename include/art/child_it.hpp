@@ -6,6 +6,7 @@
 #ifndef ART_CHILD_IT_HPP
 #define ART_CHILD_IT_HPP
 
+#include <cstdint>
 #include <iterator>
 
 namespace art {
@@ -24,7 +25,7 @@ public:
 
 
   using iterator_category = std::bidirectional_iterator_tag;
-  using value_type = const char;
+  using value_type = const uint8_t;
   using difference_type = int;
   using pointer = value_type *;
   using reference = value_type &;
@@ -42,12 +43,12 @@ public:
   bool operator<=(const child_it &rhs) const;
   bool operator>=(const child_it &rhs) const;
 
-  char get_partial_key() const;
+  uint8_t get_partial_key() const;
   node<T> *get_child_node() const;
 
 private:
   inner_node<T> *node_ = nullptr;
-  char cur_partial_key_ = -128;
+  uint8_t cur_partial_key_ = 0;
   int relative_index_ = 0;
 };
 
@@ -67,11 +68,11 @@ child_it<T>::child_it(inner_node<T> *n, int relative_index)
   }
 
   if (relative_index_ == node_->n_children() - 1) {
-    cur_partial_key_ = node_->prev_partial_key(127);
+    cur_partial_key_ = node_->prev_partial_key(255);
     return;
   }
 
-  cur_partial_key_ = node_->next_partial_key(-128);
+  cur_partial_key_ = node_->next_partial_key(0);
   for (int i = 0; i < relative_index_; ++i) {
     cur_partial_key_ = node_->next_partial_key(cur_partial_key_ + 1);
   }
@@ -100,7 +101,7 @@ template <class T> child_it<T> &child_it<T>::operator++() {
   if (relative_index_ < 0) {
     return *this;
   } else if (relative_index_ == 0) {
-    cur_partial_key_ = node_->next_partial_key(-128);
+    cur_partial_key_ = node_->next_partial_key(0);
   } else if (relative_index_ < node_->n_children()) {
     cur_partial_key_ = node_->next_partial_key(cur_partial_key_ + 1);
   }
@@ -118,7 +119,7 @@ template <class T> child_it<T> &child_it<T>::operator--() {
   if (relative_index_ > node_->n_children() - 1) {
     return *this;
   } else if (relative_index_ == node_->n_children() - 1) {
-    cur_partial_key_ = node_->prev_partial_key(127);
+    cur_partial_key_ = node_->prev_partial_key(255);
   } else if (relative_index_ >= 0) {
     cur_partial_key_ = node_->prev_partial_key(cur_partial_key_ - 1);
   }
@@ -156,7 +157,7 @@ template <class T> bool child_it<T>::operator>(const child_it<T> &rhs) const {
 }
 
 template <class T>
-char child_it<T>::get_partial_key() const {
+uint8_t child_it<T>::get_partial_key() const {
   return cur_partial_key_;
 }
 

@@ -1,8 +1,17 @@
+/**
+ * @file art tests
+ * @author ---
+ *
+ * @author Rafael Kallis <rk@rafaelkallis.com>
+ */
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include "doctest.h"
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <assert.h>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -22,35 +31,35 @@ public:
         Steroids s(infix_size, seed, load_factor);
 
         uint64_t value;
-        char buf[9];
+        uint8_t buf[9];
         memset(buf, 0, sizeof(buf));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000011111111ULL));
-        s.AddTreeKey(reinterpret_cast<char *>(&value), sizeof(value));
-        auto it = s.tree_.begin(reinterpret_cast<char *>(&value), sizeof(value));
+        s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        auto it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000022222222ULL));
-        s.AddTreeKey(reinterpret_cast<char *>(&value), sizeof(value));
+        s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000033333333ULL));
-        s.AddTreeKey(reinterpret_cast<char *>(&value), sizeof(value));
+        s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000044444444ULL));
-        s.AddTreeKey(reinterpret_cast<char *>(&value), sizeof(value));
+        s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000020000000ULL));
-        s.Insert(reinterpret_cast<char *>(&value), sizeof(value));
+        s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000040007777ULL));
-        s.Insert(reinterpret_cast<char *>(&value), sizeof(value));
+        s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         for (int32_t i = 1; i < 100; i++) {
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
             value = to_big_endian_order(interp);
-            s.Insert(reinterpret_cast<char *>(&value), sizeof(value));
+            s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
-        {
+        SUBCASE("interpolated inserts") {
             const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13, 16,
                 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54, 57, 60,
                 62, 65, 68, 71, 73, 76, 79, 81, 84, 87, 90, 92, 95, 98, 101,
@@ -94,16 +103,16 @@ public:
                    {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                    {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                    {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            assertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
             value = to_big_endian_order(interp);
-            s.Insert(reinterpret_cast<char *>(&value), sizeof(value));
+            s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
-        {
+        SUBCASE("overlapping interpolated reversed inserts with a stride of 2") {
             const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13, 16,
                 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54, 57, 60,
                 62, 65, 68, 71, 73, 76, 79, 81, 84, 87, 90, 92, 95, 98, 101,
@@ -151,16 +160,17 @@ public:
                       {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                       {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                       {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            assertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
-        uint32_t shamt = 16;
+        const uint32_t shamt = 16;
         for (int32_t i = 1; i < 50; i++) {
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
-            value = to_big_endian_order((l * 30 + r * 70) / 100 + (i << shamt));
-            s.Insert(reinterpret_cast<char *>(&value), sizeof(value));
+            const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
+            value = to_big_endian_order(interp);
+            s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
-        {
+        SUBCASE("overlapping interpolated consecutive inserts") {
             const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13, 16,
                 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54, 57, 60,
                 62, 65, 68, 71, 73, 76, 79, 81, 84, 87, 90, 92, 95, 98, 101,
@@ -224,16 +234,16 @@ public:
                      {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                      {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                      {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            assertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
         value = to_big_endian_order(value);
-        s.InsertSplitInfixStore(reinterpret_cast<char *>(&value), sizeof(value));
+        s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
         value = to_big_endian_order(static_cast<uint64_t>(0x0000000011111111ULL));
-        it = s.tree_.begin(reinterpret_cast<char *>(&value), sizeof(value));
-        {
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        SUBCASE("split infix store: left half") {
             const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32,
                 38, 43, 49, 54, 60, 65, 71, 76, 82, 87, 92, 98, 103, 109, 114,
                 120, 125, 131, 136, 142, 147, 153, 158, 163, 169, 174, 180,
@@ -273,23 +283,22 @@ public:
                      {534,1,0b11110}, {535,0,0b00010}, {536,0,0b00110},
                      {537,1,0b01010}};
             auto store = it.ref();
-            assert(!store.IsPartialKey());
-            assert(store.GetInvalidBits() == 0);
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            REQUIRE_FALSE(store.IsPartialKey());
+            REQUIRE_EQ(store.GetInvalidBits(), 0);
+            assertStoreContents(s, store, occupieds_pos, checks);
         }
-
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
         value &= ~BITMASK(shamt);
         value = to_big_endian_order(value);
-        it = s.tree_.begin(reinterpret_cast<char *>(&value), sizeof(value) - shamt / 8);
-        {
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - shamt / 8);
+        SUBCASE("split infix store: right half") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
                 7, 8, 9, 10, 11, 20, 31, 42, 53, 64, 75, 86, 97, 108, 119, 129,
                 140, 151, 162, 173, 184, 190, 195, 206, 217, 228, 239, 250,
                 260, 271, 282, 293, 304, 315};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
-                 {{0,1,0b11001}, {1,0,0b00100}, {2,0,0b01100}, {3,0,0b10100},
+                 {{0,1,0b11011}, {1,0,0b00100}, {2,0,0b01100}, {3,0,0b10100},
                      {4,1,0b11100}, {6,0,0b00100}, {7,0,0b01100},
                      {8,0,0b10100}, {9,1,0b11100}, {11,0,0b00100},
                      {12,0,0b01100}, {13,0,0b10100}, {14,1,0b11100},
@@ -314,51 +323,184 @@ public:
                      {446,1,0b11100}, {464,1,0b11100}, {482,1,0b11100},
                      {501,1,0b10100}, {519,1,0b10100}};
             auto store = it.ref();
-            assert(store.IsPartialKey());
-            assert(store.GetInvalidBits() == 7);
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            REQUIRE(store.IsPartialKey());
+            REQUIRE_EQ(store.GetInvalidBits(), 0);
+            assertStoreContents(s, store, occupieds_pos, checks);
         }
 
+        // Split an extension of a partial boundary key
+        const std::string old_boundary = it.key();
+        uint32_t extended_key_len = it.key().size() + 1;
+        uint8_t extended_key[extended_key_len];
+        memcpy(extended_key, it.key().c_str(), extended_key_len);
+        extended_key[extended_key_len - 1] = 1;
+        s.InsertSplit({extended_key, extended_key_len});
 
-        std::cerr << "old_boundary=";
-        print_key(it.key().c_str(), it.key().size(), true);
+        SUBCASE("split infix store using an extension of a partial boundary key") {
+            const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
+                7, 8, 9, 10, 11, 20, 31, 42, 53, 64, 75, 86, 97, 108, 119, 129,
+                140, 151, 162, 173, 184, 190, 195, 206, 217, 228, 239, 250,
+                260, 271, 282, 293, 304, 315};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{0,0,0b11011}, {1,1,0b11011}, {2,0,0b00100}, {3,0,0b01100},
+                     {4,0,0b10100}, {5,1,0b11100}, {6,0,0b00100},
+                     {7,0,0b01100}, {8,0,0b10100}, {9,1,0b11100},
+                     {11,0,0b00100}, {12,0,0b01100}, {13,0,0b10100},
+                     {14,1,0b11100}, {16,0,0b00100}, {17,0,0b01100},
+                     {18,0,0b10100}, {19,1,0b11100}, {21,0,0b00100},
+                     {22,0,0b01100}, {23,0,0b10100}, {24,1,0b11100},
+                     {26,0,0b00100}, {27,0,0b01100}, {28,0,0b10100},
+                     {29,1,0b11100}, {31,0,0b00100}, {32,0,0b01100},
+                     {33,0,0b10100}, {34,1,0b11100}, {36,0,0b00100},
+                     {37,0,0b01100}, {38,0,0b10100}, {39,1,0b11100},
+                     {41,0,0b00100}, {42,0,0b01100}, {43,0,0b10100},
+                     {44,0,0b11100}, {45,1,0b11100}, {47,0,0b00100},
+                     {48,0,0b01100}, {49,0,0b10100}, {50,1,0b11100},
+                     {52,1,0b00100}, {54,1,0b10100}, {56,1,0b10100},
+                     {69,1,0b10100}, {87,1,0b01100}, {105,1,0b01100},
+                     {123,1,0b01100}, {141,1,0b00100}, {159,1,0b00100},
+                     {177,1,0b00100}, {196,1,0b00100}, {212,1,0b11100},
+                     {230,1,0b11100}, {248,1,0b11100}, {266,1,0b10100},
+                     {285,1,0b10100}, {303,1,0b10100}, {313,1,0b00100},
+                     {321,1,0b01100}, {339,1,0b01100}, {357,1,0b01100},
+                     {375,1,0b00100}, {393,1,0b00100}, {412,1,0b00100},
+                     {428,1,0b11100}, {446,1,0b11100}, {464,1,0b11100},
+                     {482,1,0b11100}, {501,1,0b10100}, {519,1,0b10100}};
+            auto store = it.ref();
+            REQUIRE(store.IsPartialKey());
+            REQUIRE_EQ(store.GetInvalidBits(), 0);
+            assertStoreContents(s, store, occupieds_pos, checks);
 
-        // Split an extension of a boundary key
-        value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
-        value &= ~BITMASK(shamt);
-        value += 1;
+            REQUIRE_EQ(old_boundary.size(), it.key().size());
+            REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
+            it++;
+            const uint64_t expected_next_boundary_key = 0x0000000022222222ULL;
+            uint64_t current_key = 0;
+            memcpy(&current_key, it.key().c_str(), it.key().size());
+            REQUIRE_EQ(__bswap_64(current_key), expected_next_boundary_key);
+        }
+
+        value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
         value = to_big_endian_order(value);
-        std::cerr << "WEIRD SPLIT key=";
-        print_key(reinterpret_cast<char *>(&value), sizeof(value), true);
-        s.InsertSplitInfixStore(reinterpret_cast<char *>(&value), sizeof(value));
+        s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
-        value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
-        value &= ~BITMASK(shamt);
-        value = to_big_endian_order(value);
-        it = s.tree_.begin(reinterpret_cast<char *>(&value), sizeof(value) - shamt / 8);
-        print_key(it.key().c_str(), it.key().size());
-        PrintStore(s, it.ref());
-        it++;
-        print_key(it.key().c_str(), it.key().size());
-        PrintStore(s, it.ref());
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        it--;
+        SUBCASE("split infix store, create void infixes") {
+            const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
+                7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 30, 31};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{0,0,0b10000}, {1,0,0b10000}, {2,0,0b10000}, {3,0,0b10000},
+                     {4,0,0b10000}, {5,0,0b10000}, {6,0,0b10000},
+                     {7,0,0b10000}, {8,0,0b10000}, {9,1,0b10000},
+                     {11,0,0b10000}, {12,0,0b10000}, {13,0,0b10000},
+                     {14,0,0b10000}, {15,0,0b10000}, {16,0,0b10000},
+                     {17,0,0b10000}, {18,0,0b10000}, {19,0,0b10000},
+                     {20,1,0b10000}, {22,0,0b10000}, {23,0,0b10000},
+                     {24,0,0b10000}, {25,0,0b10000}, {26,0,0b10000},
+                     {27,0,0b10000}, {28,0,0b10000}, {29,0,0b10000},
+                     {30,0,0b10000}, {31,1,0b10000}, {33,0,0b10000},
+                     {34,0,0b10000}, {35,0,0b10000}, {36,0,0b10000},
+                     {37,0,0b10000}, {38,0,0b10000}, {39,0,0b10000},
+                     {40,1,0b10000}, {42,0,0b10000}, {43,0,0b10000},
+                     {44,0,0b10000}, {45,0,0b10000}, {46,0,0b10000},
+                     {47,0,0b10000}, {48,0,0b10000}, {49,1,0b10000},
+                     {51,0,0b10000}, {52,0,0b10000}, {53,0,0b10000},
+                     {54,0,0b10000}, {55,0,0b10000}, {56,0,0b10000},
+                     {57,0,0b10000}, {58,1,0b10000}, {60,0,0b10000},
+                     {61,0,0b10000}, {62,0,0b10000}, {63,0,0b10000},
+                     {64,0,0b10000}, {65,0,0b10000}, {66,0,0b10000},
+                     {67,1,0b10000}, {69,0,0b10000}, {70,0,0b10000},
+                     {71,0,0b10000}, {72,0,0b10000}, {73,0,0b10000},
+                     {74,0,0b10000}, {75,0,0b10000}, {76,1,0b10000},
+                     {78,0,0b10000}, {79,0,0b10000}, {80,0,0b10000},
+                     {81,0,0b10000}, {82,0,0b10000}, {83,0,0b10000},
+                     {84,0,0b10000}, {85,1,0b10000}, {87,0,0b10000},
+                     {88,0,0b10000}, {89,0,0b10000}, {90,0,0b10000},
+                     {91,0,0b10000}, {92,0,0b10000}, {93,0,0b10000},
+                     {94,1,0b10000}, {96,0,0b10000}, {97,0,0b10000},
+                     {98,0,0b10000}, {99,0,0b10000}, {100,0,0b10000},
+                     {101,0,0b10000}, {102,0,0b10000}, {103,1,0b10000},
+                     {105,0,0b10000}, {106,0,0b10000}, {107,0,0b10000},
+                     {108,0,0b10000}, {109,0,0b10000}, {110,0,0b10000},
+                     {111,0,0b10000}, {112,1,0b10000}, {114,0,0b10000},
+                     {115,0,0b10000}, {116,0,0b10000}, {117,0,0b10000},
+                     {118,0,0b10000}, {119,0,0b10000}, {120,0,0b10000},
+                     {121,1,0b10000}, {123,0,0b10000}, {124,0,0b10000},
+                     {125,0,0b10000}, {126,0,0b10000}, {127,0,0b10000},
+                     {128,0,0b10000}, {129,0,0b10000}, {130,1,0b10000},
+                     {132,0,0b10000}, {133,0,0b10000}, {134,0,0b10000},
+                     {135,0,0b10000}, {136,0,0b10000}, {137,0,0b10000},
+                     {138,1,0b10000}, {140,0,0b10000}, {141,0,0b10000},
+                     {142,0,0b10000}, {143,0,0b10000}, {144,0,0b10000},
+                     {145,0,0b10000}, {146,1,0b10000}, {148,0,0b10000},
+                     {149,0,0b10000}, {150,0,0b10000}, {151,0,0b10000},
+                     {152,0,0b10000}, {153,0,0b10000}, {154,1,0b10000},
+                     {156,0,0b10000}, {157,0,0b10000}, {158,0,0b10000},
+                     {159,0,0b10000}, {160,0,0b10000}, {161,0,0b10000},
+                     {162,1,0b10000}, {164,0,0b10000}, {165,0,0b10000},
+                     {166,0,0b10000}, {167,0,0b10000}, {168,0,0b10000},
+                     {169,0,0b10000}, {170,1,0b10000}, {172,0,0b10000},
+                     {173,0,0b10000}, {174,0,0b10000}, {175,0,0b10000},
+                     {176,0,0b10000}, {177,0,0b10000}, {178,1,0b10000},
+                     {180,0,0b10000}, {181,0,0b10000}, {182,0,0b10000},
+                     {183,0,0b10000}, {184,0,0b10000}, {185,0,0b10000},
+                     {186,1,0b10000}, {188,0,0b10000}, {189,0,0b10000},
+                     {190,0,0b10000}, {191,0,0b10000}, {192,0,0b10000},
+                     {193,0,0b10000}, {194,1,0b10000}, {196,0,0b10000},
+                     {197,0,0b10000}, {198,0,0b10000}, {199,0,0b10000},
+                     {200,0,0b10000}, {201,0,0b10000}, {202,1,0b10000},
+                     {204,0,0b10000}, {205,0,0b10000}, {206,0,0b10000},
+                     {207,0,0b10000}, {208,0,0b10000}, {209,0,0b10000},
+                     {210,1,0b10000}, {212,0,0b10000}, {213,0,0b10000},
+                     {214,0,0b10000}, {215,0,0b10000}, {216,0,0b10000},
+                     {217,0,0b10000}, {218,1,0b10000}, {220,0,0b10000},
+                     {221,0,0b10000}, {222,0,0b10000}, {223,0,0b10000},
+                     {224,0,0b10000}, {225,0,0b10000}, {226,1,0b10000},
+                     {228,0,0b10000}, {229,0,0b10000}, {230,0,0b10000},
+                     {231,0,0b10000}, {232,0,0b10000}, {233,0,0b10000},
+                     {234,1,0b10000}, {236,0,0b10000}, {237,0,0b10000},
+                     {238,0,0b10000}, {239,0,0b10000}, {240,0,0b10000},
+                     {241,0,0b10000}, {242,1,0b10000}, {244,0,0b10000},
+                     {245,0,0b10000}, {246,0,0b10000}, {247,0,0b10000},
+                     {248,0,0b10000}, {249,0,0b10000}, {250,1,0b10000},
+                     {252,0,0b10000}, {253,0,0b10000}, {254,0,0b10000},
+                     {255,0,0b10000}, {256,0,0b10000}, {257,0,0b10000},
+                     {258,1,0b10000}, {260,0,0b10000}, {261,0,0b10000},
+                     {262,0,0b10000}, {263,0,0b10000}, {264,0,0b10000},
+                     {265,0,0b10000}, {266,1,0b10000}, {268,0,0b10000},
+                     {269,0,0b10000}, {270,0,0b10000}, {271,0,0b10000},
+                     {272,0,0b10000}, {273,0,0b10000}, {274,1,0b10000}};
+            auto store = it.ref();
+            REQUIRE(store.IsPartialKey());
+            REQUIRE_EQ(store.GetInvalidBits(), 0);
+            assertStoreContents(s, store, occupieds_pos, checks);
+
+            REQUIRE_EQ(old_boundary.size(), it.key().size());
+            REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
+            it++;
+            REQUIRE_EQ(sizeof(value), it.key().size());
+            REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+        }
     }
 
 private:
-    static void AssertStoreContents(const Steroids &s, const Steroids::InfixStore &store,
-                                    const std::vector<uint32_t> &occupieds_pos,
-                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks) {
-        assert(store.ptr != nullptr);
-        assert(store.GetElemCount() == checks.size());
+    static void assertStoreContents(const Steroids& s, const Steroids::InfixStore& store,
+                                    const std::vector<uint32_t>& occupieds_pos,
+                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
+        REQUIRE_NE(store.ptr, nullptr);
+        REQUIRE_EQ(store.GetElemCount(), checks.size());
         const uint64_t *occupieds = store.ptr;
         const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
         uint32_t ind = 0;
         for (uint32_t i = 0; i < Steroids::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
-                assert(get_bitmap_bit(occupieds, i));
+                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
             }
             else 
-                assert(!get_bitmap_bit(occupieds, i));
+                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 0);
         }
 
         const uint32_t total_size = s.scaled_sizes_[store.GetSizeGrade()];
@@ -369,26 +511,26 @@ private:
             if (ind < checks.size()) {
                 const auto [pos, runend, value] = checks[ind];
                 if (i == pos) {
-                    assert(value == slot);
-                    assert(get_bitmap_bit(runends, i) == runend);
+                    REQUIRE_EQ(value, slot);
+                    REQUIRE_EQ(get_bitmap_bit(runends, i), runend);
                     runend_count += runend;
                     ind++;
                 }
                 else {
-                    assert(slot == 0ULL);
-                    assert(!get_bitmap_bit(runends, i));
+                    REQUIRE_EQ(slot, 0ULL);
+                    REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
                 }
             }
             else {
-                assert(slot == 0ULL);
-                assert(!get_bitmap_bit(runends, i));
+                REQUIRE_EQ(slot, 0ULL);
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
             }
         }
-        assert(occupieds_pos.size() == runend_count);
+        REQUIRE_EQ(occupieds_pos.size(), runend_count);
     }
 
 
-    static void PrintStore(const Steroids &s, const Steroids::InfixStore &store) {
+    static void printStore(const Steroids& s, const Steroids::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
         const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
@@ -420,11 +562,9 @@ private:
     }
 };
 
-int main(int argc, char **argv) {
-    std::cerr << ansi_green << "===== [ Running Tests ]" << ansi_white << std::endl;
-    SteroidsTests::InsertionTest();
-    std::cerr << ansi_green << "===== [ Done ]" << ansi_white << std::endl;
-
-    return 0;
+TEST_SUITE("steroids") {
+    TEST_CASE("insertion") {
+        SteroidsTests::InsertionTest();
+    }
 }
 
