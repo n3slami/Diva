@@ -106,7 +106,7 @@ public:
                    {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                    {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                    {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            assertStoreContents(s, it.ref(), occupieds_pos, checks);
+            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
         for (int32_t i = 90; i >= 70; i -= 2) {
@@ -163,7 +163,7 @@ public:
                       {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                       {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                       {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            assertStoreContents(s, it.ref(), occupieds_pos, checks);
+            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
         const uint32_t shamt = 16;
@@ -237,7 +237,7 @@ public:
                      {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                      {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                      {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            assertStoreContents(s, it.ref(), occupieds_pos, checks);
+            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
@@ -288,7 +288,7 @@ public:
             auto store = it.ref();
             REQUIRE_FALSE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
@@ -302,20 +302,20 @@ public:
                 260, 271, 282, 293, 304, 315};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
                  {{0,1,0b11011}, {1,0,0b00100}, {2,0,0b01100}, {3,0,0b10100},
-                     {4,1,0b11100}, {6,0,0b00100}, {7,0,0b01100},
-                     {8,0,0b10100}, {9,1,0b11100}, {11,0,0b00100},
-                     {12,0,0b01100}, {13,0,0b10100}, {14,1,0b11100},
-                     {16,0,0b00100}, {17,0,0b01100}, {18,0,0b10100},
-                     {19,1,0b11100}, {21,0,0b00100}, {22,0,0b01100},
-                     {23,0,0b10100}, {24,1,0b11100}, {26,0,0b00100},
-                     {27,0,0b01100}, {28,0,0b10100}, {29,1,0b11100},
-                     {31,0,0b00100}, {32,0,0b01100}, {33,0,0b10100},
-                     {34,1,0b11100}, {36,0,0b00100}, {37,0,0b01100},
-                     {38,0,0b10100}, {39,1,0b11100}, {41,0,0b00100},
-                     {42,0,0b01100}, {43,0,0b10100}, {44,0,0b11100},
-                     {45,1,0b11100}, {47,0,0b00100}, {48,0,0b01100},
-                     {49,0,0b10100}, {50,1,0b11100}, {52,1,0b00100},
-                     {54,1,0b10100}, {56,1,0b10100}, {69,1,0b10100},
+                     {4,1,0b11100}, {5,0,0b00100}, {6,0,0b01100},
+                     {7,0,0b10100}, {8,1,0b11100}, {9,0,0b00100},
+                     {10,0,0b01100}, {11,0,0b10100}, {12,1,0b11100},
+                     {13,0,0b00100}, {14,0,0b01100}, {15,0,0b10100},
+                     {16,1,0b11100}, {17,0,0b00100}, {18,0,0b01100},
+                     {19,0,0b10100}, {20,1,0b11100}, {21,0,0b00100},
+                     {22,0,0b01100}, {23,0,0b10100}, {24,1,0b11100},
+                     {25,0,0b00100}, {26,0,0b01100}, {27,0,0b10100},
+                     {28,1,0b11100}, {29,0,0b00100}, {30,0,0b01100},
+                     {31,0,0b10100}, {32,1,0b11100}, {33,0,0b00100},
+                     {34,0,0b01100}, {35,0,0b10100}, {36,0,0b11100},
+                     {37,1,0b11100}, {38,0,0b00100}, {39,0,0b01100},
+                     {40,0,0b10100}, {41,1,0b11100}, {42,1,0b00100},
+                     {43,1,0b10100}, {51,1,0b10100}, {69,1,0b10100},
                      {87,1,0b01100}, {105,1,0b01100}, {123,1,0b01100},
                      {141,1,0b00100}, {159,1,0b00100}, {177,1,0b00100},
                      {196,1,0b00100}, {212,1,0b11100}, {230,1,0b11100},
@@ -328,7 +328,7 @@ public:
             auto store = it.ref();
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
         }
 
         // Split an extension of a partial boundary key
@@ -353,18 +353,18 @@ public:
                  {{0,0,0b11001}, {1,1,0b11011}, {2,0,0b00100}, {3,0,0b01100},
                      {4,0,0b10100}, {5,1,0b11100}, {6,0,0b00100},
                      {7,0,0b01100}, {8,0,0b10100}, {9,1,0b11100},
-                     {11,0,0b00100}, {12,0,0b01100}, {13,0,0b10100},
-                     {14,1,0b11100}, {16,0,0b00100}, {17,0,0b01100},
-                     {18,0,0b10100}, {19,1,0b11100}, {21,0,0b00100},
-                     {22,0,0b01100}, {23,0,0b10100}, {24,1,0b11100},
-                     {26,0,0b00100}, {27,0,0b01100}, {28,0,0b10100},
-                     {29,1,0b11100}, {31,0,0b00100}, {32,0,0b01100},
-                     {33,0,0b10100}, {34,1,0b11100}, {36,0,0b00100},
-                     {37,0,0b01100}, {38,0,0b10100}, {39,1,0b11100},
-                     {41,0,0b00100}, {42,0,0b01100}, {43,0,0b10100},
-                     {44,0,0b11100}, {45,1,0b11100}, {47,0,0b00100},
-                     {48,0,0b01100}, {49,0,0b10100}, {50,1,0b11100},
-                     {52,1,0b00100}, {54,1,0b10100}, {56,1,0b10100},
+                     {10,0,0b00100}, {11,0,0b01100}, {12,0,0b10100},
+                     {13,1,0b11100}, {14,0,0b00100}, {15,0,0b01100},
+                     {16,0,0b10100}, {17,1,0b11100}, {18,0,0b00100},
+                     {19,0,0b01100}, {20,0,0b10100}, {21,1,0b11100},
+                     {22,0,0b00100}, {23,0,0b01100}, {24,0,0b10100},
+                     {25,1,0b11100}, {26,0,0b00100}, {27,0,0b01100},
+                     {28,0,0b10100}, {29,1,0b11100}, {30,0,0b00100},
+                     {31,0,0b01100}, {32,0,0b10100}, {33,1,0b11100},
+                     {34,0,0b00100}, {35,0,0b01100}, {36,0,0b10100},
+                     {37,0,0b11100}, {38,1,0b11100}, {39,0,0b00100},
+                     {40,0,0b01100}, {41,0,0b10100}, {42,1,0b11100},
+                     {43,1,0b00100}, {44,1,0b10100}, {51,1,0b10100},
                      {69,1,0b10100}, {87,1,0b01100}, {105,1,0b01100},
                      {123,1,0b01100}, {141,1,0b00100}, {159,1,0b00100},
                      {177,1,0b00100}, {196,1,0b00100}, {212,1,0b11100},
@@ -377,7 +377,7 @@ public:
             auto store = it.ref();
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
 
             REQUIRE_EQ(old_boundary.size(), it.get_key_len());
             REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
@@ -499,7 +499,7 @@ public:
             auto store = it.ref();
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
 
             REQUIRE_EQ(old_boundary.size(), it.get_key_len());
             REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
@@ -524,7 +524,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
             auto store = it.ref();
             REQUIRE(!store.IsPartialKey());
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
 
             REQUIRE_EQ(sizeof(value), it.get_key_len());
             REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
@@ -536,7 +536,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{403,1,0b00001}};
             auto store = it.ref();
             REQUIRE(!store.IsPartialKey());
-            assertStoreContents(s, store, occupieds_pos, checks);
+            AssertStoreContents(s, store, occupieds_pos, checks);
 
             REQUIRE_EQ(new_extended_key_len, it.get_key_len());
             REQUIRE_EQ(memcmp(new_extended_key, it.key().c_str(), new_extended_key_len), 0);
@@ -892,8 +892,246 @@ public:
         }
     }
 
+
+    static void ShrinkInfixSize() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+
+        std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
+                                   std::numeric_limits<uint64_t>::max()};
+        for (int32_t i = 0; i < 10; i++)
+            keys.insert((i + 1) * 0x0000000011111111UL);
+        for (uint64_t key : keys) {
+            const uint64_t conv_key = to_big_endian_order(key);
+            s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+        }
+        std::set<uint64_t> partial_keys;
+
+        for (int32_t i = 1; i < 100; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        for (int32_t i = 90; i >= 70; i -= 2) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        const uint32_t shamt = 16;
+        for (int32_t i = 1; i < 50; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+        
+        SUBCASE("shrink by one") {
+            s.ShrinkInfixSize(infix_size - 1);
+            REQUIRE_EQ(s.infix_size_, infix_size - 1);
+
+            auto it = s.tree_.begin();
+            {
+                const std::vector<uint32_t> occupieds_pos = {};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
+                auto store = it.ref();
+                const uint64_t value = 0;
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+                REQUIRE_FALSE(store.IsPartialKey());
+                REQUIRE_EQ(store.GetInvalidBits(), 0);
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+            ++it;
+            {
+                const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13,
+                    16, 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54,
+                    57, 60, 62, 65, 68, 71, 73, 76, 79, 81, 84, 87, 90, 92, 95,
+                    98, 101, 103, 106, 109, 112, 114, 117, 120, 122, 125, 128,
+                    131, 133, 136, 139, 142, 144, 147, 150, 152, 155, 158, 161,
+                    163, 166, 169, 172, 174, 177, 180, 183, 185, 188, 191, 192,
+                    193, 194, 196, 199, 202, 204, 207, 210, 213, 215, 218, 221,
+                    223, 226, 229, 232, 234, 237, 240, 243, 245, 248, 251, 254,
+                    256, 259, 262, 264, 267, 270};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = 
+                    {{3,1,0b1101}, {9,1,0b1001}, {15,1,0b0101}, {19,1,0b1111},
+                        {25,1,0b1011}, {31,1,0b0111}, {37,1,0b0011},
+                        {41,1,0b1111}, {47,1,0b1011}, {53,0,0b0101},
+                        {54,1,0b0101}, {59,1,0b0001}, {62,0,0b1101},
+                        {63,1,0b1101}, {68,1,0b1001}, {74,0,0b0101},
+                        {75,1,0b0101}, {80,1,0b0001}, {84,0,0b1101},
+                        {85,1,0b1101}, {90,1,0b0111}, {96,0,0b0011},
+                        {97,1,0b0011}, {100,1,0b1111}, {106,0,0b1011},
+                        {107,1,0b1011}, {112,1,0b0111}, {118,0,0b0011},
+                        {119,1,0b0011}, {121,1,0b1101}, {127,0,0b1001},
+                        {128,1,0b1001}, {133,1,0b0101}, {139,0,0b0001},
+                        {140,1,0b0001}, {143,1,0b1101}, {149,0,0b1001},
+                        {150,1,0b1001}, {155,1,0b0101}, {159,0,0b1111},
+                        {160,1,0b1111}, {165,1,0b1011}, {171,1,0b0111},
+                        {177,1,0b0011}, {180,1,0b1111}, {186,1,0b1011},
+                        {192,1,0b0101}, {198,1,0b0001}, {202,1,0b1101},
+                        {208,1,0b1001}, {214,1,0b0101}, {220,1,0b0001},
+                        {224,1,0b1101}, {230,1,0b0111}, {236,1,0b0011},
+                        {239,1,0b1111}, {245,1,0b1011}, {251,1,0b0111},
+                        {257,1,0b0011}, {261,1,0b1101}, {267,1,0b1001},
+                        {273,1,0b0101}, {279,1,0b0001}, {283,1,0b1101},
+                        {289,1,0b1001}, {295,1,0b0101}, {298,1,0b1111},
+                        {304,1,0b1011}, {310,1,0b0111}, {316,1,0b0011},
+                        {320,1,0b1111}, {326,1,0b1011}, {332,1,0b0101},
+                        {338,1,0b0001}, {342,1,0b1101}, {348,1,0b1001},
+                        {354,1,0b0101}, {359,1,0b0001}, {363,1,0b1101},
+                        {369,1,0b0111}, {375,0,0b0011}, {376,0,0b0101},
+                        {377,0,0b0101}, {378,0,0b0111}, {379,0,0b0111},
+                        {380,0,0b1001}, {381,0,0b1001}, {382,0,0b1011},
+                        {383,0,0b1011}, {384,0,0b1101}, {385,0,0b1101},
+                        {386,0,0b1111}, {387,1,0b1111}, {388,0,0b0001},
+                        {389,0,0b0001}, {390,0,0b0011}, {391,0,0b0011},
+                        {392,0,0b0101}, {393,0,0b0101}, {394,0,0b0111},
+                        {395,0,0b0111}, {396,0,0b1001}, {397,0,0b1001},
+                        {398,0,0b1011}, {399,0,0b1011}, {400,0,0b1101},
+                        {401,0,0b1101}, {402,0,0b1111}, {403,1,0b1111},
+                        {404,0,0b0001}, {405,0,0b0001}, {406,0,0b0011},
+                        {407,0,0b0011}, {408,0,0b0101}, {409,0,0b0101},
+                        {410,0,0b0111}, {411,0,0b0111}, {412,0,0b1001},
+                        {413,0,0b1001}, {414,0,0b1011}, {415,0,0b1011},
+                        {416,0,0b1101}, {417,0,0b1101}, {418,0,0b1111},
+                        {419,0,0b1111}, {420,1,0b1111}, {421,0,0b0001},
+                        {422,0,0b0001}, {423,0,0b0011}, {424,0,0b0011},
+                        {425,1,0b0101}, {426,1,0b1011}, {427,1,0b0111},
+                        {428,1,0b0011}, {429,1,0b1101}, {430,1,0b1001},
+                        {431,1,0b0101}, {432,1,0b0001}, {433,1,0b1101},
+                        {434,1,0b1001}, {435,1,0b0101}, {438,1,0b1111},
+                        {444,1,0b1011}, {450,1,0b0111}, {456,1,0b0011},
+                        {460,1,0b1111}, {466,1,0b1011}, {472,1,0b0101},
+                        {477,1,0b0001}, {481,1,0b1101}, {487,1,0b1001},
+                        {493,1,0b0101}, {499,1,0b0001}, {503,1,0b1011},
+                        {509,1,0b0111}, {515,1,0b0011}, {519,1,0b1111},
+                        {525,1,0b1011}, {531,1,0b0111}};
+                auto store = it.ref();
+                const uint64_t value = to_big_endian_order(0b00010001000100010001000100010001UL);
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+                REQUIRE_FALSE(store.IsPartialKey());
+                REQUIRE_EQ(store.GetInvalidBits(), 0);
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+        }
+
+        SUBCASE("shrink by two") {
+            s.ShrinkInfixSize(infix_size - 2);
+            REQUIRE_EQ(s.infix_size_, infix_size - 2);
+
+            auto it = s.tree_.begin();
+            {
+                const std::vector<uint32_t> occupieds_pos = {};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
+                auto store = it.ref();
+                const uint64_t value = 0;
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+                REQUIRE_FALSE(store.IsPartialKey());
+                REQUIRE_EQ(store.GetInvalidBits(), 0);
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+            ++it;
+            {
+                const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13,
+                    16, 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54,
+                    57, 60, 62, 65, 68, 71, 73, 76, 79, 81, 84, 87, 90, 92, 95,
+                    98, 101, 103, 106, 109, 112, 114, 117, 120, 122, 125, 128,
+                    131, 133, 136, 139, 142, 144, 147, 150, 152, 155, 158, 161,
+                    163, 166, 169, 172, 174, 177, 180, 183, 185, 188, 191, 192,
+                    193, 194, 196, 199, 202, 204, 207, 210, 213, 215, 218, 221,
+                    223, 226, 229, 232, 234, 237, 240, 243, 245, 248, 251, 254,
+                    256, 259, 262, 264, 267, 270};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = 
+                    {{3,1,0b111}, {9,1,0b101}, {15,1,0b011}, {19,1,0b111},
+                        {25,1,0b101}, {31,1,0b011}, {37,1,0b001}, {41,1,0b111},
+                        {47,1,0b101}, {53,0,0b011}, {54,1,0b011}, {59,1,0b001},
+                        {62,0,0b111}, {63,1,0b111}, {68,1,0b101}, {74,0,0b011},
+                        {75,1,0b011}, {80,1,0b001}, {84,0,0b111}, {85,1,0b111},
+                        {90,1,0b011}, {96,0,0b001}, {97,1,0b001},
+                        {100,1,0b111}, {106,0,0b101}, {107,1,0b101},
+                        {112,1,0b011}, {118,0,0b001}, {119,1,0b001},
+                        {121,1,0b111}, {127,0,0b101}, {128,1,0b101},
+                        {133,1,0b011}, {139,0,0b001}, {140,1,0b001},
+                        {143,1,0b111}, {149,0,0b101}, {150,1,0b101},
+                        {155,1,0b011}, {159,0,0b111}, {160,1,0b111},
+                        {165,1,0b101}, {171,1,0b011}, {177,1,0b001},
+                        {180,1,0b111}, {186,1,0b101}, {192,1,0b011},
+                        {198,1,0b001}, {202,1,0b111}, {208,1,0b101},
+                        {214,1,0b011}, {220,1,0b001}, {224,1,0b111},
+                        {230,1,0b011}, {236,1,0b001}, {239,1,0b111},
+                        {245,1,0b101}, {251,1,0b011}, {257,1,0b001},
+                        {261,1,0b111}, {267,1,0b101}, {273,1,0b011},
+                        {279,1,0b001}, {283,1,0b111}, {289,1,0b101},
+                        {295,1,0b011}, {298,1,0b111}, {304,1,0b101},
+                        {310,1,0b011}, {316,1,0b001}, {320,1,0b111},
+                        {326,1,0b101}, {332,1,0b011}, {338,1,0b001},
+                        {342,1,0b111}, {348,1,0b101}, {354,1,0b011},
+                        {359,1,0b001}, {363,1,0b111}, {369,1,0b011},
+                        {375,0,0b001}, {376,0,0b011}, {377,0,0b011},
+                        {378,0,0b011}, {379,0,0b011}, {380,0,0b101},
+                        {381,0,0b101}, {382,0,0b101}, {383,0,0b101},
+                        {384,0,0b111}, {385,0,0b111}, {386,0,0b111},
+                        {387,1,0b111}, {388,0,0b001}, {389,0,0b001},
+                        {390,0,0b001}, {391,0,0b001}, {392,0,0b011},
+                        {393,0,0b011}, {394,0,0b011}, {395,0,0b011},
+                        {396,0,0b101}, {397,0,0b101}, {398,0,0b101},
+                        {399,0,0b101}, {400,0,0b111}, {401,0,0b111},
+                        {402,0,0b111}, {403,1,0b111}, {404,0,0b001},
+                        {405,0,0b001}, {406,0,0b001}, {407,0,0b001},
+                        {408,0,0b011}, {409,0,0b011}, {410,0,0b011},
+                        {411,0,0b011}, {412,0,0b101}, {413,0,0b101},
+                        {414,0,0b101}, {415,0,0b101}, {416,0,0b111},
+                        {417,0,0b111}, {418,0,0b111}, {419,0,0b111},
+                        {420,1,0b111}, {421,0,0b001}, {422,0,0b001},
+                        {423,0,0b001}, {424,0,0b001}, {425,1,0b011},
+                        {426,1,0b101}, {427,1,0b011}, {428,1,0b001},
+                        {429,1,0b111}, {430,1,0b101}, {431,1,0b011},
+                        {432,1,0b001}, {433,1,0b111}, {434,1,0b101},
+                        {435,1,0b011}, {438,1,0b111}, {444,1,0b101},
+                        {450,1,0b011}, {456,1,0b001}, {460,1,0b111},
+                        {466,1,0b101}, {472,1,0b011}, {477,1,0b001},
+                        {481,1,0b111}, {487,1,0b101}, {493,1,0b011},
+                        {499,1,0b001}, {503,1,0b101}, {509,1,0b011},
+                        {515,1,0b001}, {519,1,0b111}, {525,1,0b101},
+                        {531,1,0b011}};
+                auto store = it.ref();
+                const uint64_t value = to_big_endian_order(0b00010001000100010001000100010001UL);
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+                REQUIRE_FALSE(store.IsPartialKey());
+                REQUIRE_EQ(store.GetInvalidBits(), 0);
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+        }
+    }
+
 private:
-    static void assertStoreContents(const Steroids& s, const Steroids::InfixStore& store,
+    static void AssertStoreContents(const Steroids& s, const Steroids::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
@@ -937,7 +1175,7 @@ private:
     }
 
 
-    static void printStore(const Steroids& s, const Steroids::InfixStore& store) {
+    static void PrintStore(const Steroids& s, const Steroids::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
         const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
@@ -980,6 +1218,10 @@ TEST_SUITE("steroids") {
 
     TEST_CASE("range query") {
         SteroidsTests::RangeQuery();
+    }
+
+    TEST_CASE("shrink infix size") {
+        SteroidsTests::ShrinkInfixSize();
     }
 }
 

@@ -213,6 +213,7 @@ private:
 
     inline uint64_t GetSlot(const InfixStore &store, const uint32_t pos) const;
     inline void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value);
+    inline void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width);
 
     inline void ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
     inline void ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
@@ -518,6 +519,7 @@ inline void Steroids::InsertSplit(InfiniteByteString key) {
     InfixStore store_gt = AllocateInfixStoreWithList(right_infix_list + (zero_pos != -1),
                                                      right_list_len - (zero_pos != -1),
                                                      total_implicit_gt);
+    auto *ptr_to_free = infix_store.ptr;
     tree_.set(prev_key.str, prev_key.length, store_lt);
     if (zero_pos != -1) {
         const uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
@@ -528,7 +530,9 @@ inline void Steroids::InsertSplit(InfiniteByteString key) {
     }
     else
         tree_.set(key.str, key.length, store_gt);
-    // TODO: fix memory leak
+
+    // No memory leaks!
+    delete[] ptr_to_free;
 }
 
 
@@ -732,6 +736,19 @@ inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint6
     uint64_t stamp;
     memcpy(&stamp, ptr, sizeof(stamp));
     stamp &= ~(BITMASK(infix_size_) << (bit_pos % 8));
+    stamp |= value << (bit_pos % 8);
+    memcpy(ptr, &stamp, sizeof(stamp));
+}
+
+
+__attribute__((always_inline))
+inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * width;
+    uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
+    uint64_t stamp;
+    memcpy(&stamp, ptr, sizeof(stamp));
+    stamp &= ~(BITMASK(width) << (bit_pos % 8));
     stamp |= value << (bit_pos % 8);
     memcpy(ptr, &stamp, sizeof(stamp));
 }
@@ -979,15 +996,14 @@ inline void Steroids::ResizeInfixStore(InfixStore &store, const bool expand, con
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t infix_count = store.GetElemCount();
     const uint32_t current_size = scaled_sizes_[size_grade];
-    const int32_t delta = expand ? 1 : -1;
-    size_grade += delta;
-    store.SetSizeGrade(size_grade);
-    const uint32_t next_size = scaled_sizes_[size_grade];
 
     uint64_t infix_list[infix_count];
     GetInfixList(store, infix_list);
-    delete store.ptr;
+    delete[] store.ptr;
 
+    size_grade += expand ? 1 : -1;
+    store.SetSizeGrade(size_grade);
+    const uint32_t next_size = scaled_sizes_[size_grade];
     const uint32_t word_count = InfixStore::GetPtrWordCount(next_size, infix_size_);
     store.ptr = new uint64_t[word_count];
     LoadListToInfixStore(store, infix_list, infix_count, total_implicit, true);
@@ -1000,19 +1016,19 @@ inline void Steroids::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_
     const uint32_t slot_count = scaled_sizes_[size_grade];
 
     InfixStore new_store(slot_count, new_infix_size);
+
+    // Copy the occupieds and runends bitmaps
+    const uint32_t total_bitmap_size = infix_store_target_size + scaled_sizes_[size_grade];
+    memcpy(new_store.ptr, store.ptr, (total_bitmap_size + 7) / 8);
+    new_store.ptr[(total_bitmap_size + 63) / 64 - 1] &= BITMASK(64 - total_bitmap_size % 64);
+
     for (int32_t i = 0; i < slot_count; i++) {
         const uint64_t old_slot = GetSlot(store, i);
         const uint64_t new_slot = (old_slot >> (infix_size_ - new_infix_size))
-                                | (infix_size_ - lowbit_pos(old_slot) > new_infix_size ? 1ULL : 0ULL);
-        SetSlot(new_store, i, new_slot);
+                                | (infix_size_ > new_infix_size + lowbit_pos(old_slot) ? 1ULL : 0ULL);
+        SetSlot(new_store, i, new_slot, new_infix_size);
     }
-    const uint64_t *old_runends = store.ptr;
-    uint64_t *new_runends = new_store.ptr;
-    for (int32_t bit_pos = 0; bit_pos < slot_count; bit_pos += 64) {
-        const uint32_t move_amount = std::min(slot_count - bit_pos, 64U);
-        new_runends[bit_pos / 64] |= old_runends[bit_pos / 64] & BITMASK(move_amount);
-    }
-    delete store.ptr;
+    delete[] store.ptr;
     store.ptr = new_store.ptr;
 }
 
@@ -1035,18 +1051,17 @@ inline void Steroids::LoadListToInfixStore(InfixStore &store, const uint64_t *li
     uint64_t *occupieds = store.ptr;
     uint64_t *runends = store.ptr + infix_store_target_size / 64;
     uint64_t old_implicit_part = list[0] >> infix_size_;
-    l[0] = (size_scalars_[size_grade] * implicit_scalar * old_implicit_part) >> (scale_shift + scale_implicit_shift);
+    l[0] = (old_implicit_part * size_scalars_[size_grade] * implicit_scalar)
+                >> (scale_shift + scale_implicit_shift);
     r[0] = l[0];
     for (uint32_t i = 0; i < list_len; i++) {
         const uint64_t implicit_part = list[i] >> infix_size_;
         assert(implicit_part <= total_implicit);
         if (implicit_part != old_implicit_part) {
             ind++;
-            l[ind] = std::max(r[ind - 1] + 1,
-                              static_cast<int32_t>((size_scalars_[size_grade] * implicit_scalar * implicit_part) 
-                                                            >> (scale_shift + scale_implicit_shift)));
-            const uint64_t baseline = (size_scalars_[size_grade] * implicit_scalar * implicit_part) 
-                                                >> (scale_shift + scale_implicit_shift);
+            l[ind] = std::max<int32_t>(r[ind - 1],
+                                       (implicit_scalar * size_scalars_[size_grade] * implicit_part)
+                                            >> (scale_shift + scale_implicit_shift));
             r[ind] = l[ind];
         }
         r[ind]++;
@@ -1089,12 +1104,12 @@ inline Steroids::InfixStore Steroids::AllocateInfixStoreWithList(const uint64_t 
 
 inline uint32_t Steroids::GetInfixList(const InfixStore &store, uint64_t *res) const {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t list_size = scaled_sizes_[size_grade];
+    const uint32_t store_size = scaled_sizes_[size_grade];
     const uint64_t *occupieds = store.ptr;
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
     uint64_t implicit_part = occupieds[0] & 1ULL ? 0 : NextOccupied(store, 0);
     uint32_t ind = 0;
-    for (int32_t i = 0; i < list_size; i++) {
+    for (int32_t i = 0; i < store_size; i++) {
         const uint64_t explicit_part = GetSlot(store, i);
         if (explicit_part)
             res[ind++] = (implicit_part << infix_size_) | explicit_part;
