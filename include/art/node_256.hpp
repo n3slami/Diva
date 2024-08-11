@@ -62,8 +62,8 @@ private:
 
 template <class T> class node_256_valued : public node_256<T> {
 public:
-    T *get_value() const {
-        return &value_;
+    T *get_value() override {
+        return reinterpret_cast<T *>(&value_);
     };
 
     inner_node<T> *shrink() override {

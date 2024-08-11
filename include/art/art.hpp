@@ -94,25 +94,25 @@ public:
     /**
      * Forward iterator that traverses the tree in lexicographic order.
      */
-    tree_it<T> begin();
+    tree_it<T> begin() const;
 
     /**
      * Forward iterator that traverses the tree in lexicographic order starting
      * from the provided key.
      */
-    tree_it<T> begin(const uint8_t *key);
+    tree_it<T> begin(const uint8_t *key) const;
 
     /**
      * Forward iterator that traverses the tree in lexicographic order starting
      * from the provided key.
      */
-    tree_it<T> begin(const uint8_t *key, const uint32_t key_len);
+    tree_it<T> begin(const uint8_t *key, const uint32_t key_len) const;
 
 
     /**
      * Iterator to the end of the lexicographic order.
      */
-    tree_it<T> end();
+    tree_it<T> end() const;
 
 private:
     node<T> *root_ = nullptr;
@@ -145,7 +145,7 @@ template <class T> art<T>::~art() {
 
 template <class T> 
 T art<T>::get(const uint8_t *key) const {
-    return get(key, std::strlen(reinterpret_cast<const char *>(key)) + 1);
+    return get(key, std::strlen(reinterpret_cast<const char *>(key)));
 }
 
 template <class T> 
@@ -159,9 +159,14 @@ T art<T>::get(const uint8_t *key, const uint32_t key_len) const {
         }
         if (cur->prefix_len_ == key_len - depth) {
             /* exact match */
-            return cur->is_leaf() ? static_cast<leaf_node<T>*>(cur)->value_ : T{};
+            if (cur->is_leaf())
+                return reinterpret_cast<leaf_node<T>*>(cur)->value_;
+            inner_node<T> *cur_inner = reinterpret_cast<inner_node<T> *>(cur);
+            return cur_inner->get_value() != nullptr ? *cur_inner->get_value() : T{};
         }
-        child = static_cast<inner_node<T>*>(cur)->find_child(key[depth + cur->prefix_len_]);
+        if (cur->is_leaf())
+            return T{};
+        child = reinterpret_cast<inner_node<T> *>(cur)->find_child(key[depth + cur->prefix_len_]);
         depth += (cur->prefix_len_ + 1);
         cur = child != nullptr ? *child : nullptr;
     }
@@ -171,7 +176,7 @@ T art<T>::get(const uint8_t *key, const uint32_t key_len) const {
 
 template <class T> 
 T art<T>::set(const uint8_t *key, T value) {
-    return set(key, std::strlen(reinterpret_cast<const char *>(key)) + 1, value);
+    return set(key, std::strlen(reinterpret_cast<const char *>(key)), value);
 }
 
 template <class T> 
@@ -180,7 +185,7 @@ T art<T>::set(const uint8_t *key, const uint32_t key_len, T value) {
     if (root_ == nullptr) {
         root_ = new leaf_node<T>(value);
         root_->prefix_ = new uint8_t[key_len];
-        std::copy(key, key + key_len + 1, root_->prefix_);
+        std::copy(key, key + key_len, root_->prefix_);
         root_->prefix_len_ = key_len;
         return T{};
     }
@@ -195,73 +200,101 @@ T art<T>::set(const uint8_t *key, const uint32_t key_len, T value) {
         prefix_match_len = (**cur).check_prefix(key + depth, key_len - depth);
 
         /* true if the current node's prefix matches with a part of the key */
-        is_prefix_match = (std::min<int>((**cur).prefix_len_, key_len - depth)) ==
-            prefix_match_len;
+        is_prefix_match = (std::min<int>((**cur).prefix_len_, key_len - depth)) == prefix_match_len;
 
-        if (is_prefix_match && (**cur).prefix_len_ == key_len - depth) {
-            /* exact match:
-             * => "replace"
-             * => replace value of current node.
-             * => return old value to caller to handle.
-             *        _                             _
-             *        |                             |
-             *       (aa)                          (aa)
-             *    a /    \ b     +[aaaaa,v3]    a /    \ b
-             *     /      \      ==========>     /      \
-             * *(aa)->v1  ()->v2             *(aa)->v3  ()->v2
-             *
-             */
+        if (is_prefix_match) {
+            if ((**cur).prefix_len_ == key_len - depth) {
+                /* exact match:
+                 * => "replace"
+                 * => replace value of current node.
+                 * => return old value to caller to handle.
+                 *        _                             _
+                 *        |                             |
+                 *       (aa)                          (aa)
+                 *    a /    \ b     +[aaaaa,v3]    a /    \ b
+                 *     /      \      ==========>     /      \
+                 * *(aa)->v1  ()->v2             *(aa)->v3  ()->v2
+                 *
+                 */
 
-            T old_value {};
-            if ((**cur).is_leaf()) {
-                auto cur_leaf = static_cast<leaf_node<T>*>(*cur);
-                old_value = cur_leaf->value_;
-                cur_leaf->value_ = value;
+                T old_value {};
+                if ((**cur).is_leaf()) {
+                    auto cur_leaf = static_cast<leaf_node<T>*>(*cur);
+                    old_value = cur_leaf->value_;
+                    cur_leaf->value_ = value;
+                }
+                else {
+                    cur_inner = reinterpret_cast<inner_node<T> **>(cur);
+                    if ((**cur_inner).get_value() != nullptr)
+                        old_value = *((**cur_inner).get_value());
+                    *cur = (**cur_inner).set_value(value);
+                }
+                return old_value;
             }
-            else {
-                cur_inner = reinterpret_cast<inner_node<T> **>(cur);
-                if ((**cur_inner).get_value() != nullptr)
-                    old_value = *((**cur_inner).get_value());
-                *cur = (**cur_inner).set_value(value);
+            else if (((**cur).prefix_len_ < key_len - depth && (**cur).is_leaf())) {
+                /* prefix match:
+                 * => convert leaf into inner node and add new key as its child.
+                 *        _                             _
+                 *        |                             |
+                 *       (aa)->v1    +[aaaaa,v2]       (aa)->v1
+                 *                   ==========>        |
+                 *                                     (aaa)->v2
+                 *
+                 */
+
+                auto new_node = new leaf_node<T>(value);
+                new_node->prefix_ = new uint8_t[key_len - depth - (**cur).prefix_len_ - 1];
+                std::copy(key + depth + (**cur).prefix_len_ + 1, key + key_len, new_node->prefix_);
+                new_node->prefix_len_ = key_len - depth - (**cur).prefix_len_ - 1;
+
+                leaf_node<T> *cur_leaf = reinterpret_cast<leaf_node<T> *>(*cur);
+                auto new_parent = new node_4_valued<T>();
+                new_parent->prefix_ = cur_leaf->prefix_;
+                new_parent->prefix_len_ = cur_leaf->prefix_len_;
+                new_parent->set_value(cur_leaf->value_);
+                new_parent->set_child(key[depth + cur_leaf->prefix_len_], new_node);
+
+                delete cur_leaf;
+
+                *cur = new_parent;
+                return T{};
             }
-            return old_value;
+            else if ((**cur).prefix_len_ > key_len - depth) {
+                /* prefix match:
+                 * => new prefix parent node.
+                 * => new inner node with value to insert.
+                 * => current node becomes child of new parent node.
+                 *
+                 *        |                        |
+                 *      *(aa)                    +(a)->v3
+                 *    a /    \ b     +[a,v3]     a |   
+                 *     /      \      =======>      |
+                 *  (aa)->v1  ()->v2             *()
+                 *                             a /  \ b
+                 *                              /    \
+                 *                          (aa)->v1 ()->v2
+                 *                          /|\      /|\
+                 */
+
+                auto new_parent = new node_4_valued<T>();
+                new_parent->prefix_ = new uint8_t[prefix_match_len];
+                std::copy((**cur).prefix_, (**cur).prefix_ + prefix_match_len, new_parent->prefix_);
+                new_parent->prefix_len_ = prefix_match_len;
+                new_parent->set_child((**cur).prefix_[prefix_match_len], *cur);
+                new_parent->value_ = value;
+
+                auto old_prefix = (**cur).prefix_;
+                auto old_prefix_len = (**cur).prefix_len_;
+                (**cur).prefix_ = new uint8_t[old_prefix_len - prefix_match_len - 1];
+                (**cur).prefix_len_ = old_prefix_len - prefix_match_len - 1;
+                std::copy(old_prefix + prefix_match_len + 1, old_prefix + old_prefix_len, (**cur).prefix_);
+                delete old_prefix;
+
+                *cur = new_parent;
+                return T{};
+            }
         }
-
-        if (!is_prefix_match && depth + prefix_match_len == key_len) {
-            /* prefix mismatch:
-             * => new prefix parent node.
-             * => new inner node with value to insert.
-             * => current node becomes child of new parent node.
-             *
-             *        |                        |
-             *      *(aa)                    +(a)->v3
-             *    a /    \ b     +[a,v3]   a /   
-             *     /      \      =======>   /
-             *  (aa)->v1  ()->v2          *()->Ø 
-             *                          a /   \ b
-             *                           /     \
-             *                        (aa)->v1 ()->v2
-             *                        /|\      /|\
-             */
-
-            auto new_parent = new node_4_valued<T>();
-            new_parent->prefix_ = new uint8_t[prefix_match_len];
-            std::copy((**cur).prefix_, (**cur).prefix_ + prefix_match_len, new_parent->prefix_);
-            new_parent->prefix_len_ = prefix_match_len;
-            new_parent->set_child((**cur).prefix_[prefix_match_len], *cur);
-            new_parent->value_ = value;
-
-            auto old_prefix = (**cur).prefix_;
-            auto old_prefix_len = (**cur).prefix_len_;
-            (**cur).prefix_ = new uint8_t[old_prefix_len - prefix_match_len - 1];
-            (**cur).prefix_len_ = old_prefix_len - prefix_match_len - 1;
-            std::copy(old_prefix + prefix_match_len + 1, old_prefix + old_prefix_len, (**cur).prefix_);
-            delete old_prefix;
-
-            *cur = new_parent;
-            return T{};
-        }
-        else if (!is_prefix_match) {
+        else {
             /* prefix mismatch:
              * => new parent node with common prefix and no associated value.
              * => new node with value to insert.
@@ -354,7 +387,7 @@ T art<T>::set(const uint8_t *key, const uint32_t key_len, T value) {
 
 template <class T> 
 T art<T>::del(const uint8_t *key) {
-    return del(key, std::strlen(reinterpret_cast<const char *>(key)) + 1);
+    return del(key, std::strlen(reinterpret_cast<const char *>(key)));
 }
 
 template <class T> 
@@ -386,14 +419,11 @@ T art<T>::del(const uint8_t *key, const uint32_t key_len) {
                 inner_node<T> **inner_cur = reinterpret_cast<inner_node<T> **>(cur);
                 if ((**inner_cur).get_value() != nullptr) {
                     T res = *(**inner_cur).get_value();
-                    auto n_children = (**inner_cur).n_children() - 1;
+                    auto n_children = (**inner_cur).n_children();
                     if (n_children == 1) {
                         /* find child */
-                        auto partial_key = (**par).next_partial_key(0);
-                        if (partial_key == cur_partial_key) {
-                            partial_key = (**par).next_partial_key(cur_partial_key + 1);
-                        }
-                        auto child = *(**par).find_child(partial_key);
+                        auto partial_key = (**inner_cur).next_partial_key(0);
+                        auto child = *(**inner_cur).find_child(partial_key);
 
                         auto old_prefix = child->prefix_;
                         auto old_prefix_len = child->prefix_len_;
@@ -412,33 +442,63 @@ T art<T>::del(const uint8_t *key, const uint32_t key_len) {
                         delete (*inner_cur);
                         *cur = child;
                     }
-                    else
+                    else {
                         *cur = (**inner_cur).remove_value();
+                    }
                     return res;
                 }
                 return T{};
             }
-            auto value = static_cast<leaf_node<T>*>(*cur)->value_;
+            auto value = reinterpret_cast<leaf_node<T>*>(*cur)->value_;
             auto n_siblings = par != nullptr ? (**par).n_children() - 1 : 0;
 
             if (n_siblings == 0) {
-                /*
-                 * => must be root node
-                 * => delete root node
-                 *
-                 *     |                 |
-                 *    (aa)->v1          (aa)->v1
-                 *     | a     -[aaaaa]
-                 *     |       =======>
-                 *   *(aa)->v2
-                 */
+                if (cur == &root_) {
+                    if ((**cur).is_leaf()) {
+                        /*
+                         * => must be root node
+                         * => delete root node
+                         *
+                         *     |       -[aa]     |
+                         *     |       =======>  
+                         *   *(aa)->v2
+                         */
 
-                if ((**cur).prefix_ != nullptr) {
-                    delete[](**cur).prefix_;
+                        if ((**cur).prefix_ != nullptr) {
+                            delete[](**cur).prefix_;
+                        }
+                        delete (*cur);
+                        *cur = nullptr;
+                    }
+                    else
+                        *cur = (**reinterpret_cast<inner_node<T> **>(cur)).remove_value();
                 }
-                delete (*cur);
-                *cur = nullptr;
+                else {
+                    /*
+                     * => parent must a valued inner node
+                     * => delete parent node replace it with the leaf node
+                     *
+                     *     |                 |
+                     *    (aa)->v1          (aa)->v1
+                     *     | a     -[aaaaa]
+                     *     |       =======>
+                     *   *(aa)->v2
+                     */
 
+                    leaf_node<T> **cur_leaf = reinterpret_cast<leaf_node<T> **>(cur);
+                    auto old_prefix = (**cur).prefix_;
+                    auto old_par_ptr = *par;
+
+                    (**cur_leaf).prefix_ = (**par).prefix_;
+                    (**cur_leaf).prefix_len_ = (**par).prefix_len_;
+                    (**cur_leaf).value_ = *((**par).get_value());
+
+                    if (old_prefix != nullptr) {
+                        delete[] old_prefix;
+                    }
+                    node<T> **converted_par = reinterpret_cast<node<T> **>(par);
+                    *converted_par = *cur;
+                }
             } else if (n_siblings == 1 && (**par).get_value() == nullptr) {
                 /* => delete leaf node
                  * => replace parent with sibling
@@ -483,7 +543,7 @@ T art<T>::del(const uint8_t *key, const uint32_t key_len) {
                 *par = static_cast<inner_node<T>*>(sibling);
 
             } else if (n_siblings == 1) {
-                /* => delete leaf node onlu
+                /* => delete leaf node only, as parent has a value
                  *
                  *        |a                         |a
                  *        |                          |
@@ -494,28 +554,11 @@ T art<T>::del(const uint8_t *key, const uint32_t key_len) {
                  *  /|\                          /|\
                  */
 
-                /* find sibling */
-                auto sibling_partial_key = (**par).next_partial_key(0);
-                if (sibling_partial_key == cur_partial_key) {
-                    sibling_partial_key = (**par).next_partial_key(cur_partial_key + 1);
-                }
-                auto sibling = *(**par).find_child(sibling_partial_key);
-
-                auto old_prefix = sibling->prefix_;
-                auto old_prefix_len = sibling->prefix_len_;
-
-                sibling->prefix_ = new uint8_t[(**par).prefix_len_ + 1 + old_prefix_len];
-                sibling->prefix_len_ = (**par).prefix_len_ + 1 + old_prefix_len;
-                std::copy((**par).prefix_, (**par).prefix_ + (**par).prefix_len_, sibling->prefix_);
-                sibling->prefix_[(**par).prefix_len_] = sibling_partial_key;
-                std::copy(old_prefix, old_prefix + old_prefix_len, sibling->prefix_ + (**par).prefix_len_ + 1);
-                if (old_prefix != nullptr) {
-                    delete[] old_prefix;
-                }
                 if ((**cur).prefix_ != nullptr) {
                     delete[](**cur).prefix_;
                 }
                 delete (*cur);
+                (**par).del_child(cur_partial_key);
             } else /* if (n_siblings > 1) */ {
                 /* => delete leaf node
                  *
@@ -549,19 +592,19 @@ T art<T>::del(const uint8_t *key, const uint32_t key_len) {
     return T{};
 }
 
-template <class T> tree_it<T> art<T>::begin() {
+template <class T> tree_it<T> art<T>::begin() const {
     return tree_it<T>::min(this->root_);
 }
 
-template <class T> tree_it<T> art<T>::begin(const uint8_t *key) {
+template <class T> tree_it<T> art<T>::begin(const uint8_t *key) const {
     return tree_it<T>::greater_equal(this->root_, key);
 }
 
-template <class T> tree_it<T> art<T>::begin(const uint8_t *key, const uint32_t key_len) {
+template <class T> tree_it<T> art<T>::begin(const uint8_t *key, const uint32_t key_len) const {
     return tree_it<T>::greater_equal(this->root_, key, key_len);
 }
 
-template <class T> tree_it<T> art<T>::end() { 
+template <class T> tree_it<T> art<T>::end() const { 
     return tree_it<T>(); 
 }
 

@@ -5,6 +5,9 @@
  * @author Rafael Kallis <rk@rafaelkallis.com>
  */
 
+#include <endian.h>
+#include <limits>
+#include <memory>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
@@ -24,7 +27,7 @@ const std::string ansi_white = "\033[0;97m";
 
 class SteroidsTests {
 public:
-    static void InsertionTest() {
+    static void Insert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -34,23 +37,23 @@ public:
         uint8_t buf[9];
         memset(buf, 0, sizeof(buf));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000011111111ULL));
+        value = to_big_endian_order(0x0000000011111111UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         auto it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000022222222ULL));
+        value = to_big_endian_order(0x0000000022222222UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000033333333ULL));
+        value = to_big_endian_order(0x0000000033333333UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000044444444ULL));
+        value = to_big_endian_order(0x0000000044444444UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000020000000ULL));
+        value = to_big_endian_order(0x0000000020000000UL);
         s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000040007777ULL));
+        value = to_big_endian_order(0x0000000040007777UL);
         s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         for (int32_t i = 1; i < 100; i++) {
@@ -241,7 +244,7 @@ public:
         value = to_big_endian_order(value);
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
-        value = to_big_endian_order(static_cast<uint64_t>(0x0000000011111111ULL));
+        value = to_big_endian_order(0x0000000011111111UL);
         it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         SUBCASE("split infix store: left half") {
             const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32,
@@ -330,11 +333,16 @@ public:
 
         // Split an extension of a partial boundary key
         const std::string old_boundary = it.key();
-        uint32_t extended_key_len = it.key().size() + 1;
+        uint32_t extended_key_len = it.get_key_len() + 1;
         uint8_t extended_key[extended_key_len];
         memcpy(extended_key, it.key().c_str(), extended_key_len);
         extended_key[extended_key_len - 1] = 1;
         s.InsertSplit({extended_key, extended_key_len});
+
+        value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
+        value &= ~BITMASK(shamt);
+        value = to_big_endian_order(value);
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - shamt / 8);
 
         SUBCASE("split infix store using an extension of a partial boundary key") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
@@ -342,7 +350,7 @@ public:
                 140, 151, 162, 173, 184, 190, 195, 206, 217, 228, 239, 250,
                 260, 271, 282, 293, 304, 315};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
-                 {{0,0,0b11011}, {1,1,0b11011}, {2,0,0b00100}, {3,0,0b01100},
+                 {{0,0,0b11001}, {1,1,0b11011}, {2,0,0b00100}, {3,0,0b01100},
                      {4,0,0b10100}, {5,1,0b11100}, {6,0,0b00100},
                      {7,0,0b01100}, {8,0,0b10100}, {9,1,0b11100},
                      {11,0,0b00100}, {12,0,0b01100}, {13,0,0b10100},
@@ -371,12 +379,12 @@ public:
             REQUIRE_EQ(store.GetInvalidBits(), 0);
             assertStoreContents(s, store, occupieds_pos, checks);
 
-            REQUIRE_EQ(old_boundary.size(), it.key().size());
+            REQUIRE_EQ(old_boundary.size(), it.get_key_len());
             REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
-            it++;
+            ++it;
             const uint64_t expected_next_boundary_key = 0x0000000022222222ULL;
             uint64_t current_key = 0;
-            memcpy(&current_key, it.key().c_str(), it.key().size());
+            memcpy(&current_key, it.key().c_str(), it.get_key_len());
             REQUIRE_EQ(__bswap_64(current_key), expected_next_boundary_key);
         }
 
@@ -384,104 +392,503 @@ public:
         value = to_big_endian_order(value);
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-        it--;
+        value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - 2);
+        --it;
         SUBCASE("split infix store, create void infixes") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
-                7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-                23, 24, 25, 26, 27, 28, 29, 30, 31};
+                7, 8, 9, 10, 11, 12, 13, 14, 15, 32, 33, 34, 35, 36, 37, 38,
+                39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+                55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+                71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86,
+                87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101,
+                102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
+                114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125,
+                126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137,
+                138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149,
+                150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161,
+                162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
+                174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185,
+                186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197,
+                198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
+                210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221,
+                222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233,
+                234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245,
+                246, 247, 248, 249, 250, 251, 252, 253, 254, 255};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
-                 {{0,0,0b10000}, {1,0,0b10000}, {2,0,0b10000}, {3,0,0b10000},
-                     {4,0,0b10000}, {5,0,0b10000}, {6,0,0b10000},
-                     {7,0,0b10000}, {8,0,0b10000}, {9,1,0b10000},
-                     {11,0,0b10000}, {12,0,0b10000}, {13,0,0b10000},
-                     {14,0,0b10000}, {15,0,0b10000}, {16,0,0b10000},
-                     {17,0,0b10000}, {18,0,0b10000}, {19,0,0b10000},
-                     {20,1,0b10000}, {22,0,0b10000}, {23,0,0b10000},
-                     {24,0,0b10000}, {25,0,0b10000}, {26,0,0b10000},
-                     {27,0,0b10000}, {28,0,0b10000}, {29,0,0b10000},
-                     {30,0,0b10000}, {31,1,0b10000}, {33,0,0b10000},
-                     {34,0,0b10000}, {35,0,0b10000}, {36,0,0b10000},
-                     {37,0,0b10000}, {38,0,0b10000}, {39,0,0b10000},
-                     {40,1,0b10000}, {42,0,0b10000}, {43,0,0b10000},
-                     {44,0,0b10000}, {45,0,0b10000}, {46,0,0b10000},
-                     {47,0,0b10000}, {48,0,0b10000}, {49,1,0b10000},
-                     {51,0,0b10000}, {52,0,0b10000}, {53,0,0b10000},
-                     {54,0,0b10000}, {55,0,0b10000}, {56,0,0b10000},
-                     {57,0,0b10000}, {58,1,0b10000}, {60,0,0b10000},
-                     {61,0,0b10000}, {62,0,0b10000}, {63,0,0b10000},
-                     {64,0,0b10000}, {65,0,0b10000}, {66,0,0b10000},
-                     {67,1,0b10000}, {69,0,0b10000}, {70,0,0b10000},
-                     {71,0,0b10000}, {72,0,0b10000}, {73,0,0b10000},
-                     {74,0,0b10000}, {75,0,0b10000}, {76,1,0b10000},
-                     {78,0,0b10000}, {79,0,0b10000}, {80,0,0b10000},
-                     {81,0,0b10000}, {82,0,0b10000}, {83,0,0b10000},
-                     {84,0,0b10000}, {85,1,0b10000}, {87,0,0b10000},
-                     {88,0,0b10000}, {89,0,0b10000}, {90,0,0b10000},
-                     {91,0,0b10000}, {92,0,0b10000}, {93,0,0b10000},
-                     {94,1,0b10000}, {96,0,0b10000}, {97,0,0b10000},
-                     {98,0,0b10000}, {99,0,0b10000}, {100,0,0b10000},
-                     {101,0,0b10000}, {102,0,0b10000}, {103,1,0b10000},
-                     {105,0,0b10000}, {106,0,0b10000}, {107,0,0b10000},
-                     {108,0,0b10000}, {109,0,0b10000}, {110,0,0b10000},
-                     {111,0,0b10000}, {112,1,0b10000}, {114,0,0b10000},
-                     {115,0,0b10000}, {116,0,0b10000}, {117,0,0b10000},
-                     {118,0,0b10000}, {119,0,0b10000}, {120,0,0b10000},
-                     {121,1,0b10000}, {123,0,0b10000}, {124,0,0b10000},
-                     {125,0,0b10000}, {126,0,0b10000}, {127,0,0b10000},
-                     {128,0,0b10000}, {129,0,0b10000}, {130,1,0b10000},
-                     {132,0,0b10000}, {133,0,0b10000}, {134,0,0b10000},
-                     {135,0,0b10000}, {136,0,0b10000}, {137,0,0b10000},
-                     {138,1,0b10000}, {140,0,0b10000}, {141,0,0b10000},
-                     {142,0,0b10000}, {143,0,0b10000}, {144,0,0b10000},
-                     {145,0,0b10000}, {146,1,0b10000}, {148,0,0b10000},
-                     {149,0,0b10000}, {150,0,0b10000}, {151,0,0b10000},
-                     {152,0,0b10000}, {153,0,0b10000}, {154,1,0b10000},
-                     {156,0,0b10000}, {157,0,0b10000}, {158,0,0b10000},
-                     {159,0,0b10000}, {160,0,0b10000}, {161,0,0b10000},
-                     {162,1,0b10000}, {164,0,0b10000}, {165,0,0b10000},
-                     {166,0,0b10000}, {167,0,0b10000}, {168,0,0b10000},
-                     {169,0,0b10000}, {170,1,0b10000}, {172,0,0b10000},
-                     {173,0,0b10000}, {174,0,0b10000}, {175,0,0b10000},
-                     {176,0,0b10000}, {177,0,0b10000}, {178,1,0b10000},
-                     {180,0,0b10000}, {181,0,0b10000}, {182,0,0b10000},
-                     {183,0,0b10000}, {184,0,0b10000}, {185,0,0b10000},
-                     {186,1,0b10000}, {188,0,0b10000}, {189,0,0b10000},
-                     {190,0,0b10000}, {191,0,0b10000}, {192,0,0b10000},
-                     {193,0,0b10000}, {194,1,0b10000}, {196,0,0b10000},
-                     {197,0,0b10000}, {198,0,0b10000}, {199,0,0b10000},
-                     {200,0,0b10000}, {201,0,0b10000}, {202,1,0b10000},
-                     {204,0,0b10000}, {205,0,0b10000}, {206,0,0b10000},
-                     {207,0,0b10000}, {208,0,0b10000}, {209,0,0b10000},
-                     {210,1,0b10000}, {212,0,0b10000}, {213,0,0b10000},
-                     {214,0,0b10000}, {215,0,0b10000}, {216,0,0b10000},
-                     {217,0,0b10000}, {218,1,0b10000}, {220,0,0b10000},
-                     {221,0,0b10000}, {222,0,0b10000}, {223,0,0b10000},
-                     {224,0,0b10000}, {225,0,0b10000}, {226,1,0b10000},
-                     {228,0,0b10000}, {229,0,0b10000}, {230,0,0b10000},
-                     {231,0,0b10000}, {232,0,0b10000}, {233,0,0b10000},
-                     {234,1,0b10000}, {236,0,0b10000}, {237,0,0b10000},
-                     {238,0,0b10000}, {239,0,0b10000}, {240,0,0b10000},
-                     {241,0,0b10000}, {242,1,0b10000}, {244,0,0b10000},
-                     {245,0,0b10000}, {246,0,0b10000}, {247,0,0b10000},
-                     {248,0,0b10000}, {249,0,0b10000}, {250,1,0b10000},
-                     {252,0,0b10000}, {253,0,0b10000}, {254,0,0b10000},
-                     {255,0,0b10000}, {256,0,0b10000}, {257,0,0b10000},
-                     {258,1,0b10000}, {260,0,0b10000}, {261,0,0b10000},
-                     {262,0,0b10000}, {263,0,0b10000}, {264,0,0b10000},
-                     {265,0,0b10000}, {266,1,0b10000}, {268,0,0b10000},
-                     {269,0,0b10000}, {270,0,0b10000}, {271,0,0b10000},
-                     {272,0,0b10000}, {273,0,0b10000}, {274,1,0b10000}};
+                 {{0,1,0b10000}, {2,1,0b10000}, {4,1,0b10000}, {6,1,0b10000},
+                     {8,1,0b10000}, {10,1,0b10000}, {12,1,0b10000},
+                     {14,1,0b10000}, {16,1,0b10000}, {18,1,0b10000},
+                     {20,1,0b10000}, {23,1,0b10000}, {25,1,0b10000},
+                     {27,1,0b10000}, {29,1,0b10000}, {31,1,0b10000},
+                     {67,1,0b10000}, {69,1,0b10000}, {71,1,0b10000},
+                     {73,1,0b10000}, {75,1,0b10000}, {77,1,0b10000},
+                     {79,1,0b10000}, {81,1,0b10000}, {83,1,0b10000},
+                     {85,1,0b10000}, {88,1,0b10000}, {90,1,0b10000},
+                     {92,1,0b10000}, {94,1,0b10000}, {96,1,0b10000},
+                     {98,1,0b10000}, {100,1,0b10000}, {102,1,0b10000},
+                     {104,1,0b10000}, {106,1,0b10000}, {109,1,0b10000},
+                     {111,1,0b10000}, {113,1,0b10000}, {115,1,0b10000},
+                     {117,1,0b10000}, {119,1,0b10000}, {121,1,0b10000},
+                     {123,1,0b10000}, {125,1,0b10000}, {127,1,0b10000},
+                     {130,1,0b10000}, {132,1,0b10000}, {134,1,0b10000},
+                     {136,1,0b10000}, {138,1,0b10000}, {140,1,0b10000},
+                     {142,1,0b10000}, {144,1,0b10000}, {146,1,0b10000},
+                     {148,1,0b10000}, {150,1,0b10000}, {153,1,0b10000},
+                     {155,1,0b10000}, {157,1,0b10000}, {159,1,0b10000},
+                     {161,1,0b10000}, {163,1,0b10000}, {165,1,0b10000},
+                     {167,1,0b10000}, {169,1,0b10000}, {171,1,0b10000},
+                     {174,1,0b10000}, {176,1,0b10000}, {178,1,0b10000},
+                     {180,1,0b10000}, {182,1,0b10000}, {184,1,0b10000},
+                     {186,1,0b10000}, {188,1,0b10000}, {190,1,0b10000},
+                     {192,1,0b10000}, {195,1,0b10000}, {197,1,0b10000},
+                     {199,1,0b10000}, {201,1,0b10000}, {203,1,0b10000},
+                     {205,1,0b10000}, {207,1,0b10000}, {209,1,0b10000},
+                     {211,1,0b10000}, {213,1,0b10000}, {215,1,0b10000},
+                     {218,1,0b10000}, {220,1,0b10000}, {222,1,0b10000},
+                     {224,1,0b10000}, {226,1,0b10000}, {228,1,0b10000},
+                     {230,1,0b10000}, {232,1,0b10000}, {234,1,0b10000},
+                     {236,1,0b10000}, {239,1,0b10000}, {241,1,0b10000},
+                     {243,1,0b10000}, {245,1,0b10000}, {247,1,0b10000},
+                     {249,1,0b10000}, {251,1,0b10000}, {253,1,0b10000},
+                     {255,1,0b10000}, {257,1,0b10000}, {260,1,0b10000},
+                     {262,1,0b10000}, {264,1,0b10000}, {266,1,0b10000},
+                     {268,1,0b10000}, {270,1,0b10000}, {272,1,0b10000},
+                     {274,1,0b10000}, {276,1,0b10000}, {278,1,0b10000},
+                     {280,1,0b10000}, {283,1,0b10000}, {285,1,0b10000},
+                     {287,1,0b10000}, {289,1,0b10000}, {291,1,0b10000},
+                     {293,1,0b10000}, {295,1,0b10000}, {297,1,0b10000},
+                     {299,1,0b10000}, {301,1,0b10000}, {304,1,0b10000},
+                     {306,1,0b10000}, {308,1,0b10000}, {310,1,0b10000},
+                     {312,1,0b10000}, {314,1,0b10000}, {316,1,0b10000},
+                     {318,1,0b10000}, {320,1,0b10000}, {322,1,0b10000},
+                     {325,1,0b10000}, {327,1,0b10000}, {329,1,0b10000},
+                     {331,1,0b10000}, {333,1,0b10000}, {335,1,0b10000},
+                     {337,1,0b10000}, {339,1,0b10000}, {341,1,0b10000},
+                     {343,1,0b10000}, {346,1,0b10000}, {348,1,0b10000},
+                     {350,1,0b10000}, {352,1,0b10000}, {354,1,0b10000},
+                     {356,1,0b10000}, {358,1,0b10000}, {360,1,0b10000},
+                     {362,1,0b10000}, {364,1,0b10000}, {366,1,0b10000},
+                     {369,1,0b10000}, {371,1,0b10000}, {373,1,0b10000},
+                     {375,1,0b10000}, {377,1,0b10000}, {379,1,0b10000},
+                     {381,1,0b10000}, {383,1,0b10000}, {385,1,0b10000},
+                     {387,1,0b10000}, {390,1,0b10000}, {392,1,0b10000},
+                     {394,1,0b10000}, {396,1,0b10000}, {398,1,0b10000},
+                     {400,1,0b10000}, {402,1,0b10000}, {404,1,0b10000},
+                     {406,1,0b10000}, {408,1,0b10000}, {411,1,0b10000},
+                     {413,1,0b10000}, {415,1,0b10000}, {417,1,0b10000},
+                     {419,1,0b10000}, {421,1,0b10000}, {423,1,0b10000},
+                     {425,1,0b10000}, {427,1,0b10000}, {429,1,0b10000},
+                     {431,1,0b10000}, {434,1,0b10000}, {436,1,0b10000},
+                     {438,1,0b10000}, {440,1,0b10000}, {442,1,0b10000},
+                     {444,1,0b10000}, {446,1,0b10000}, {448,1,0b10000},
+                     {450,1,0b10000}, {452,1,0b10000}, {455,1,0b10000},
+                     {457,1,0b10000}, {459,1,0b10000}, {461,1,0b10000},
+                     {463,1,0b10000}, {465,1,0b10000}, {467,1,0b10000},
+                     {469,1,0b10000}, {471,1,0b10000}, {473,1,0b10000},
+                     {476,1,0b10000}, {478,1,0b10000}, {480,1,0b10000},
+                     {482,1,0b10000}, {484,1,0b10000}, {486,1,0b10000},
+                     {488,1,0b10000}, {490,1,0b10000}, {492,1,0b10000},
+                     {494,1,0b10000}, {496,1,0b10000}, {499,1,0b10000},
+                     {501,1,0b10000}, {503,1,0b10000}, {505,1,0b10000},
+                     {507,1,0b10000}, {509,1,0b10000}, {511,1,0b10000},
+                     {513,1,0b10000}, {515,1,0b10000}, {517,1,0b10000},
+                     {520,1,0b10000}, {522,1,0b10000}, {524,1,0b10000},
+                     {526,1,0b10000}, {528,1,0b10000}, {530,1,0b10000},
+                     {532,1,0b10000}, {534,1,0b10000}};
             auto store = it.ref();
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
             assertStoreContents(s, store, occupieds_pos, checks);
 
-            REQUIRE_EQ(old_boundary.size(), it.key().size());
+            REQUIRE_EQ(old_boundary.size(), it.get_key_len());
             REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
-            it++;
-            REQUIRE_EQ(sizeof(value), it.key().size());
+            ++it;
+            REQUIRE_EQ(sizeof(value) - 2, it.get_key_len());
+            REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value) - 2), 0);
+        }
+
+        value = to_big_endian_order(0x0000000033333333UL);
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        uint32_t new_extended_key_len = it.get_key_len() + 3;
+        uint8_t new_extended_key[extended_key_len];
+        memcpy(new_extended_key, it.key().c_str(), it.get_key_len());
+        memset(new_extended_key + it.get_key_len(), 0, new_extended_key_len - 1 - it.get_key_len());
+        new_extended_key[new_extended_key_len - 1] = 1;
+        s.InsertSplit({new_extended_key, new_extended_key_len});
+
+        value = to_big_endian_order(0x0000000033333333UL);
+        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        SUBCASE("split infix store using an extension of a full boundary key: left half") {
+            const std::vector<uint32_t> occupieds_pos = {};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
+            auto store = it.ref();
+            REQUIRE(!store.IsPartialKey());
+            assertStoreContents(s, store, occupieds_pos, checks);
+
+            REQUIRE_EQ(sizeof(value), it.get_key_len());
             REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+        }
+
+        ++it;
+        SUBCASE("split infix store using an extension of a full boundary key: right half") {
+            const std::vector<uint32_t> occupieds_pos = {205};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{403,1,0b00001}};
+            auto store = it.ref();
+            REQUIRE(!store.IsPartialKey());
+            assertStoreContents(s, store, occupieds_pos, checks);
+
+            REQUIRE_EQ(new_extended_key_len, it.get_key_len());
+            REQUIRE_EQ(memcmp(new_extended_key, it.key().c_str(), new_extended_key_len), 0);
+        }
+    }
+
+
+    static void PointQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+
+        std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
+                                   std::numeric_limits<uint64_t>::max()};
+        for (int32_t i = 0; i < 10; i++)
+            keys.insert((i + 1) * 0x0000000011111111UL);
+        for (uint64_t key : keys) {
+            const uint64_t conv_key = to_big_endian_order(key);
+            s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+        }
+        std::set<uint64_t> partial_keys;
+
+        for (int32_t i = 1; i < 100; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        for (int32_t i = 90; i >= 70; i -= 2) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        const uint32_t shamt = 16;
+        for (int32_t i = 1; i < 50; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        {
+            uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
+            value = to_big_endian_order(value);
+            s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
+            partial_keys.insert(0b0000000000000000000000000000000000011101000010111000000000000000UL);
+
+            value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
+            value = to_big_endian_order(value);
+            s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+        }
+
+        SUBCASE("no false negatives") {
+            for (uint64_t key : keys) {
+                const uint64_t conv_key = to_big_endian_order(key);
+                REQUIRE(s.PointQuery(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key)));
+            }
+        }
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        const uint32_t n_queries_per_partial_key = 100;
+        SUBCASE("extensions of partial keys") {
+            for (uint64_t partial_key : partial_keys) {
+                const uint64_t l = partial_key - (partial_key & -partial_key);
+                const uint64_t r = partial_key | (partial_key - 1);
+                for (int32_t i = 0; i < n_queries_per_partial_key; i++) {
+                    const uint64_t key = l + rng() % (r - l + 1);
+                    const uint64_t conv_key = to_big_endian_order(key);
+                    REQUIRE(s.PointQuery(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key)));
+                }
+            }
+        }
+
+        SUBCASE("negatives") {
+            const uint32_t n_queries = 100000;
+            std::set<uint64_t> queries;
+            while (queries.size() < n_queries) {
+                const uint64_t key = rng() % (5 * 0x0000000011111111UL);
+                bool skip = false;
+                if (keys.find(key) != keys.end())
+                    skip = true;
+                for (uint64_t partial_key : partial_keys) {
+                    const uint64_t mask = ((partial_key & -partial_key) << 1) - 1;
+                    if ((partial_key | mask) == (key | mask)) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (!skip)
+                    queries.insert(key);
+            }
+            for (uint64_t query : queries) {
+                const uint64_t conv_query = to_big_endian_order(query);
+                REQUIRE_FALSE(s.PointQuery(reinterpret_cast<const uint8_t *>(&conv_query), sizeof(conv_query)));
+            }
+
+            queries.clear();
+            while (queries.size() < n_queries) {
+                const uint64_t key = rng();
+                bool skip = false;
+                if (keys.find(key) != keys.end())
+                    skip = true;
+                for (uint64_t partial_key : partial_keys) {
+                    const uint64_t mask = ((partial_key & -partial_key) << 1) - 1;
+                    if ((partial_key | mask) == (key | mask)) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (!skip)
+                    queries.insert(key);
+            }
+            for (uint64_t query : queries) {
+                const uint64_t conv_query = to_big_endian_order(query);
+                REQUIRE_FALSE(s.PointQuery(reinterpret_cast<const uint8_t *>(&conv_query), sizeof(conv_query)));
+            }
+        }
+    }
+
+
+    static void RangeQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+
+        std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
+                                   std::numeric_limits<uint64_t>::max()};
+        for (int32_t i = 0; i < 10; i++)
+            keys.insert((i + 1) * 0x0000000011111111UL);
+        for (uint64_t key : keys) {
+            const uint64_t conv_key = to_big_endian_order(key);
+            s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+        }
+        std::set<uint64_t> partial_keys;
+
+        for (int32_t i = 1; i < 100; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        for (int32_t i = 90; i >= 70; i -= 2) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * i + r * (100 - i)) / 100;
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        const uint32_t shamt = 16;
+        for (int32_t i = 1; i < 50; i++) {
+            const uint32_t shared = 34;
+            const uint32_t ignore = 1;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+            const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+            const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
+            const uint64_t value = to_big_endian_order(interp);
+            s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+            partial_keys.insert((rev_value & (~BITMASK(bits_to_zero_out)) | (1ULL << bits_to_zero_out)));
+        }
+
+        {
+            uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
+            value = to_big_endian_order(value);
+            s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
+            partial_keys.insert(0b0000000000000000000000000000000000011101000010111000000000000000UL);
+
+            value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
+            value = to_big_endian_order(value);
+            s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+            const uint64_t rev_value = __bswap_64(value);
+            keys.insert(rev_value);
+        }
+
+        SUBCASE("no false negatives: random end-points") {
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+            const uint32_t n_queries = 100000;
+            std::set<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() % (4 * 0x0000000011111111UL);
+                uint64_t r = rng() % (4 * 0x0000000011111111UL);
+                if (l > r)
+                    std::swap(l, r);
+                bool skip = *keys.lower_bound(l) > r;
+                if (!skip)
+                    queries.insert({l, r});
+            }
+            for (auto [l, r] : queries) {
+                const uint64_t conv_l = to_big_endian_order(l);
+                const uint64_t conv_r = to_big_endian_order(r);
+                REQUIRE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
+                                     reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
+        }
+
+        SUBCASE("no false negatives: bounded-length ranges") {
+            const uint32_t rng_seed = 3;
+            std::mt19937_64 rng(rng_seed);
+            const uint32_t n_queries = 100000;
+            const uint64_t length_modulo = 1ULL << 17;
+            std::set<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() % (4 * 0x0000000011111111UL);
+                uint64_t r = l + rng() % length_modulo;
+                bool skip = *keys.lower_bound(l) > r;
+                if (!skip)
+                    queries.insert({l, r});
+            }
+            for (auto [l, r] : queries) {
+                const uint64_t conv_l = to_big_endian_order(l);
+                const uint64_t conv_r = to_big_endian_order(r);
+                REQUIRE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
+                                     reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
+        }
+
+        SUBCASE("intersections with partial keys") {
+            const uint32_t rng_seed = 4;
+            std::mt19937_64 rng(rng_seed);
+            const uint32_t n_queries = 100000;
+            std::set<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() % (4 * 0x0000000011111111UL);
+                uint64_t next_key = *keys.lower_bound(l);
+                uint64_t r = l + rng() % (next_key - l);
+                bool skip = true;
+                for (uint64_t partial_key : partial_keys) {
+                    const uint64_t partial_l = partial_key - (partial_key & -partial_key);
+                    const uint64_t partial_r = partial_key | (partial_key - 1);
+                    if (std::max(l, partial_l) <= std::min(r, partial_r)) {
+                        skip = false;
+                        break;
+                    }
+                }
+                if (!skip)
+                    queries.insert({l, r});
+            }
+            for (auto [l, r] : queries) {
+                const uint64_t conv_l = to_big_endian_order(l);
+                const uint64_t conv_r = to_big_endian_order(r);
+                REQUIRE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
+                                     reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
+        }
+
+        SUBCASE("negatives: close to keys from the left") {
+            const uint32_t rng_seed = 5;
+            std::mt19937_64 rng(rng_seed);
+            const uint32_t n_queries = 100000;
+            std::set<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() % (4 * 0x0000000011111111UL);
+                uint64_t next_key = *keys.lower_bound(l);
+                uint64_t r = l + rng() % (next_key - l);
+                bool skip = false;
+                for (uint64_t partial_key : partial_keys) {
+                    const uint64_t partial_l = partial_key - (partial_key & -partial_key);
+                    const uint64_t partial_r = partial_key | (partial_key - 1);
+                    if (std::max(l, partial_l) <= std::min(r, partial_r)) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (!skip)
+                    queries.insert({l, r});
+            }
+            for (auto [l, r] : queries) {
+                const uint64_t conv_l = to_big_endian_order(l);
+                const uint64_t conv_r = to_big_endian_order(r);
+                REQUIRE_FALSE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
+                                           reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
+        }
+
+        SUBCASE("negatives: close to keys from the right") {
+            const uint32_t rng_seed = 6;
+            std::mt19937_64 rng(rng_seed);
+            const uint32_t n_queries = 100000;
+            std::set<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t r = rng() % (4 * 0x0000000011111111UL);
+                auto it = keys.lower_bound(r);
+                --it;
+                uint64_t prev_key = *it;
+                uint64_t l = r - rng() % (r - prev_key);
+                bool skip = false;
+                for (uint64_t partial_key : partial_keys) {
+                    const uint64_t partial_l = partial_key - (partial_key & -partial_key);
+                    const uint64_t partial_r = partial_key | (partial_key - 1);
+                    if (std::max(l, partial_l) <= std::min(r, partial_r)) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (!skip)
+                    queries.insert({l, r});
+            }
+            for (auto [l, r] : queries) {
+                const uint64_t conv_l = to_big_endian_order(l);
+                const uint64_t conv_r = to_big_endian_order(r);
+                REQUIRE_FALSE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
+                                           reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
         }
     }
 
@@ -563,8 +970,16 @@ private:
 };
 
 TEST_SUITE("steroids") {
-    TEST_CASE("insertion") {
-        SteroidsTests::InsertionTest();
+    TEST_CASE("insert") {
+        SteroidsTests::Insert();
+    }
+
+    TEST_CASE("point query") {
+        SteroidsTests::PointQuery();
+    }
+
+    TEST_CASE("range query") {
+        SteroidsTests::RangeQuery();
     }
 }
 

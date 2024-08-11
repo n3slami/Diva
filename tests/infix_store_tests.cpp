@@ -5,6 +5,9 @@
  * @author Rafael Kallis <rk@rafaelkallis.com>
  */
 
+#include <random>
+#include <utility>
+#include <vector>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
@@ -21,7 +24,7 @@ const char ansi_white[] = "\033[0;97m";
 
 class InfixStoreTests {
 public:
-    static void TestAllocation() {
+    static void Allocation() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -34,7 +37,7 @@ public:
     }
 
 
-    static void TestShiftingSlots() {
+    static void ShiftingSlots() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -153,7 +156,7 @@ public:
     }
 
 
-    static void TestShiftingRunends() {
+    static void ShiftingRunends() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -231,7 +234,7 @@ public:
         }
     }
 
-    static void TestInsertRaw() {
+    static void InsertRaw() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -378,51 +381,175 @@ public:
         }
     }
 
-    static void TestGetInfixList() {
+    static void GetInfixList() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Steroids s(infix_size, seed, load_factor);
         Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
-        const uint64_t keys[21] = {0b00000000000001, 0b00000000000101, 0b00000000010101,
-                                   0b00000000100001, 0b00000000100011, 0b00000000100101,
-                                   0b01000000100001, 0b01000000100011, 0b01000000100101,
-                                   0b01000000100110, 0b01000000100110, 0b01000000100110,
-                                   0b01000001100001, 0b01000001100011, 0b01000001100101,
-                                   0b01111111000001, 0b01111111000010, 0b01111111000010,
-                                   0b01111111100001, 0b01111111100010, 0b01111111100010};
-        for (int32_t i = 0; i < 21; i++)
-            s.InsertRawIntoInfixStore(store, keys[i]);
-        uint64_t res[22];
+        const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
+            0b00000000010101, 0b00000000100001, 0b00000000100011,
+            0b00000000100101, 0b01000000100001, 0b01000000100011,
+            0b01000000100101, 0b01000000100110, 0b01000000100110,
+            0b01000000100110, 0b01000001100001, 0b01000001100011,
+            0b01000001100101, 0b01111111000001, 0b01111111000010,
+            0b01111111000010, 0b01111111100001, 0b01111111100010,
+            0b01111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+        uint64_t res[keys.size() + 1];
         const uint32_t len = s.GetInfixList(store, res);
-        REQUIRE_EQ(len, 21);
-        for (int32_t i = 0; i < 21; i++)
+        REQUIRE_EQ(len, keys.size());
+        for (int32_t i = 0; i < keys.size(); i++)
             REQUIRE_EQ(res[i], keys[i]);
     }
 
-    static void TestLoadInfixList() {
+    static void LoadInfixList() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Steroids s(infix_size, seed, load_factor);
         Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
-        const uint64_t keys[27] = {0b000000000000001, 0b000000000000101, 0b000000000010101,
-                                   0b000000000100001, 0b000000000100011, 0b000000000100101,
-                                   0b001000000100001, 0b001000000100011, 0b001000000100101,
-                                   0b001000000100110, 0b001000000100110, 0b001000000100110,
-                                   0b001000001100001, 0b001000001100011, 0b001000001100101,
-                                   0b001111111000001, 0b001111111000010, 0b001111111000010,
-                                   0b001111111100001, 0b001111111100010, 0b001111111100010,
-                                   0b011111111000001, 0b011111111000010, 0b011111111000010,
-                                   0b011111111100001, 0b011111111100010, 0b011111111100010};
-        s.LoadListToInfixStore(store, keys, 27);
-        uint64_t res[28];
+        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
+            0b000000000010101, 0b000000000100001, 0b000000000100011,
+            0b000000000100101, 0b001000000100001, 0b001000000100011,
+            0b001000000100101, 0b001000000100110, 0b001000000100110,
+            0b001000000100110, 0b001000001100001, 0b001000001100011,
+            0b001000001100101, 0b001111111000001, 0b001111111000010,
+            0b001111111000010, 0b001111111100001, 0b001111111100010,
+            0b001111111100010, 0b011111111000001, 0b011111111000010,
+            0b011111111000010, 0b011111111100001, 0b011111111100010,
+            0b011111111100010};
+        s.LoadListToInfixStore(store, keys.data(), keys.size());
+        uint64_t res[keys.size() + 1];
         const uint32_t len = s.GetInfixList(store, res);
-        REQUIRE_EQ(len, 27);
-        for (int32_t i = 0; i < 27; i++)
+        REQUIRE_EQ(len, keys.size());
+        for (int32_t i = 0; i < keys.size(); i++)
             REQUIRE_EQ(res[i], keys[i]);
+    }
+
+
+    static void PointQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+
+        const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
+            0b00000000010101, 0b00000000100001, 0b00000000101000,
+            0b00000000101011, 0b01000000100001, 0b01000000100011,
+            0b01000000100101, 0b01000000100110, 0b01000000100110,
+            0b01000000100110, 0b01000001110000, 0b01000001100011,
+            0b01000001100101, 0b01111111000001, 0b01111111000011,
+            0b01111111000111, 0b01111111100001, 0b01111111100010,
+            0b01111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+
+        SUBCASE("no false negatives") {
+            for (uint64_t key : keys)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, key), true);
+        }
+
+        SUBCASE("extensions of partial infix") {
+            std::vector<uint64_t> queries;
+            for (uint64_t key : keys)
+                for (uint64_t query_key = key - (key & -key); query_key < (key | (key - 1)); query_key++)
+                    queries.emplace_back(query_key);
+            for (uint64_t query : queries)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, query), true);
+        }
+
+        SUBCASE("negatives") {
+            std::vector<uint64_t> queries;
+            for (uint64_t query_key = 0; query_key < (1ULL << (s.infix_size_ + Steroids::base_implicit_size)); query_key++) {
+                
+                bool valid = true;
+                for (uint64_t key : keys)
+                    if (key - (key & -key) <= query_key && query_key <= (key | (key - 1))) {
+                        valid = false;
+                        break;
+                    }
+                if (valid)
+                    queries.emplace_back(query_key);
+            }
+            for (uint64_t query : queries)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, query), false);
+        }
+    }
+
+    static void RangeQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        
+        const uint32_t n_queries = 100000;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
+            0b00000000010101, 0b00000000100001, 0b00000000101000,
+            0b00000000101011, 0b01000000100001, 0b01000000100011,
+            0b01000000100101, 0b01000000100110, 0b01000000100110,
+            0b01000000100110, 0b01000001110000, 0b01000001100011,
+            0b01000001100101, 0b01111111000001, 0b01111111000011,
+            0b01111111000111, 0b01111111100001, 0b01111111100010,
+            0b01111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+
+        SUBCASE("no false negatives") {
+            std::vector<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                if (l > r)
+                    std::swap(l, r);
+
+                bool valid = false;
+                for (uint64_t key : keys) {
+                    const uint64_t key_l = key - (key & -key);
+                    const uint64_t key_r = key | (key - 1);
+                    if (std::max(key_l, l) <= std::min(key_r, r)) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if (valid)
+                    queries.emplace_back(l, r);
+            }
+            for (auto [query_l, query_r] : queries)
+                REQUIRE_EQ(s.RangeQueryInfixStore(store, query_l, query_r), true);
+        }
+
+        SUBCASE("negatives") {
+            std::vector<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                if (l > r)
+                    std::swap(l, r);
+
+                bool valid = true;
+                for (uint64_t key : keys) {
+                    const uint64_t key_l = key - (key & -key);
+                    const uint64_t key_r = key | (key - 1);
+                    if (std::max(key_l, l) <= std::min(key_r, r)) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid)
+                    queries.emplace_back(l, r);
+            }
+            for (auto [query_l, query_r] : queries)
+                REQUIRE_EQ(s.RangeQueryInfixStore(store, query_l, query_r), false);
+        }
     }
 
 private:
@@ -459,27 +586,35 @@ private:
 
 TEST_SUITE("infix_store") {
     TEST_CASE("allocation") {
-        InfixStoreTests::TestAllocation();
+        InfixStoreTests::Allocation();
     }
 
     TEST_CASE("shifting slots") {
-        InfixStoreTests::TestShiftingSlots();
+        InfixStoreTests::ShiftingSlots();
     }
 
     TEST_CASE("shifting runends") {
-        InfixStoreTests::TestShiftingRunends();
+        InfixStoreTests::ShiftingRunends();
     }
 
     TEST_CASE("raw inserts") {
-        InfixStoreTests::TestInsertRaw();
+        InfixStoreTests::InsertRaw();
     }
 
     TEST_CASE("get infix list") {
-        InfixStoreTests::TestGetInfixList();
+        InfixStoreTests::GetInfixList();
     }
 
     TEST_CASE("load infix list") {
-        InfixStoreTests::TestLoadInfixList();
+        InfixStoreTests::LoadInfixList();
+    }
+
+    TEST_CASE("point query") {
+        InfixStoreTests::PointQuery();
+    }
+
+    TEST_CASE("range query") {
+        InfixStoreTests::RangeQuery();
     }
 }
 

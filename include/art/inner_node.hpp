@@ -34,7 +34,7 @@ public:
   /**
    * Returns the value stored in the node.
    */
-  T *get_value() const {
+  virtual T *get_value() {
       return nullptr;
   }
 

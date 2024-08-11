@@ -40,3 +40,7 @@ add_executable(ArtNode256Tests ./node_256_tests.cpp)
 target_link_libraries(ArtNode256Tests ArtLib doctest)
 add_test(NAME test_art_node_256 COMMAND ArtNode256Tests)
 
+add_executable(ArtTreeItTests ./tree_it_tests.cpp)
+target_link_libraries(ArtTreeItTests ArtLib doctest)
+add_test(NAME test_art_tree_it COMMAND ArtTreeItTests)
+

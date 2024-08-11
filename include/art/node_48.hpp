@@ -72,8 +72,8 @@ private:
 
 template <class T> class node_48_valued : public node_48<T> {
 public:
-    T *get_value() const {
-        return &value_;
+    T *get_value() override {
+        return reinterpret_cast<T *>(&value_);
     };
 
     inner_node<T> *grow() override {

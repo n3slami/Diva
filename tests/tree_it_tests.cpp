@@ -6,6 +6,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "art.hpp"
@@ -72,7 +73,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int0, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 3, "aa"));
       REQUIRE_EQ("aa", it.key());
 
       ++it;
@@ -80,7 +80,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int1, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 5, "aaaa"));
       REQUIRE_EQ("aaaa", it.key());
 
       ++it;
@@ -88,7 +87,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int2, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaaaaa"));
       REQUIRE_EQ("aaaaaaa", it.key());
 
       ++it;
@@ -96,7 +94,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int3, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaaaaaaaa"));
       REQUIRE_EQ("aaaaaaaaaa", it.key());
 
       ++it;
@@ -104,7 +101,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int4, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 10, "aaaaaaaba"));
       REQUIRE_EQ("aaaaaaaba", it.key());
 
       ++it;
@@ -112,7 +108,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int5, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaabaa"));
       REQUIRE_EQ("aaaabaa", it.key());
 
       ++it;
@@ -120,7 +115,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int6, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaabaaaaa"));
       REQUIRE_EQ("aaaabaaaaa", it.key());
 
       ++it;
@@ -173,7 +167,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int6, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaabaaaaa"));
       REQUIRE_EQ("aaaabaaaaa", it.key());
 
       --it;
@@ -181,7 +174,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int5, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaabaa"));
       REQUIRE_EQ("aaaabaa", it.key());
 
       --it;
@@ -189,7 +181,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int4, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 10, "aaaaaaaba"));
       REQUIRE_EQ("aaaaaaaba", it.key());
 
       --it;
@@ -197,7 +188,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int3, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaaaaaaaa"));
       REQUIRE_EQ("aaaaaaaaaa", it.key());
 
       --it;
@@ -205,7 +195,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int2, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaaaaa"));
       REQUIRE_EQ("aaaaaaa", it.key());
 
 
@@ -214,7 +203,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int1, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 5, "aaaa"));
       REQUIRE_EQ("aaaa", it.key());
 
       --it;
@@ -222,7 +210,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it == it_begin);
       REQUIRE_EQ(&int0, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 3, "aa"));
       REQUIRE_EQ("aa", it.key());
     }
 
@@ -255,29 +242,37 @@ TEST_SUITE("tree_it") {
       int int4 = 5;
       int int5 = 5;
       int int6 = 6;
+      int int7 = 10;
+      int int8 = 11;
+      int int9 = 12;
+      int int10 = 13;
 
       art::art<int*> m;
 
-      m.set(reinterpret_cast<const uint8_t *>("aa"), 2, &int0);
-      m.set(reinterpret_cast<const uint8_t *>("aaaa"), 4, &int1);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaa"), 7, &int2);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaaaa"), 10, &int3);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaba"), 9, &int4);
-      m.set(reinterpret_cast<const uint8_t *>("aaaabaa"), 7, &int5);
-      m.set(reinterpret_cast<const uint8_t *>("aaaabaaaaa"), 10, &int6);
+      m.set(reinterpret_cast<const uint8_t *>("aa"), &int0);
+      m.set(reinterpret_cast<const uint8_t *>("aaaa"), &int1);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaa"), &int2);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaaaa"), &int3);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaba"), &int4);
+      m.set(reinterpret_cast<const uint8_t *>("aaaabaa"), &int5);
+      m.set(reinterpret_cast<const uint8_t *>("aaaabaaaaa"), &int6);
+      m.set(reinterpret_cast<const uint8_t *>("aaba"), &int7);
+      m.set(reinterpret_cast<const uint8_t *>("aabb"), &int8);
+      m.set(reinterpret_cast<const uint8_t *>("aabba"), &int9);
+      m.set(reinterpret_cast<const uint8_t *>("aabc"), &int10);
 
       /* The above statements construct the following tree:
        *
-       *    (aa)->0
-       *     |a
-       *     |
-       *    (a)->0
-       *     |a\____________b
-       *     |              \
-       *    (aa)->2         (aa)->5
-       *     |a\___b         |a
-       *     |     \         |
-       *   (aa)->3 (a)->4   (aa)->6
+       *        (aa)->0
+       *       a/  \______________________b
+       *       /                          |
+       *     (a)->0                       ()________c
+       *     a| \____________b          a/ \__b     \
+       *      |              \          /     \     ()->10
+       *     (aa)->2         (aa)->5   ()->7  ()->8
+       *    a/  \___b         |a             a|
+       *    /       \         |               ()->9
+       *  (aa)->3  (a)->4   (aa)->6
        *
        */
 
@@ -290,7 +285,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int0, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 3, "aa"));
       REQUIRE_EQ("aa", it.key());
 
       ++it;
@@ -298,7 +292,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int1, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 5, "aaaa"));
       REQUIRE_EQ("aaaa", it.key());
 
       ++it;
@@ -306,7 +299,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int2, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaaaaa"));
       REQUIRE_EQ("aaaaaaa", it.key());
 
       ++it;
@@ -314,7 +306,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int3, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaaaaaaaa"));
       REQUIRE_EQ("aaaaaaaaaa", it.key());
 
       ++it;
@@ -322,7 +313,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int4, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 10, "aaaaaaaba"));
       REQUIRE_EQ("aaaaaaaba", it.key());
 
       ++it;
@@ -330,7 +320,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int5, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaabaa"));
       REQUIRE_EQ("aaaabaa", it.key());
 
       ++it;
@@ -338,11 +327,38 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_end);
       REQUIRE_EQ(&int6, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaabaaaaa"));
       REQUIRE_EQ("aaaabaaaaa", it.key());
 
       ++it;
-      // 7 (overflow)
+      // 7
+      REQUIRE(it != it_end);
+      REQUIRE_EQ(&int7, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aaba", it.key());
+
+      ++it;
+      // 8
+      REQUIRE(it != it_end);
+      REQUIRE_EQ(&int8, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabb", it.key());
+
+      ++it;
+      // 9
+      REQUIRE(it != it_end);
+      REQUIRE_EQ(&int9, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabba", it.key());
+
+      ++it;
+      // 10
+      REQUIRE(it != it_end);
+      REQUIRE_EQ(&int10, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabc", it.key());
+
+      ++it;
+      // 11 (overflow)
       REQUIRE(it == it_end);
     }
 
@@ -354,44 +370,79 @@ TEST_SUITE("tree_it") {
       int int4 = 5;
       int int5 = 5;
       int int6 = 6;
+      int int7 = 10;
+      int int8 = 11;
+      int int9 = 12;
+      int int10 = 13;
 
       art::art<int*> m;
 
-      m.set(reinterpret_cast<const uint8_t *>("aa"), 2, &int0);
-      m.set(reinterpret_cast<const uint8_t *>("aaaa"), 4, &int1);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaa"), 7, &int2);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaaaa"), 10, &int3);
-      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaba"), 9, &int4);
-      m.set(reinterpret_cast<const uint8_t *>("aaaabaa"), 7, &int5);
-      m.set(reinterpret_cast<const uint8_t *>("aaaabaaaaa"), 10, &int6);
+      m.set(reinterpret_cast<const uint8_t *>("aa"), &int0);
+      m.set(reinterpret_cast<const uint8_t *>("aaaa"), &int1);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaa"), &int2);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaaaa"), &int3);
+      m.set(reinterpret_cast<const uint8_t *>("aaaaaaaba"), &int4);
+      m.set(reinterpret_cast<const uint8_t *>("aaaabaa"), &int5);
+      m.set(reinterpret_cast<const uint8_t *>("aaaabaaaaa"), &int6);
+      m.set(reinterpret_cast<const uint8_t *>("aaba"), &int7);
+      m.set(reinterpret_cast<const uint8_t *>("aabb"), &int8);
+      m.set(reinterpret_cast<const uint8_t *>("aabba"), &int9);
+      m.set(reinterpret_cast<const uint8_t *>("aabc"), &int10);
 
       /* The above statements construct the following tree:
        *
-       *    (aa)->0
-       *     |a
-       *     |
-       *    (a)->0
-       *     |a\____________b
-       *     |              \
-       *    (aa)->2         (aa)->5
-       *     |a\___b         |a
-       *     |     \         |
-       *   (aa)->3 (a)->4   (aa)->6
+       *        (aa)->0
+       *       a/  \______________________b
+       *       /                          |
+       *     (a)->0                       ()________c
+       *     a| \____________b          a/ \__b     \
+       *      |              \          /     \     ()->10
+       *     (aa)->2         (aa)->5   ()->7  ()->8
+       *    a/  \___b         |a             a|
+       *    /       \         |               ()->9
+       *  (aa)->3  (a)->4   (aa)->6
        *
        */
 
       auto it = m.begin();
-      for (int i = 0; i < 6; i++)
+      for (int i = 0; i < 10; i++)
           it++;
       auto it_begin = m.begin();
       std::string key;
       key.reserve(20);
 
+      // 10
+      REQUIRE(it != it_begin);
+      REQUIRE_EQ(&int10, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabc", it.key());
+
+      --it;
+      // 9
+      REQUIRE(it != it_begin);
+      REQUIRE_EQ(&int9, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabba", it.key());
+
+      --it;
+      // 8
+      REQUIRE(it != it_begin);
+      REQUIRE_EQ(&int8, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aabb", it.key());
+
+      --it;
+      // 7
+      REQUIRE(it != it_begin);
+      REQUIRE_EQ(&int7, *it);
+      it.key(key.begin());
+      REQUIRE_EQ("aaba", it.key());
+
+      --it;
       // 6
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int6, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaabaaaaa"));
       REQUIRE_EQ("aaaabaaaaa", it.key());
 
       --it;
@@ -399,7 +450,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int5, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaabaa"));
       REQUIRE_EQ("aaaabaa", it.key());
 
       --it;
@@ -407,7 +457,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int4, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 10, "aaaaaaaba"));
       REQUIRE_EQ("aaaaaaaba", it.key());
 
       --it;
@@ -415,7 +464,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int3, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 11, "aaaaaaaaaa"));
       REQUIRE_EQ("aaaaaaaaaa", it.key());
 
       --it;
@@ -423,16 +471,13 @@ TEST_SUITE("tree_it") {
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int2, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 8, "aaaaaaa"));
       REQUIRE_EQ("aaaaaaa", it.key());
-
 
       --it;
       // 1
       REQUIRE(it != it_begin);
       REQUIRE_EQ(&int1, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 5, "aaaa"));
       REQUIRE_EQ("aaaa", it.key());
 
       --it;
@@ -440,7 +485,6 @@ TEST_SUITE("tree_it") {
       REQUIRE(it == it_begin);
       REQUIRE_EQ(&int0, *it);
       it.key(key.begin());
-      REQUIRE(std::equal(key.begin(), key.begin() + 3, "aa"));
       REQUIRE_EQ("aa", it.key());
     }
 

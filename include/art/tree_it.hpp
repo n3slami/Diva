@@ -86,8 +86,8 @@ private:
     const uint8_t *get_key() const;
     int get_depth() const;
 
-    void seek_leaf();
-    void seek_leaf_rev();
+    void seek_value(bool check_inner_node_value=true);
+    void seek_value_rev(const bool go_up=true);
 
     node<T> *root_;
     std::vector<step> traversal_stack_;
@@ -229,7 +229,9 @@ tree_it<T>::tree_it() {}
 
 template <class T>
 tree_it<T>::tree_it(node<T> *root, std::vector<step> traversal_stack) : root_(root), traversal_stack_(traversal_stack) {
-    seek_leaf();
+    if (get_node()->is_leaf())
+        return;
+    seek_value();
 }
 
 template <class T> tree_it<T> tree_it<T>::min(node<T> *root) {
@@ -251,28 +253,39 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const uint8_t *key, const ui
     traversal_stack.push_back({root, 0, nullptr, {nullptr, -2}, {nullptr, -2}, {nullptr, -1}});
 
     while (true) {
-        tree_it<T>::step &cur_step = traversal_stack.back();
+        tree_it<T>::step& cur_step = traversal_stack.back();
         node<T> *cur_node = cur_step.child_node_;
         int cur_depth = cur_step.depth_;
 
-        int prefix_match_len = std::min<int>(cur_node->check_prefix(key + cur_depth, key_len - cur_depth), key_len - cur_depth);
+        int prefix_match_len = std::min<int32_t>(cur_node->check_prefix(key + cur_depth,
+                                                                        key_len - cur_depth),
+                                                 key_len - cur_depth);
+
         // if search key "equals" the prefix
-        if (key_len == cur_depth + prefix_match_len) {
-            return tree_it<T>(root, traversal_stack);
+        if (prefix_match_len == cur_node->prefix_len_) {
+            if (key_len == cur_depth + prefix_match_len)
+                return tree_it<T>(root, traversal_stack);
+            if (cur_node->is_leaf() && key_len > cur_depth + prefix_match_len) {
+                for (++traversal_stack.back();
+                        traversal_stack.back().child_it_ == traversal_stack.back().child_it_end_;
+                        ++traversal_stack.back())
+                    traversal_stack.pop_back();
+                return tree_it<T>(root, traversal_stack);
+            }
         }
         // if search key is "greater than" the prefix
         const uint8_t diff_key_char = key[cur_depth + prefix_match_len];
         const uint8_t diff_node_char = cur_node->prefix_[prefix_match_len];
-        std::cerr << "diff_key_char=" << +diff_key_char << " diff_node_char=" << +diff_node_char << std::endl;
-        if (prefix_match_len < cur_node->prefix_len_ && diff_key_char > diff_node_char) {
-            ++cur_step;
-            return tree_it<T>(root, traversal_stack);
-        }
-        if (cur_node->is_leaf()) {
+        if (prefix_match_len < cur_node->prefix_len_) {
+            if (diff_key_char > diff_node_char)
+                for (++traversal_stack.back();
+                        traversal_stack.back().child_it_ == traversal_stack.back().child_it_end_;
+                        ++traversal_stack.back())
+                    traversal_stack.pop_back();
             return tree_it<T>(root, traversal_stack);
         }
         // seek subtree where search key is "lesser than or equal" the subtree partial key
-        inner_node<T> *cur_inner_node = static_cast<inner_node<T> *>(cur_node);
+        inner_node<T> *cur_inner_node = reinterpret_cast<inner_node<T> *>(cur_node);
         child_it<T> c_it = cur_inner_node->begin();
         child_it<T> c_it_begin = cur_inner_node->begin();
         child_it<T> c_it_end = cur_inner_node->end();
@@ -280,6 +293,13 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const uint8_t *key, const ui
         for (; c_it != c_it_end; ++c_it) {
             if (key[cur_depth + cur_node->prefix_len_] <= c_it.get_partial_key())
                 break;
+        }
+        if (c_it == c_it_end) {
+            for (++traversal_stack.back();
+                    traversal_stack.back().child_it_ == traversal_stack.back().child_it_end_;
+                    ++traversal_stack.back())
+                traversal_stack.pop_back();
+            return tree_it<T>(root, traversal_stack);
         }
         int depth = cur_depth + cur_node->prefix_len_ + 1;
         tree_it<T>::step child(depth, c_it, c_it_begin, c_it_end);
@@ -295,31 +315,40 @@ tree_it<T> tree_it<T>::greater_equal(node<T> *root, const uint8_t *key, const ui
 }
 
 template <class T> typename tree_it<T>::value_type tree_it<T>::operator*() {
-    assert(get_node()->is_leaf());
-    return static_cast<leaf_node<T> *>(get_node())->value_;
+    if (get_node()->is_leaf())
+        return reinterpret_cast<leaf_node<T> *>(get_node())->value_;
+    inner_node<T> *cur_node = reinterpret_cast<inner_node<T> *>(get_node());
+    assert(cur_node->get_value() != nullptr);
+    return *cur_node->get_value();
 }
 
 
 template <class T> typename tree_it<T>::value_type& tree_it<T>::ref() {
-    assert(get_node()->is_leaf());
-    return static_cast<leaf_node<T> *>(get_node())->value_;
+    if (get_node()->is_leaf())
+        return reinterpret_cast<leaf_node<T> *>(get_node())->value_;
+    inner_node<T> *cur_node = reinterpret_cast<inner_node<T> *>(get_node());
+    assert(cur_node->get_value() != nullptr);
+    return *(cur_node->get_value());
 }
 
 
 template <class T> typename tree_it<T>::pointer tree_it<T>::operator->() {
-    assert(get_node()->is_leaf());
-    return &static_cast<leaf_node<T> *>(get_node())->value_;
+    if (get_node()->is_leaf())
+        return &reinterpret_cast<leaf_node<T> *>(get_node())->value_;
+    inner_node<T> *cur_node = reinterpret_cast<inner_node<T> *>(get_node());
+    assert(cur_node->get_value() != nullptr);
+    return cur_node->get_value();
 }
 
 template <class T> tree_it<T> &tree_it<T>::operator++() {
     if (get_node()->is_leaf()) {
         ++get_step();
-        seek_leaf();
+        seek_value(true);
         return *this;
     }
     inner_node<T> *inner = reinterpret_cast<inner_node<T> *>(get_node());
     assert(inner->get_value() != nullptr);
-    seek_leaf();
+    seek_value(false);
     return *this;
 }
 
@@ -331,16 +360,22 @@ template <class T> tree_it<T> tree_it<T>::operator++(int) {
 
 template <class T> tree_it<T> &tree_it<T>::operator--() {
     if (get_node()->is_leaf()) {
-        const step old_step = get_step();
-        if (old_step.child_it_ == old_step.child_it_begin_)
-            seek_leaf_rev();
-        else
+        if (get_step().child_it_ == get_step().child_it_begin_) {
+            seek_value_rev(true);
+        }
+        else {
             --get_step();
+            seek_value_rev(false);
+        }
         return *this;
     }
-    inner_node<T> *inner = reinterpret_cast<inner_node<T> *>(get_node());
-    assert(inner->get_value() != nullptr);
-    seek_leaf_rev();
+    assert(reinterpret_cast<inner_node<T> *>(get_node())->get_value() != nullptr);
+    if (get_step().child_it_ != get_step().child_it_begin_) {
+        --get_step();
+        seek_value_rev(false);
+    }
+    else
+        seek_value_rev(true);
     return *this;
 }
 
@@ -386,22 +421,27 @@ const std::string tree_it<T>::key() const {
 }
 
 template <class T>
-void tree_it<T>::seek_leaf() {
-    /* traverse up until a node on the right is found or stack gets empty */
-    for (; get_step().child_it_ == get_step().child_it_end_; ++get_step()) {
-        traversal_stack_.pop_back();
-        if (get_step().child_node_ == root_) { // root guard
+void tree_it<T>::seek_value(bool check_inner_node_value) {
+    if (get_step().child_it_ == get_step().child_it_end_) {
+        /* traverse up until a node on the right is found or stack gets empty */
+        for (; get_step().child_it_ == get_step().child_it_end_; ++get_step()) {
             traversal_stack_.pop_back();
-            assert(traversal_stack_.empty());
-            return;
+            if (get_step().child_node_ == root_) { // root guard
+                traversal_stack_.pop_back();
+                assert(traversal_stack_.empty());
+                return;
+            }
         }
+        check_inner_node_value = true;
     }
 
-    /* find leftmost leaf node */
+    /* find leftmost valued node */
     while (!get_node()->is_leaf()) {
         inner_node<T> *cur_inner_node = static_cast<inner_node<T> *>(get_node());
-        if (cur_inner_node->get_value() != nullptr)
+        if (check_inner_node_value && cur_inner_node->get_value() != nullptr)
             break;
+        check_inner_node_value = true;
+
         int depth = get_depth() + get_node()->prefix_len_ + 1;
         child_it<T> c_it = cur_inner_node->begin();
         child_it<T> c_it_begin = cur_inner_node->begin();
@@ -416,21 +456,24 @@ void tree_it<T>::seek_leaf() {
 }
 
 template <class T>
-void tree_it<T>::seek_leaf_rev() {
-    /* traverse up until a node on the right is found or stack gets empty */
-    while (get_step().child_it_ == get_step().child_it_begin_) {
-        traversal_stack_.pop_back();
-        if (get_step().child_node_ == root_) { // root guard
+void tree_it<T>::seek_value_rev(const bool go_up) {
+    if (go_up) {
+        /* traverse up until a node on the left is found or stack gets empty */
+        bool went_up = false;
+        do {
             traversal_stack_.pop_back();
-            assert(traversal_stack_.empty());
+            went_up = true;
+        } while (get_step().child_it_ == get_step().child_it_begin_ 
+                && reinterpret_cast<inner_node<T> *>(get_node())->get_value() == nullptr);
+        if (went_up && reinterpret_cast<inner_node<T> *>(get_node())->get_value() != nullptr)
             return;
-        }
+
+        --get_step();
     }
-    --get_step();
 
     /* find rightmost leaf node */
     while (!get_node()->is_leaf()) {
-        inner_node<T> *cur_inner_node = static_cast<inner_node<T> *>(get_node());
+        inner_node<T> *cur_inner_node = reinterpret_cast<inner_node<T> *>(get_node());
         int depth = get_depth() + get_node()->prefix_len_ + 1;
         child_it<T> c_it = cur_inner_node->end();
         --c_it;
