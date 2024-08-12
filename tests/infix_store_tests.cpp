@@ -1,8 +1,6 @@
 /**
- * @file art tests
+ * @file infix store tests
  * @author ---
- *
- * @author Rafael Kallis <rk@rafaelkallis.com>
  */
 
 #include <random>
@@ -14,7 +12,6 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
-#include <string>
 
 #include "steroids.hpp"
 #include "util.hpp"
@@ -378,6 +375,158 @@ public:
             }
             REQUIRE_EQ(s.GetSlot(store, 537), (inserts[6] & BITMASK(infix_size)));
             REQUIRE_EQ(get_bitmap_bit(runends, 537), 1);
+        }
+    }
+
+    static void DeleteRaw() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+
+        const std::vector<uint64_t> keys {0b00000010011000, 0b00000010010100,
+            0b00000010010110, 0b00000010010101, 0b00000010011111,
+            0b00000010110101, 0b00000010110111, 0b00000010111001,
+            0b00000011111011, 0b00000100011011, 0b00000100011111,
+            0b00000111100001, 0b00000111100011, 0b00000111100111,
+            0b11111010000001, 0b11111101100101, 0b11111101100111,
+            0b11111110011111, 0b11111110110101, 0b11111111011000,
+            0b11111111010100, 0b11111111010110, 0b11111111010101,
+            0b11111111011111, 0b11111111100001, 0b11111111100011};
+        s.LoadListToInfixStore(store, keys.data(), keys.size());
+
+        SUBCASE("single match, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b00000010011111);
+            const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15, 500,
+                507, 508, 509, 510, 511};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110}, {7,1,0b10101},
+                     {8,0,0b10101}, {9,0,0b10111}, {10,1,0b11001},
+                     {11,1,0b11011}, {12,0,0b11011}, {13,1,0b11111},
+                     {15,0,0b00001}, {16,0,0b00011}, {17,1,0b00111},
+                     {526,1,0b00001}, {527,0,0b00101}, {528,1,0b00111},
+                     {529,1,0b11111}, {530,1,0b10101}, {531,0,0b11000},
+                     {532,0,0b10100}, {533,0,0b10110}, {534,0,0b10101},
+                     {535,1,0b11111}, {536,0,0b00001}, {537,1,0b00011}};
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        SUBCASE("multiple matches, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b00000010010101);
+            {
+                const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15,
+                    500, 507, 508, 509, 510, 511};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                     {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110},
+                         {7,1,0b11111}, {8,0,0b10101}, {9,0,0b10111},
+                         {10,1,0b11001}, {11,1,0b11011}, {12,0,0b11011},
+                         {13,1,0b11111}, {15,0,0b00001}, {16,0,0b00011},
+                         {17,1,0b00111}, {526,1,0b00001}, {527,0,0b00101},
+                         {528,1,0b00111}, {529,1,0b11111}, {530,1,0b10101},
+                         {531,0,0b11000}, {532,0,0b10100}, {533,0,0b10110},
+                         {534,0,0b10101}, {535,1,0b11111}, {536,0,0b00001},
+                         {537,1,0b00011}};
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+
+            s.DeleteRawFromInfixStore(store, 0b00000010010101);
+            {
+                const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15,
+                    500, 507, 508, 509, 510, 511};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                     {{4,0,0b11000}, {5,0,0b10100}, {6,1,0b11111},
+                         {7,0,0b10101}, {8,0,0b10111}, {9,1,0b11001},
+                         {10,1,0b11011}, {11,0,0b11011}, {12,1,0b11111},
+                         {15,0,0b00001}, {16,0,0b00011}, {17,1,0b00111},
+                         {526,1,0b00001}, {527,0,0b00101}, {528,1,0b00111},
+                         {529,1,0b11111}, {530,1,0b10101}, {531,0,0b11000},
+                         {532,0,0b10100}, {533,0,0b10110}, {534,0,0b10101},
+                         {535,1,0b11111}, {536,0,0b00001}, {537,1,0b00011}};
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+        }
+
+        SUBCASE("destroy run, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b00000011111011);
+            const std::vector<uint32_t> occupieds_pos = {4, 5, 8, 15, 500, 507,
+                508, 509, 510, 511};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110}, {7,0,0b10101},
+                     {8,1,0b11111}, {9,0,0b10101}, {10,0,0b10111},
+                     {11,1,0b11001}, {12,0,0b11011}, {13,1,0b11111},
+                     {15,0,0b00001}, {16,0,0b00011}, {17,1,0b00111},
+                     {526,1,0b00001}, {527,0,0b00101}, {528,1,0b00111},
+                     {529,1,0b11111}, {530,1,0b10101}, {531,0,0b11000},
+                     {532,0,0b10100}, {533,0,0b10110}, {534,0,0b10101},
+                     {535,1,0b11111}, {536,0,0b00001}, {537,1,0b00011}};
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        SUBCASE("single match, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b11111111011111);
+            const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15, 500,
+                507, 508, 509, 510, 511};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110}, {7,0,0b10101},
+                     {8,1,0b11111}, {9,0,0b10101}, {10,0,0b10111},
+                     {11,1,0b11001}, {12,1,0b11011}, {13,0,0b11011},
+                     {14,1,0b11111}, {15,0,0b00001}, {16,0,0b00011},
+                     {17,1,0b00111}, {526,1,0b00001}, {528,0,0b00101},
+                     {529,1,0b00111}, {530,1,0b11111}, {531,1,0b10101},
+                     {532,0,0b11000}, {533,0,0b10100}, {534,0,0b10110},
+                     {535,1,0b10101}, {536,0,0b00001}, {537,1,0b00011}};
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        SUBCASE("multiple matches, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b11111111010101);
+            {
+                const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15,
+                    500, 507, 508, 509, 510, 511};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                     {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110},
+                         {7,0,0b10101}, {8,1,0b11111}, {9,0,0b10101},
+                         {10,0,0b10111}, {11,1,0b11001}, {12,1,0b11011},
+                         {13,0,0b11011}, {14,1,0b11111}, {15,0,0b00001},
+                         {16,0,0b00011}, {17,1,0b00111}, {526,1,0b00001},
+                         {528,0,0b00101}, {529,1,0b00111}, {530,1,0b11111},
+                         {531,1,0b10101}, {532,0,0b11000}, {533,0,0b10100},
+                         {534,0,0b10110}, {535,1,0b11111}, {536,0,0b00001},
+                         {537,1,0b00011}};
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+            s.DeleteRawFromInfixStore(store, 0b11111111010101);
+            {
+                const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15,
+                    500, 507, 508, 509, 510, 511};
+                const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                     {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110},
+                         {7,0,0b10101}, {8,1,0b11111}, {9,0,0b10101},
+                         {10,0,0b10111}, {11,1,0b11001}, {12,1,0b11011},
+                         {13,0,0b11011}, {14,1,0b11111}, {15,0,0b00001},
+                         {16,0,0b00011}, {17,1,0b00111}, {526,1,0b00001},
+                         {529,0,0b00101}, {530,1,0b00111}, {531,1,0b11111},
+                         {532,1,0b10101}, {533,0,0b11000}, {534,0,0b10100},
+                         {535,1,0b11111}, {536,0,0b00001}, {537,1,0b00011}};
+                AssertStoreContents(s, store, occupieds_pos, checks);
+            }
+        }
+
+        SUBCASE("destroy run, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b11111110110101);
+            const std::vector<uint32_t> occupieds_pos = {4, 5, 7, 8, 15, 500,
+                507, 508, 510, 511};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                 {{4,0,0b11000}, {5,0,0b10100}, {6,0,0b10110}, {7,0,0b10101},
+                     {8,1,0b11111}, {9,0,0b10101}, {10,0,0b10111},
+                     {11,1,0b11001}, {12,1,0b11011}, {13,0,0b11011},
+                     {14,1,0b11111}, {15,0,0b00001}, {16,0,0b00011},
+                     {17,1,0b00111}, {526,1,0b00001}, {528,0,0b00101},
+                     {529,1,0b00111}, {530,1,0b11111}, {531,0,0b11000},
+                     {532,0,0b10100}, {533,0,0b10110}, {534,0,0b10101},
+                     {535,1,0b11111}, {536,0,0b00001}, {537,1,0b00011}};
+            AssertStoreContents(s, store, occupieds_pos, checks);
         }
     }
 
@@ -1339,8 +1488,12 @@ TEST_SUITE("infix_store") {
         InfixStoreTests::ShiftingRunends();
     }
 
-    TEST_CASE("raw inserts") {
+    TEST_CASE("insert") {
         InfixStoreTests::InsertRaw();
+    }
+
+    TEST_CASE("delete") {
+        InfixStoreTests::DeleteRaw();
     }
 
     TEST_CASE("get infix list") {

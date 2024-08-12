@@ -1,13 +1,10 @@
 /**
- * @file art tests
+ * @file steroids tests
  * @author ---
- *
- * @author Rafael Kallis <rk@rafaelkallis.com>
  */
 
 #include <endian.h>
 #include <limits>
-#include <memory>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"

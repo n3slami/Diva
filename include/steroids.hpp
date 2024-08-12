@@ -9,6 +9,7 @@
 #include <endian.h>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <random>
 #include <string>
 #include <string_view>
@@ -143,42 +144,42 @@ private:
             return Steroids::infix_store_target_size + (slot_count * (slot_size + 1) + 63) / 64;
         }
 
-        inline uint32_t GetElemCount() const {
+        uint32_t GetElemCount() const {
             return status & BITMASK(elem_count_bit_count);
         }
 
-        inline void SetElemCount(const int32_t elem_count) {
+        void SetElemCount(const int32_t elem_count) {
             status &= ~BITMASK(elem_count_bit_count);
             status |= elem_count;
         }
 
-        inline void UpdateElemCount(const int32_t delta) {
+        void UpdateElemCount(const int32_t delta) {
             status += delta;
         }
 
-        inline uint32_t GetSizeGrade() const {
+        uint32_t GetSizeGrade() const {
             return (status >> elem_count_bit_count) & BITMASK(size_grade_bit_count);
         }
 
-        inline void SetSizeGrade(const uint32_t size_grade) {
+        void SetSizeGrade(const uint32_t size_grade) {
             status &= ~(BITMASK(size_grade_bit_count) << elem_count_bit_count);
             status |= size_grade << elem_count_bit_count;
         }
 
-        inline uint32_t GetInvalidBits() const {
+        uint32_t GetInvalidBits() const {
             return status >> (elem_count_bit_count + size_grade_bit_count) & 7U;
         }
 
-        inline void SetInvalidBits(const uint32_t invalid_bits) {
+        void SetInvalidBits(const uint32_t invalid_bits) {
             status &= ~(7U << (elem_count_bit_count + size_grade_bit_count));
             status |= invalid_bits << (elem_count_bit_count + size_grade_bit_count);
         }
 
-        inline bool IsPartialKey() const {
+        bool IsPartialKey() const {
             return status >> 31;
         }
 
-        inline void SetPartialKey(bool val) {
+        void SetPartialKey(bool val) {
             if (val)
                 status |= (1U << 31);
             else 
@@ -194,53 +195,56 @@ private:
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count];
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
 
-    inline void AddTreeKey(const uint8_t *key, const size_t key_len);
-    inline void InsertSimple(const InfiniteByteString key);
-    inline void InsertSplit(const InfiniteByteString key);
-    inline void SetupScaleFactors();
-    inline std::tuple<uint32_t, uint32_t, uint32_t> 
+    void AddTreeKey(const uint8_t *key, const size_t key_len);
+    void InsertSimple(const InfiniteByteString key);
+    void InsertSplit(const InfiniteByteString key);
+    void SetupScaleFactors();
+    std::tuple<uint32_t, uint32_t, uint32_t> 
         GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
                                        const InfiniteByteString key_2) const;
-    inline uint64_t ExtractPartialKey(const InfiniteByteString key,
-                                      const uint32_t shared, const uint32_t ignore,
-                                      const uint32_t implicit_size, const uint64_t msb) const;
+    uint64_t ExtractPartialKey(const InfiniteByteString key,
+                               const uint32_t shared, const uint32_t ignore,
+                               const uint32_t implicit_size, const uint64_t msb) const;
 
-    inline uint32_t RankOccupieds(const InfixStore &store, const uint32_t pos) const;
-    inline uint32_t SelectRunends(const InfixStore &store, const uint32_t rank) const;
-    inline int32_t NextRunend(const InfixStore &store, const uint32_t pos) const;
-    inline int32_t NextOccupied(const InfixStore &store, const uint32_t pos) const;
-    inline int32_t PreviousRunend(const InfixStore &store, const uint32_t pos) const;
+    uint32_t RankOccupieds(const InfixStore &store, const uint32_t pos) const;
+    uint32_t SelectRunends(const InfixStore &store, const uint32_t rank) const;
+    int32_t NextOccupied(const InfixStore &store, const uint32_t pos) const;
+    int32_t PreviousOccupied(const InfixStore &store, const uint32_t pos) const;
+    int32_t NextRunend(const InfixStore &store, const uint32_t pos) const;
+    int32_t PreviousRunend(const InfixStore &store, const uint32_t pos) const;
 
-    inline uint64_t GetSlot(const InfixStore &store, const uint32_t pos) const;
-    inline void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value);
-    inline void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width);
+    uint64_t GetSlot(const InfixStore &store, const uint32_t pos) const;
+    void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value);
+    void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width);
 
-    inline void ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
-    inline void ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
-    inline void ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
-    inline void ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
+    void ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
+    void ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
+    void ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
+    void ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r, const uint32_t shamt);
 
-    inline int32_t FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const;
-    inline int32_t FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const;
-    inline void InsertRawIntoInfixStore(InfixStore &store, const uint64_t key,
-                                        const uint32_t total_implicit=infix_store_target_size);
-    inline bool RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
-                                     const uint32_t total_implicit=infix_store_target_size) const;
-    inline bool PointQueryInfixStore(InfixStore &store, const uint64_t key,
-                                     const uint32_t total_implicit=infix_store_target_size) const;
-    inline void ResizeInfixStore(InfixStore &store, const bool expand=true,
+    int32_t FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const;
+    int32_t FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const;
+    void InsertRawIntoInfixStore(InfixStore &store, const uint64_t key,
                                  const uint32_t total_implicit=infix_store_target_size);
-    inline void ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size);
-    inline void LoadListToInfixStore(InfixStore &store, const uint64_t *list, const size_t list_len,
-                                     const uint32_t total_implicit=infix_store_target_size, const bool zero_out=false);
-    inline InfixStore AllocateInfixStoreWithList(const uint64_t *list, const size_t list_len,
-                                                 const uint32_t total_implicit=infix_store_target_size);
-    inline uint32_t GetInfixList(const InfixStore &store, uint64_t *res) const;
-    inline uint32_t GetExpandedInfixListLength(const uint64_t *list, const size_t list_len, const uint32_t implicit_size,
-                                               const uint32_t shamt, const uint64_t lower_lim, const uint64_t upper_lim);
-    inline void UpdateInfixList(const uint64_t *list, const size_t list_len, const uint32_t shamt, 
-                                     const uint64_t lower_lim, const uint64_t upper_lim,
-                                     uint64_t *res, const size_t res_len);
+    void DeleteRawFromInfixStore(InfixStore &store, const uint64_t key,
+                                 const uint32_t total_implicit=infix_store_target_size);
+    bool RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
+                              const uint32_t total_implicit=infix_store_target_size) const;
+    bool PointQueryInfixStore(InfixStore &store, const uint64_t key,
+                              const uint32_t total_implicit=infix_store_target_size) const;
+    void ResizeInfixStore(InfixStore &store, const bool expand=true,
+                          const uint32_t total_implicit=infix_store_target_size);
+    void ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size);
+    void LoadListToInfixStore(InfixStore &store, const uint64_t *list, const size_t list_len,
+                              const uint32_t total_implicit=infix_store_target_size, const bool zero_out=false);
+    InfixStore AllocateInfixStoreWithList(const uint64_t *list, const size_t list_len,
+                                          const uint32_t total_implicit=infix_store_target_size);
+    uint32_t GetInfixList(const InfixStore &store, uint64_t *res) const;
+    uint32_t GetExpandedInfixListLength(const uint64_t *list, const size_t list_len, const uint32_t implicit_size,
+                                        const uint32_t shamt, const uint64_t lower_lim, const uint64_t upper_lim);
+    void UpdateInfixList(const uint64_t *list, const size_t list_len, const uint32_t shamt, 
+                         const uint64_t lower_lim, const uint64_t upper_lim,
+                         uint64_t *res, const size_t res_len);
 };
 
 
@@ -679,6 +683,30 @@ inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t 
 }
 
 
+inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *occupieds = store.ptr;
+    int32_t res = pos + 1, lb_pos;
+    do {
+        lb_pos = lowbit_pos(occupieds[res / 64] & (~BITMASK(res % 64)));
+        res += lb_pos - res % 64;
+    } while (lb_pos == 64 && res < infix_store_target_size);
+    return res;
+}
+
+
+__attribute__((always_inline))
+inline int32_t Steroids::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *occupieds = store.ptr;
+    int32_t res = pos - 1, hb_pos;
+    do {
+        const int32_t offset = res % 64;
+        hb_pos = highbit_pos(occupieds[res / 64] & BITMASK(offset + 1));
+        res += (hb_pos == 64 ? -offset - 1 : hb_pos - offset);
+    } while (hb_pos == 64 && res >= 0);
+    return res;
+}
+
+
 __attribute__((always_inline))
 inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
@@ -689,17 +717,6 @@ inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos)
         lb_pos = lowbit_pos(runends[res / 64] & (~BITMASK(res % 64)));
         res += lb_pos - res % 64;
     } while (lb_pos == 64 && res < runends_size);
-    return res;
-}
-
-
-inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t pos) const {
-    const uint64_t *occupieds = store.ptr;
-    int32_t res = pos + 1, lb_pos;
-    do {
-        lb_pos = lowbit_pos(occupieds[res / 64] & (~BITMASK(res % 64)));
-        res += lb_pos - res % 64;
-    } while (lb_pos == 64 && res < infix_store_target_size);
     return res;
 }
 
@@ -903,6 +920,110 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
     }
     set_bitmap_bit(occupieds, implicit_part);
     store.UpdateElemCount(1);
+}
+
+
+inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const uint32_t elem_count = store.GetElemCount();
+    if (size_grade > 0 && elem_count == (size_grade > 1 ? scaled_sizes_[size_grade - 2] : infix_store_target_size))
+        ResizeInfixStore(store, true, total_implicit);
+
+    const uint64_t implicit_part = key >> infix_size_;
+    const uint64_t explicit_part = key & BITMASK(infix_size_);
+    const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
+
+    uint64_t *occupieds = store.ptr;
+    const bool is_occupied = get_bitmap_bit(occupieds, implicit_part);
+    assert(is_occupied);
+
+    const uint32_t key_rank = RankOccupieds(store, implicit_part);
+    const int32_t runend_pos = SelectRunends(store, key_rank);
+    const int32_t runstart_pos = std::max(key_rank ? static_cast<int32_t>(SelectRunends(store, key_rank - 1)) : -1,
+                                          static_cast<int32_t>(FindEmptySlotBefore(store, runend_pos))) + 1;
+    const bool run_destroyed = runstart_pos == runend_pos;
+
+    int32_t l = runstart_pos - 1, r = runend_pos + 1, mid;
+    while (r - l > 1) {
+        mid = (l + r) / 2;
+        uint64_t value = GetSlot(store, mid);
+        value -= value & -value;
+        if (value <= key - 1)
+            l = mid;
+        else 
+            r = mid;
+    }
+    int32_t match_pos;
+    for (match_pos = l; match_pos >= 0; match_pos--) {
+        const uint64_t value = GetSlot(store, match_pos);
+        const uint64_t mask = ((value & -value) << 1) - 1;
+        if ((value | mask) == (explicit_part | mask))
+            break;
+    }
+
+    // TODO: Perhaps I can avoid shifting the cluster by changing the inserts?
+    // But that may slow down inserts...
+    
+    bool found_empty_right = false;     // If we find an empty to the right, we
+                                        // can be sure we have to shift to the
+                                        // left. But if we don't, we have to do
+                                        // further checking.
+    int32_t cur_occupied = implicit_part;
+    int32_t cur_runend = runend_pos, prev_runend;
+    int32_t shift_start = -1, shift_end = -1;
+    while (cur_runend < scaled_sizes_[size_grade]) {
+        // Find last run that starts in its canonical slot.
+        prev_runend = cur_runend;
+        if (prev_runend + 1 < scaled_sizes_[size_grade] && GetSlot(store, prev_runend + 1) == 0) {
+            found_empty_right = true;
+            break;
+        }
+        cur_runend = NextRunend(store, cur_runend);
+        cur_occupied = NextOccupied(store, cur_occupied);
+        const uint32_t mapped_pos = (cur_occupied * size_scalars_[size_grade] * implicit_scalar) 
+                                            >> (scale_shift + scale_implicit_shift);
+        shift_end = (mapped_pos < prev_runend + 1 ? cur_runend : shift_end);
+        if (mapped_pos > prev_runend + 1)
+            break;
+    }
+    if (!found_empty_right) {
+        // Check if should shift to the right.
+        int32_t cur_occupied = implicit_part;
+        int32_t cur_runend = PreviousRunend(store, runend_pos), prev_runend = runend_pos;
+        while (cur_runend >= 0) {
+            if (GetSlot(store, cur_runend + 1) == 0) {
+                const int32_t runstart = FindEmptySlotBefore(store, prev_runend) + 1;
+                const uint32_t mapped_pos = (cur_occupied * size_scalars_[size_grade] * implicit_scalar) 
+                                                    >> (scale_shift + scale_implicit_shift);
+                shift_start = (mapped_pos > runstart ? runstart : shift_start);
+                break;
+            }
+            const uint32_t mapped_pos = (cur_occupied * size_scalars_[size_grade] * implicit_scalar) 
+                                                >> (scale_shift + scale_implicit_shift);
+            shift_start = (mapped_pos > cur_runend + 1 ? cur_runend + 1 : shift_start);
+            prev_runend = cur_runend;
+            cur_runend = PreviousRunend(store, cur_runend);
+            cur_occupied = PreviousOccupied(store, cur_occupied);
+        }
+    }
+
+    uint64_t *runends = store.ptr + infix_store_target_size / 64;
+    if (shift_start == -1) {    // Shift to the left
+        ShiftRunendsLeft(store, match_pos + 1, shift_end + 1, 1);
+        ShiftSlotsLeft(store, match_pos + 1, shift_end + 1, 1);
+        if (!run_destroyed)
+            set_bitmap_bit(runends, runend_pos - 1);
+    }
+    else {  // Shift to the right
+        ShiftRunendsRight(store, shift_start, match_pos, 1);
+        ShiftSlotsRight(store, shift_start, match_pos, 1);
+        if (!run_destroyed)
+            set_bitmap_bit(runends, runend_pos);
+    }
+    
+    if (run_destroyed)
+        reset_bitmap_bit(occupieds, implicit_part);
+    store.UpdateElemCount(-1);
 }
 
 
