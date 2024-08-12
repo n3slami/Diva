@@ -72,6 +72,8 @@ public:
 
     void Insert(std::string_view key);
     void Insert(const uint8_t *key, const size_t key_len);
+    void Delete(std::string_view input_key);
+    void Delete(const uint8_t *input_key, const size_t input_key_len);
     bool RangeQuery(std::string_view input_l, std::string_view input_r) const;
     bool RangeQuery(const uint8_t *input_l, const size_t input_l_len,
                     const uint8_t *input_r, const size_t input_r_len) const;
@@ -222,6 +224,8 @@ private:
     void AddTreeKey(const uint8_t *key, const size_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
+    void DeleteSimple(const InfiniteByteString key);
+    void DeleteMerge(const InfiniteByteString key);
     template <class t_itr>
     void BulkLoadFixedLength(t_itr begin, t_itr end, const size_t key_len);
     template <class t_itr>
@@ -256,6 +260,8 @@ private:
                                  const uint32_t total_implicit=infix_store_target_size);
     void DeleteRawFromInfixStore(InfixStore &store, const uint64_t key,
                                  const uint32_t total_implicit=infix_store_target_size);
+    uint32_t GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                         const uint32_t total_implicit=infix_store_target_size) const;
     bool RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
                               const uint32_t total_implicit=infix_store_target_size) const;
     bool PointQueryInfixStore(InfixStore &store, const uint64_t key,
@@ -686,6 +692,15 @@ inline uint64_t Steroids::ExtractPartialKey(const InfiniteByteString key,
 }
 
 
+inline void Steroids::Delete(std::string_view input_key) {
+    Delete(reinterpret_cast<const uint8_t *>(input_key.data()), input_key.size());
+}
+
+
+inline void Steroids::Delete(const uint8_t *input_key, const size_t input_key_len) {
+}
+
+
 template <class t_itr>
 inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const size_t key_len) {
     uint64_t infix_list[infix_store_target_size];
@@ -1104,7 +1119,7 @@ inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t 
             r = mid;
     }
     int32_t match_pos;
-    for (match_pos = l; match_pos >= 0; match_pos--) {
+    for (match_pos = l; match_pos >= runstart_pos; match_pos--) {
         const uint64_t value = GetSlot(store, match_pos);
         const uint64_t mask = ((value & -value) << 1) - 1;
         if ((value | mask) == (explicit_part | mask))
@@ -1174,6 +1189,43 @@ inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t 
     if (run_destroyed)
         reset_bitmap_bit(occupieds, implicit_part);
     store.UpdateElemCount(-1);
+}
+
+
+inline uint32_t Steroids::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                                      const uint32_t total_implicit) const {
+    const uint64_t implicit_part = key >> infix_size_;
+    const uint64_t explicit_part = key & BITMASK(infix_size_);
+    const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
+
+    uint64_t *occupieds = store.ptr;
+    const bool is_occupied = get_bitmap_bit(occupieds, implicit_part);
+    assert(is_occupied);
+
+    const uint32_t key_rank = RankOccupieds(store, implicit_part);
+    const int32_t runend_pos = SelectRunends(store, key_rank);
+    const int32_t runstart_pos = std::max(key_rank ? static_cast<int32_t>(SelectRunends(store, key_rank - 1)) : -1,
+                                          static_cast<int32_t>(FindEmptySlotBefore(store, runend_pos))) + 1;
+    const bool run_destroyed = runstart_pos == runend_pos;
+
+    int32_t l = runstart_pos - 1, r = runend_pos + 1, mid;
+    while (r - l > 1) {
+        mid = (l + r) / 2;
+        uint64_t value = GetSlot(store, mid);
+        value -= value & -value;
+        if (value <= key - 1)
+            l = mid;
+        else 
+            r = mid;
+    }
+    int32_t match_pos;
+    for (match_pos = l; match_pos >= runstart_pos; match_pos--) {
+        const uint64_t value = GetSlot(store, match_pos);
+        const uint64_t mask = ((value & -value) << 1) - 1;
+        if ((value | mask) == (explicit_part | mask))
+            return infix_size_ - lowbit_pos(value);
+    }
+    return 0;   // No matching infix found
 }
 
 

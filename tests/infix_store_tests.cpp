@@ -530,6 +530,32 @@ public:
         }
     }
 
+
+    static void GetLongestMatchingInfixSize() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+
+        const std::vector<uint64_t> keys {0b00000010011000, 0b00000010010100,
+            0b00000010010110, 0b00000010010101, 0b00000010011111,
+            0b00000010110101, 0b00000010110111, 0b00000010111001,
+            0b00000011111011, 0b00000100011011, 0b00000100011111,
+            0b00000111100001, 0b00000111100011, 0b00000111100111, 0b00100111110000, 0b00100111110010, 0b00100111110011,
+            0b11111010000001, 0b11111101100101, 0b11111101100111,
+            0b11111110011111, 0b11111110110101, 0b11111111011000,
+            0b11111111010100, 0b11111111010110, 0b11111111010101,
+            0b11111111011111, 0b11111111100001, 0b11111111100011};
+        s.LoadListToInfixStore(store, keys.data(), keys.size());
+
+        PrintStore(s, store);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111110011), infix_size);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111110001), infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111100001), infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b11111111111111), 0);
+    }
+
     static void GetInfixList() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -1493,7 +1519,12 @@ TEST_SUITE("infix_store") {
     }
 
     TEST_CASE("delete") {
-        InfixStoreTests::DeleteRaw();
+        SUBCASE("delete raw") {
+            InfixStoreTests::DeleteRaw();
+        }
+        SUBCASE("get longest matching infix size") {
+            InfixStoreTests::GetLongestMatchingInfixSize();
+        }
     }
 
     TEST_CASE("get infix list") {
