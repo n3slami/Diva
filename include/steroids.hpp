@@ -43,12 +43,31 @@ class Steroids {
     friend class InfixStoreTests;
 
 public:
-    Steroids(const uint32_t infix_size, const uint32_t rng_seed,
-             const float load_factor): infix_size_(infix_size), load_factor_(load_factor) {
+    Steroids(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor):
+            infix_size_(infix_size),
+            load_factor_(load_factor) {
         rng_.seed(rng_seed);
-        for (int32_t i = 0; i < 8; i++)
-            zero_padding += '\0';
         SetupScaleFactors();
+    }
+
+    template <class t_itr>
+    Steroids(const uint32_t infix_size, t_itr begin, t_itr end, const size_t key_len,
+             const uint32_t rng_seed, const float load_factor):
+            infix_size_(infix_size),
+            load_factor_(load_factor) {
+        rng_.seed(rng_seed);
+        SetupScaleFactors();
+        BulkLoadFixedLength(begin, end, key_len);
+    }
+
+    template <class t_itr>
+    Steroids(const uint32_t infix_size, t_itr begin, t_itr end, 
+             const uint32_t rng_seed, const float load_factor):
+            infix_size_(infix_size),
+            load_factor_(load_factor) {
+        rng_.seed(rng_seed);
+        SetupScaleFactors();
+        BulkLoad(begin, end);
     }
 
     void Insert(std::string_view key);
@@ -70,7 +89,13 @@ private:
 
     struct InfiniteByteString {
         const uint8_t *str;
-        const size_t length;
+        size_t length;
+
+        InfiniteByteString& operator=(const InfiniteByteString& other) {
+            str = other.str;
+            length = other.length;
+            return *this;
+        }
 
         uint64_t WordAt(const uint32_t byte_pos) const {
             if (byte_pos >= length)
@@ -190,7 +215,6 @@ private:
     uint32_t infix_size_;
     art::art<InfixStore> tree_;
     std::mt19937 rng_;
-    std::string zero_padding;
     const float load_factor_ = 0.95;
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count];
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
@@ -198,6 +222,10 @@ private:
     void AddTreeKey(const uint8_t *key, const size_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
+    template <class t_itr>
+    void BulkLoadFixedLength(t_itr begin, t_itr end, const size_t key_len);
+    template <class t_itr>
+    void BulkLoad(t_itr begin, t_itr end);
     void SetupScaleFactors();
     std::tuple<uint32_t, uint32_t, uint32_t> 
         GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
@@ -656,6 +684,128 @@ inline uint64_t Steroids::ExtractPartialKey(const InfiniteByteString key,
     res |= msb << (implicit_size - 1 + infix_size_);
     return res;
 }
+
+
+template <class t_itr>
+inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const size_t key_len) {
+    uint64_t infix_list[infix_store_target_size];
+    t_itr last_key_it = begin, key_it = begin;
+    InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
+    InfiniteByteString right_key {};
+    AddTreeKey(left_key.str, left_key.length);
+    int32_t cnt = 1;
+    for (++key_it; key_it != end; ++key_it) {
+        if (cnt % infix_store_target_size == 0) {   // New boundary key
+            right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
+            AddTreeKey(right_key.str, right_key.length);
+            auto it = tree_.begin(left_key.str, left_key.length);
+
+            auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+            const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+            const uint64_t next_implicit = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+            const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+            ++last_key_it;
+            for (int32_t i = 0; i < infix_store_target_size - 1; i++) {
+                const InfiniteByteString key {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
+                const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
+                infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+                ++last_key_it;
+            }
+            LoadListToInfixStore(it.ref(), infix_list, infix_store_target_size - 1, total_implicit);
+            left_key = right_key;
+        }
+        cnt++;
+    }
+
+    // Add what was left from the loop
+    uint8_t min_str[key_len], max_str[key_len];
+    memset(min_str, 0, key_len);
+    memset(max_str, 0xFF, key_len);
+    AddTreeKey(min_str, key_len);
+    AddTreeKey(max_str, key_len);
+
+    right_key = {max_str, key_len};
+    auto it = tree_.begin(left_key.str, left_key.length);
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+    const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+    const uint64_t next_implicit = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    int32_t i = 0;
+    ++last_key_it;
+    while (last_key_it != key_it) {
+        const InfiniteByteString key {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
+        const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
+        infix_list[i++] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+        ++last_key_it;
+    }
+    if (i)
+        LoadListToInfixStore(it.ref(), infix_list, i, total_implicit);
+}
+
+
+template <class t_itr>
+inline void Steroids::BulkLoad(t_itr begin, t_itr end) {
+    uint64_t infix_list[infix_store_target_size];
+    t_itr last_key_it = begin, key_it = begin;
+    std::string_view sv {*key_it};
+    InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(sv.data()), sv.size()};
+    InfiniteByteString right_key {};
+    AddTreeKey(left_key.str, left_key.length);
+    int32_t cnt = 1;
+    size_t max_len = sv.size();
+    for (++key_it; key_it != end; ++key_it) {
+        if (cnt % infix_store_target_size == 0) {   // New boundary key
+            std::string_view sv = *key_it;
+            right_key = {reinterpret_cast<const uint8_t *>(sv.data()), sv.size()};
+            AddTreeKey(right_key.str, right_key.length);
+            auto it = tree_.begin(left_key.str, left_key.length);
+
+            auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+            const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+            const uint64_t next_implicit = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+            const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+            ++last_key_it;
+            for (int32_t i = 0; i < infix_store_target_size - 1; i++) {
+                sv = *last_key_it;
+                const InfiniteByteString key {reinterpret_cast<const uint8_t *>(sv.data()), sv.size()};
+                const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
+                infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+                ++last_key_it;
+            }
+            LoadListToInfixStore(it.ref(), infix_list, infix_store_target_size - 1, total_implicit);
+            left_key = right_key;
+        }
+        sv = *key_it;
+        max_len = std::max(max_len, sv.size());
+        cnt++;
+    }
+
+    // Add what was left from the loop
+    uint8_t min_str[max_len], max_str[max_len];
+    memset(min_str, 0, max_len);
+    memset(max_str, 0xFF, max_len);
+    AddTreeKey(min_str, max_len);
+    AddTreeKey(max_str, max_len);
+
+    right_key = {max_str, max_len};
+    auto it = tree_.begin(left_key.str, left_key.length);
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+    const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+    const uint64_t next_implicit = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    int32_t i = 0;
+    ++last_key_it;
+    while (last_key_it != key_it) {
+        sv = *last_key_it;
+        const InfiniteByteString key {reinterpret_cast<const uint8_t *>(sv.data()), sv.size()};
+        const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
+        infix_list[i++] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+        ++last_key_it;
+    }
+    if (i)
+        LoadListToInfixStore(it.ref(), infix_list, i, total_implicit);
+}
+
 
 __attribute__((always_inline))
 inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
@@ -1239,4 +1389,5 @@ inline uint32_t Steroids::GetInfixList(const InfixStore &store, uint64_t *res) c
     }
     return ind;
 }
+
 
