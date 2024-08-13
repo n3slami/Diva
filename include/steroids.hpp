@@ -80,6 +80,7 @@ public:
     bool PointQuery(std::string_view key) const;
     bool PointQuery(const uint8_t *key, const size_t key_len) const;
     void ShrinkInfixSize(const uint32_t new_infix_size);
+    size_t Size() const;
 
 private:
     static const uint32_t infix_store_target_size = 512;
@@ -676,6 +677,13 @@ inline void Steroids::ShrinkInfixSize(const uint32_t new_infix_size) {
     } while (it != tree_.end());
 
     infix_size_ = new_infix_size;
+}
+
+inline size_t Steroids::Size() const {
+    size_t res = 0;
+    for (auto it = tree_.begin(); it != tree_.end(); ++it)
+        res += (scaled_sizes_[it.ref().GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
+    return res;
 }
 
 
