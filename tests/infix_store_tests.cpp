@@ -549,7 +549,6 @@ public:
             0b11111111011111, 0b11111111100001, 0b11111111100011};
         s.LoadListToInfixStore(store, keys.data(), keys.size());
 
-        PrintStore(s, store);
         REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111110011), infix_size);
         REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111110001), infix_size - 1);
         REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b00100111100001), infix_size - 4);

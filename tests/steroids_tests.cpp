@@ -3,6 +3,7 @@
  * @author ---
  */
 
+#include "wormhole/wh.h"
 #include <endian.h>
 #include <limits>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -36,7 +37,6 @@ public:
 
         value = to_big_endian_order(0x0000000011111111UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-        auto it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
 
         value = to_big_endian_order(0x0000000022222222UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
@@ -52,6 +52,7 @@ public:
 
         value = to_big_endian_order(0x0000000040007777UL);
         s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+
 
         for (int32_t i = 1; i < 100; i++) {
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
@@ -103,7 +104,19 @@ public:
                    {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                    {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                    {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            const uint64_t value = to_big_endian_order(0x0000000011111111UL);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                             reinterpret_cast<void **>(&store), &dummy);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            wh_iter_destroy(it);
         }
 
         for (int32_t i = 90; i >= 70; i -= 2) {
@@ -160,7 +173,19 @@ public:
                       {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                       {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                       {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            const uint64_t value = to_big_endian_order(0x0000000011111111UL);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                             reinterpret_cast<void **>(&store), &dummy);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            wh_iter_destroy(it);
         }
 
         const uint32_t shamt = 16;
@@ -234,15 +259,25 @@ public:
                      {487,1,0b10001}, {493,1,0b01001}, {499,1,0b00001},
                      {503,1,0b10111}, {509,1,0b01111}, {515,1,0b00111},
                      {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
-            AssertStoreContents(s, it.ref(), occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            const uint64_t value = to_big_endian_order(0x0000000011111111UL);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                             reinterpret_cast<void **>(&store), &dummy);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            wh_iter_destroy(it);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
         value = to_big_endian_order(value);
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
-        value = to_big_endian_order(0x0000000011111111UL);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         SUBCASE("split infix store: left half") {
             const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32,
                 38, 43, 49, 54, 60, 65, 71, 76, 82, 87, 92, 98, 103, 109, 114,
@@ -282,16 +317,27 @@ public:
                      {531,0,0b10010}, {532,0,0b10110}, {533,0,0b11010},
                      {534,1,0b11110}, {535,0,0b00010}, {536,0,0b00110},
                      {537,1,0b01010}};
-            auto store = it.ref();
-            REQUIRE_FALSE(store.IsPartialKey());
-            REQUIRE_EQ(store.GetInvalidBits(), 0);
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            const uint64_t value = to_big_endian_order(0x0000000011111111UL);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                             reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE_FALSE(store->IsPartialKey());
+            REQUIRE_EQ(store->GetInvalidBits(), 0);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            wh_iter_destroy(it);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
         value &= ~BITMASK(shamt);
         value = to_big_endian_order(value);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - shamt / 8);
+        //it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - shamt / 8);
         SUBCASE("split infix store: right half") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
                 7, 8, 9, 10, 11, 20, 31, 42, 53, 64, 75, 86, 97, 108, 119, 129,
@@ -322,24 +368,39 @@ public:
                      {393,1,0b00100}, {412,1,0b00100}, {428,1,0b11100},
                      {446,1,0b11100}, {464,1,0b11100}, {482,1,0b11100},
                      {501,1,0b10100}, {519,1,0b10100}};
-            auto store = it.ref();
+            uint8_t res_key[sizeof(uint64_t)];
+            uint32_t res_size, dummy;
+            Steroids::InfixStore store;
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8);
+
+            wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
+                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
             AssertStoreContents(s, store, occupieds_pos, checks);
+
+            wh_iter_destroy(it);
         }
 
         // Split an extension of a partial boundary key
-        const std::string old_boundary = it.key();
-        uint32_t extended_key_len = it.get_key_len() + 1;
+        uint8_t old_boundary [sizeof(uint64_t)];
+        uint32_t old_boundary_size;
+        {
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8);
+            uint32_t dummy;
+            Steroids::InfixStore store;
+            wh_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
+                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
+            wh_iter_destroy(it);
+        }
+        uint32_t extended_key_len = old_boundary_size + 1;
         uint8_t extended_key[extended_key_len];
-        memcpy(extended_key, it.key().c_str(), extended_key_len);
+        memcpy(extended_key, old_boundary, extended_key_len);
         extended_key[extended_key_len - 1] = 1;
         s.InsertSplit({extended_key, extended_key_len});
-
-        value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
-        value &= ~BITMASK(shamt);
-        value = to_big_endian_order(value);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - shamt / 8);
 
         SUBCASE("split infix store using an extension of a partial boundary key") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
@@ -371,27 +432,39 @@ public:
                      {375,1,0b00100}, {393,1,0b00100}, {412,1,0b00100},
                      {428,1,0b11100}, {446,1,0b11100}, {464,1,0b11100},
                      {482,1,0b11100}, {501,1,0b10100}, {519,1,0b10100}};
-            auto store = it.ref();
-            REQUIRE(store.IsPartialKey());
-            REQUIRE_EQ(store.GetInvalidBits(), 0);
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
 
-            REQUIRE_EQ(old_boundary.size(), it.get_key_len());
-            REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
-            ++it;
+            uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
+            value &= ~BITMASK(shamt);
+            value = to_big_endian_order(value);
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8);
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE(store->IsPartialKey());
+            REQUIRE_EQ(store->GetInvalidBits(), 0);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            REQUIRE_EQ(old_boundary_size, res_size);
+            REQUIRE_EQ(memcmp(old_boundary, res_key, old_boundary_size), 0);
+            wh_iter_skip1(it);
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
             const uint64_t expected_next_boundary_key = 0x0000000022222222ULL;
             uint64_t current_key = 0;
-            memcpy(&current_key, it.key().c_str(), it.get_key_len());
+            memcpy(&current_key, res_key, res_size);
             REQUIRE_EQ(__bswap_64(current_key), expected_next_boundary_key);
+
+            wh_iter_destroy(it);
         }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
         value = to_big_endian_order(value);
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
-        value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value) - 2);
-        --it;
         SUBCASE("split infix store, create void infixes") {
             const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6,
                 7, 8, 9, 10, 11, 12, 13, 14, 15, 32, 33, 34, 35, 36, 37, 38,
@@ -493,50 +566,93 @@ public:
                      {520,1,0b10000}, {522,1,0b10000}, {524,1,0b10000},
                      {526,1,0b10000}, {528,1,0b10000}, {530,1,0b10000},
                      {532,1,0b10000}, {534,1,0b10000}};
-            auto store = it.ref();
-            REQUIRE(store.IsPartialKey());
-            REQUIRE_EQ(store.GetInvalidBits(), 0);
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
 
-            REQUIRE_EQ(old_boundary.size(), it.get_key_len());
-            REQUIRE_EQ(memcmp(old_boundary.c_str(), it.key().c_str(), old_boundary.size()), 0);
-            ++it;
-            REQUIRE_EQ(sizeof(value) - 2, it.get_key_len());
-            REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value) - 2), 0);
+            uint64_t value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - 2);
+            wh_iter_skip1_rev(it);
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE(store->IsPartialKey());
+            REQUIRE_EQ(store->GetInvalidBits(), 0);
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            REQUIRE_EQ(old_boundary_size, res_size);
+            REQUIRE_EQ(memcmp(old_boundary, res_key, old_boundary_size), 0);
+            wh_iter_skip1(it);
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE_EQ(sizeof(value) - 2, res_size);
+            REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value) - 2), 0);
+
+            wh_iter_destroy(it);
         }
 
-        value = to_big_endian_order(0x0000000033333333UL);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-        uint32_t new_extended_key_len = it.get_key_len() + 3;
-        uint8_t new_extended_key[extended_key_len];
-        memcpy(new_extended_key, it.key().c_str(), it.get_key_len());
-        memset(new_extended_key + it.get_key_len(), 0, new_extended_key_len - 1 - it.get_key_len());
+        uint8_t new_extended_key[12];
+        uint32_t new_extended_key_len;
+        {
+            uint64_t value = to_big_endian_order(0x0000000033333333UL);
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value));
+            Steroids::InfixStore *store;
+            uint32_t dummy;
+            wh_iter_peek(it, reinterpret_cast<void *>(new_extended_key), sizeof(new_extended_key), &new_extended_key_len, 
+                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
+            wh_iter_destroy(it);
+        }
+        memset(new_extended_key + new_extended_key_len, 0, 3);
+        new_extended_key_len += 3;
         new_extended_key[new_extended_key_len - 1] = 1;
         s.InsertSplit({new_extended_key, new_extended_key_len});
 
-        value = to_big_endian_order(0x0000000033333333UL);
-        it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
+        //it = s.tree_.begin(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         SUBCASE("split infix store using an extension of a full boundary key: left half") {
             const std::vector<uint32_t> occupieds_pos = {};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-            auto store = it.ref();
-            REQUIRE(!store.IsPartialKey());
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
 
-            REQUIRE_EQ(sizeof(value), it.get_key_len());
-            REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
+            const uint64_t value = to_big_endian_order(0x0000000033333333UL);
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE_FALSE(store->IsPartialKey());
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            REQUIRE_EQ(sizeof(value), res_size);
+            REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
+
+            wh_iter_destroy(it);
         }
 
-        ++it;
         SUBCASE("split infix store using an extension of a full boundary key: right half") {
             const std::vector<uint32_t> occupieds_pos = {205};
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{403,1,0b00001}};
-            auto store = it.ref();
-            REQUIRE(!store.IsPartialKey());
-            AssertStoreContents(s, store, occupieds_pos, checks);
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
 
-            REQUIRE_EQ(new_extended_key_len, it.get_key_len());
-            REQUIRE_EQ(memcmp(new_extended_key, it.key().c_str(), new_extended_key_len), 0);
+            const uint64_t value = to_big_endian_order(0x0000000033333333UL);
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+            wh_iter_skip1(it);
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            REQUIRE_FALSE(store->IsPartialKey());
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+
+            REQUIRE_EQ(new_extended_key_len, res_size);
+            REQUIRE_EQ(memcmp(new_extended_key, res_key, new_extended_key_len), 0);
+
+            wh_iter_destroy(it);
         }
     }
 
@@ -953,18 +1069,26 @@ public:
             s.ShrinkInfixSize(infix_size - 1);
             REQUIRE_EQ(s.infix_size_, infix_size - 1);
 
-            auto it = s.tree_.begin();
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0);
             {
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
                 const uint64_t value = 0;
-                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+                REQUIRE_EQ(res_size, sizeof(value));
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
-            ++it;
+            wh_iter_skip1(it);
             {
                 const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13,
                     16, 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54,
@@ -1029,31 +1153,47 @@ public:
                         {493,1,0b0101}, {499,1,0b0001}, {503,1,0b1011},
                         {509,1,0b0111}, {515,1,0b0011}, {519,1,0b1111},
                         {525,1,0b1011}, {531,1,0b0111}};
-                auto store = it.ref();
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
                 const uint64_t value = to_big_endian_order(0b00010001000100010001000100010001UL);
-                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+                REQUIRE_EQ(res_size, sizeof(value));
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
+            wh_iter_destroy(it);
         }
 
         SUBCASE("shrink by two") {
             s.ShrinkInfixSize(infix_size - 2);
             REQUIRE_EQ(s.infix_size_, infix_size - 2);
 
-            auto it = s.tree_.begin();
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0);
             {
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
                 const uint64_t value = 0;
-                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+                REQUIRE_EQ(res_size, sizeof(value));
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
-            ++it;
+            wh_iter_skip1(it);
             {
                 const std::vector<uint32_t> occupieds_pos = {2, 5, 8, 10, 13,
                     16, 19, 21, 24, 27, 30, 32, 35, 38, 41, 43, 46, 49, 51, 54,
@@ -1117,13 +1257,20 @@ public:
                         {499,1,0b001}, {503,1,0b101}, {509,1,0b011},
                         {515,1,0b001}, {519,1,0b111}, {525,1,0b101},
                         {531,1,0b011}};
-                auto store = it.ref();
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
                 const uint64_t value = to_big_endian_order(0b00010001000100010001000100010001UL);
-                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), it.key().c_str(), sizeof(value)), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+                REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
+            wh_iter_destroy(it);
         }
     }
 
@@ -1146,21 +1293,28 @@ public:
 
             Steroids s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
 
-            auto it = s.tree_.begin();
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0);
             {
                 const uint8_t expected_boundary[] = {0b00000000, 0b00000000,
                     0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
                     0b00000000};
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), sizeof(keys[0])), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const uint8_t expected_boundary[] = {0b00000000, 0b00010000,
                     0b00001100, 0b00111101, 0b11110111, 0b11101011, 0b00011100,
@@ -1362,14 +1516,20 @@ public:
                         {531,1,0b00101}, {532,0,0b10101}, {533,0,0b10111},
                         {534,1,0b11011}, {535,0,0b00011}, {536,0,0b01001},
                         {537,1,0b11101}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), sizeof(keys[0])), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const uint8_t expected_boundary[] = {0b01100101, 0b11000011,
                     0b01001000, 0b01111100, 0b10000001, 0b11001001, 0b11011000,
@@ -1570,14 +1730,20 @@ public:
                         {531,0,0b10001}, {532,1,0b10111}, {533,0,0b01101},
                         {534,0,0b01111}, {535,1,0b11111}, {536,0,0b00111},
                         {537,1,0b11011}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), sizeof(keys[0])), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const uint8_t expected_boundary[] = {0b11001001, 0b11101110,
                     0b11000100, 0b11001000, 0b11110011, 0b10110110, 0b11110100,
@@ -1692,26 +1858,39 @@ public:
                         {524,1,0b11101}, {528,1,0b01111}, {531,1,0b00111},
                         {532,1,0b10111}, {533,0,0b01111}, {534,0,0b10011},
                         {535,1,0b10101}, {536,1,0b00111}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), sizeof(keys[0])), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const uint8_t expected_boundary[] = {0b11111111, 0b11111111,
                     0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111,
                     0b11111111};
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), sizeof(keys[0])), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
+            wh_iter_destroy(it);
         }
 
         SUBCASE("variable length") {
@@ -1728,7 +1907,8 @@ public:
 
             Steroids s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
 
-            auto it = s.tree_.begin();
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0);
             {
                 const size_t expected_boundary_length = 8;
                 const uint8_t expected_boundary[expected_boundary_length] =
@@ -1736,14 +1916,20 @@ public:
                         0b00000000, 0b00000000, 0b00000000, 0b00000000};
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), expected_boundary_length), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const size_t expected_boundary_length = 7;
                 const uint8_t expected_boundary[expected_boundary_length] =
@@ -1946,14 +2132,20 @@ public:
                         {531,1,0b00101}, {532,0,0b10101}, {533,0,0b10111},
                         {534,1,0b11011}, {535,0,0b00011}, {536,0,0b01001},
                         {537,1,0b11101}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), expected_boundary_length), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const size_t expected_boundary_length = 7;
                 const uint8_t expected_boundary[expected_boundary_length] =
@@ -2155,14 +2347,20 @@ public:
                         {531,0,0b10001}, {532,1,0b10111}, {533,0,0b01101},
                         {534,0,0b01111}, {535,1,0b11111}, {536,0,0b00111},
                         {537,1,0b11011}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), expected_boundary_length), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const size_t expected_boundary_length = 8;
                 const uint8_t expected_boundary[expected_boundary_length] =
@@ -2278,14 +2476,20 @@ public:
                         {524,1,0b11101}, {528,1,0b01111}, {531,1,0b00111},
                         {532,1,0b10111}, {533,0,0b01111}, {534,0,0b10011},
                         {535,1,0b10101}, {536,1,0b00111}};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), expected_boundary_length), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
 
-            ++it;
+            wh_iter_skip1(it);
             {
                 const size_t expected_boundary_length = 8;
                 const uint8_t expected_boundary[expected_boundary_length] =
@@ -2293,12 +2497,19 @@ public:
                         0b11111111, 0b11111111, 0b11111111, 0b11111111};
                 const std::vector<uint32_t> occupieds_pos = {};
                 const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
-                auto store = it.ref();
-                REQUIRE_EQ(memcmp(expected_boundary, it.key().c_str(), expected_boundary_length), 0);
-                REQUIRE_FALSE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 0);
-                AssertStoreContents(s, store, occupieds_pos, checks);
+
+                const uint8_t *res_key;
+                uint32_t res_size, dummy;
+                Steroids::InfixStore *store;
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                     reinterpret_cast<void **>(&store), &dummy);
+
+                REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
+                REQUIRE_FALSE(store->IsPartialKey());
+                REQUIRE_EQ(store->GetInvalidBits(), 0);
+                AssertStoreContents(s, *store, occupieds_pos, checks);
             }
+            wh_iter_destroy(it);
         }
     }
 
