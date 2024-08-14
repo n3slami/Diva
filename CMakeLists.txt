@@ -17,14 +17,6 @@ endif ()
 set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
 #set(BITHACKING_COMPILE_FLAGS -Ofast -mbmi2 -msse4.2 -D__SSE4_2_)
 
-add_library(ArtLib INTERFACE)
-target_include_directories(
-    ArtLib
-    INTERFACE
-    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
-    "$<INSTALL_INTERFACE:include>"
-)
-
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
                                ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh.h)
 set_target_properties(WormholeLib PROPERTIES LINKER_LANGUAGE CXX)
@@ -43,7 +35,7 @@ add_library(SteroidsLib STATIC ./include/steroids.hpp)
 set_target_properties(SteroidsLib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(SteroidsLib PUBLIC ./include)
 target_compile_options(SteroidsLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
-target_link_libraries(SteroidsLib PRIVATE ArtLib WormholeLib)
+target_link_libraries(SteroidsLib PRIVATE WormholeLib)
 
 
 if (BUILD_TESTS)
