@@ -3147,7 +3147,7 @@ wormhole_iter_fix_rev(struct wormhole_iter * const iter)
       wormleaf_unlock_read(iter->leaf);
     }
     iter->leaf = prev;
-    iter->is = prev->nr_sorted - 1;
+    iter->is = prev->nr_keys - 1;
     if (!wormhole_iter_valid(iter))
       return;
   }

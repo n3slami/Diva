@@ -6,6 +6,8 @@
 #include "wormhole/wh.h"
 #include <endian.h>
 #include <limits>
+#include <random>
+#include <x86intrin.h>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
@@ -1001,6 +1003,372 @@ public:
                 const uint64_t conv_r = to_big_endian_order(r);
                 REQUIRE_FALSE(s.RangeQuery(reinterpret_cast<const uint8_t *>(&conv_l), sizeof(conv_l),
                                            reinterpret_cast<const uint8_t *>(&conv_r), sizeof(conv_r)));
+            }
+        }
+    }
+
+
+    static void Delete() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Steroids s(infix_size, seed, load_factor);
+
+        SUBCASE("merge") {
+            SUBCASE("1") {
+                std::vector<uint64_t> boundary_keys = 
+                    {0b00001111'11111111'00000000'00000000UL,
+                        0b00010000'00000000'11111111'11111111UL,
+                        0b00010111'11111111'00000000'00000000UL,
+                        0b11111111'11111111'11111111'11111111UL};
+                for (uint64_t key : boundary_keys) {
+                    const uint64_t conv_key = to_big_endian_order(key);
+                    s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+                }
+
+                const uint8_t *key_ptr;
+                uint32_t key_len;
+                uint64_t value = to_big_endian_order(boundary_keys[0]);
+                Steroids::InfixStore *store;
+                uint32_t dummy;
+
+                wormhole_iter *it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                uint64_t total_implicit = 0b1'11111111 - 0b0'00000000 + 1;
+                std::vector<uint64_t> left_store_infixes {0b0'01010101'01011,
+                                                          0b0'11011011'00100,
+                                                          0b0'11011011'00001,
+                                                          0b1'01010101'01000,
+                                                          0b1'01010101'01011,
+                                                          0b1'11011011'00001};
+                s.LoadListToInfixStore(*store, left_store_infixes.data(), left_store_infixes.size(), total_implicit);
+
+                wh_iter_skip1(it);
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                std::vector<uint64_t> right_store_infixes {0b1'01010101'10000,
+                                                           0b1'01010101'01011,
+                                                           0b1'01111111'11001,
+                                                           0b1'11111100'01000,
+                                                           0b1'11111100'00111};
+                s.LoadListToInfixStore(*store, right_store_infixes.data(), right_store_infixes.size(), total_implicit);
+
+                s.DeleteMerge(it);
+
+                it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                {
+                    const std::vector<uint32_t> occupieds_pos = {0, 1, 171,
+                        192, 255};
+                    const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                         {{0,0,0b11101}, {1,0,0b11111}, {2,1,0b11111},
+                             {3,0,0b00001}, {4,0,0b00001}, {5,1,0b00011},
+                             {358,0,0b11000}, {359,1,0b10101}, {402,1,0b11101},
+                             {534,0,0b00100}, {535,1,0b00011}};
+
+                    const uint8_t *res_key;
+                    uint32_t res_size, dummy;
+                    Steroids::InfixStore *store;
+
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_FALSE(store->IsPartialKey());
+                    REQUIRE_EQ(store->GetInvalidBits(), 0);
+                    AssertStoreContents(s, *store, occupieds_pos, checks);
+
+                    uint64_t value = to_big_endian_order(boundary_keys[0]);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                    wh_iter_skip1(it);
+                    value = to_big_endian_order(boundary_keys[2]);
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                }
+                wh_iter_destroy(it);
+            }
+
+            SUBCASE("2") {
+                std::vector<uint64_t> boundary_keys = 
+                    {0b00001111'11111111'00000000'00000000UL,
+                        0b00010000'01111111'00001010'00000000UL,
+                        0b00010000'10000000'11111111'11111111UL,
+                        0b11111111'11111111'11111111'11111111UL};
+                for (uint64_t key : boundary_keys) {
+                    const uint64_t conv_key = to_big_endian_order(key);
+                    s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+                }
+
+                const uint8_t *key_ptr;
+                uint32_t key_len;
+                uint64_t value = to_big_endian_order(boundary_keys[0]);
+                Steroids::InfixStore *store;
+                uint32_t dummy;
+
+                wormhole_iter *it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                uint64_t total_implicit = 0b1'11111111 - 0b0'00000000 + 1;
+                std::vector<uint64_t> left_store_infixes {0b0'00000000'10100,
+                                                          0b0'00000000'10101,
+                                                          0b0'00000001'10111,
+                                                          0b0'00000010'10000,
+                                                          0b0'00000010'00001,
+                                                          0b0'00000011'10111,
+                                                          0b1'00000000'00001};
+                s.LoadListToInfixStore(*store, left_store_infixes.data(), left_store_infixes.size(), total_implicit);
+
+                wh_iter_skip1(it);
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                std::vector<uint64_t> right_store_infixes {0b0'10100000'11111,
+                                                           0b0'11110101'01000,
+                                                           0b0'11110101'00001,
+                                                           0b1'01001011'01011};
+                s.LoadListToInfixStore(*store, right_store_infixes.data(), right_store_infixes.size(), total_implicit);
+
+                s.DeleteMerge(it);
+
+                it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                {
+                    const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3,
+                        256, 257, 258};
+                    const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                         {{0,0,0b10100}, {1,1,0b10101}, {2,1,0b10111},
+                             {4,0,0b10000}, {5,1,0b00001}, {6,1,0b10111},
+                             {530,1,0b00001}, {532,0,0b01011}, {533,0,0b11111},
+                             {534,1,0b11111}, {535,1,0b10101}};
+
+                    const uint8_t *res_key;
+                    uint32_t res_size, dummy;
+                    Steroids::InfixStore *store;
+
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_FALSE(store->IsPartialKey());
+                    REQUIRE_EQ(store->GetInvalidBits(), 0);
+                    AssertStoreContents(s, *store, occupieds_pos, checks);
+
+                    uint64_t value = to_big_endian_order(boundary_keys[0]);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                    wh_iter_skip1(it);
+                    value = to_big_endian_order(boundary_keys[2]);
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                }
+                wh_iter_destroy(it);
+            }
+
+            SUBCASE("3") {
+                std::vector<uint64_t> boundary_keys = 
+                    {0b00000000'00000000'00000000'00000000UL,
+                        0b00000000'00000000'11111111'11111111UL,
+                        0b11111111'11111111'11111111'11111111UL};
+                for (uint64_t key : boundary_keys) {
+                    const uint64_t conv_key = to_big_endian_order(key);
+                    s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+                }
+
+                const uint8_t *key_ptr;
+                uint32_t key_len;
+                uint64_t value = to_big_endian_order(boundary_keys[0]);
+                Steroids::InfixStore *store;
+                uint32_t dummy;
+
+                wormhole_iter *it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                uint64_t total_implicit = 0b1'11111111 - 0b0'00000000 + 1;
+                std::vector<uint64_t> left_store_infixes {0b0'00000000'10100,
+                                                          0b0'00000000'10101,
+                                                          0b0'00000001'10111,
+                                                          0b0'00000010'10000,
+                                                          0b0'00000010'00001,
+                                                          0b0'00000011'10111,
+                                                          0b1'00000000'00001};
+                s.LoadListToInfixStore(*store, left_store_infixes.data(), left_store_infixes.size(), total_implicit);
+
+                wh_iter_skip1(it);
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                std::vector<uint64_t> right_store_infixes {0b0'10100000'11111,
+                                                           0b0'11110101'01000,
+                                                           0b0'11110101'00001,
+                                                           0b1'01001011'01011};
+                s.LoadListToInfixStore(*store, right_store_infixes.data(), right_store_infixes.size(), total_implicit);
+
+                s.DeleteMerge(it);
+
+                it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value));
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
+                        reinterpret_cast<void **>(&store), &dummy);
+                {
+                    const std::vector<uint32_t> occupieds_pos = {0, 160, 245,
+                        331};
+                    const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                         {{0,0,0b00001}, {1,0,0b00001}, {2,0,0b00001},
+                             {3,0,0b00001}, {4,0,0b00001}, {5,0,0b00001},
+                             {6,1,0b00001}, {168,1,0b11111}, {257,0,0b01000},
+                             {258,1,0b00001}, {348,1,0b01011}};
+
+                    const uint8_t *res_key;
+                    uint32_t res_size, dummy;
+                    Steroids::InfixStore *store;
+
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_FALSE(store->IsPartialKey());
+                    REQUIRE_EQ(store->GetInvalidBits(), 0);
+                    AssertStoreContents(s, *store, occupieds_pos, checks);
+
+                    uint64_t value = to_big_endian_order(boundary_keys[0]);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                    wh_iter_skip1(it);
+                    value = to_big_endian_order(boundary_keys[2]);
+                    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+                    REQUIRE_EQ(sizeof(value), res_size);
+                    REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value)), 0);
+                }
+                wh_iter_destroy(it);
+            }
+        }
+
+        SUBCASE("delete all") {
+            std::vector<std::pair<uint64_t, uint64_t>> keys;
+            std::set<uint64_t> boundary_keys;
+            for (int32_t i = 0; i < 10; i++)
+                keys.emplace_back((i + 1) * 0x0000000011111111UL, 0);
+            {
+                const uint64_t min_key = std::numeric_limits<uint64_t>::min();
+                s.AddTreeKey(reinterpret_cast<const uint8_t *>(&min_key), sizeof(min_key));
+                boundary_keys.insert(min_key);
+                const uint64_t max_key = std::numeric_limits<uint64_t>::max();
+                s.AddTreeKey(reinterpret_cast<const uint8_t *>(&max_key), sizeof(max_key));
+                boundary_keys.insert(max_key);
+            }
+            for (auto [key, bits_to_zero_out] : keys) {
+                const uint64_t conv_key = to_big_endian_order(key);
+                s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
+                boundary_keys.insert(key);
+            }
+
+            for (int32_t i = 1; i < 100; i++) {
+                const uint32_t shared = 34;
+                const uint32_t ignore = 1;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+                const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+                const uint64_t interp = (l * i + r * (100 - i)) / 100;
+                const uint64_t value = to_big_endian_order(interp);
+                s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+                keys.emplace_back(interp, bits_to_zero_out);
+            }
+
+            for (int32_t i = 90; i >= 70; i -= 2) {
+                const uint32_t shared = 34;
+                const uint32_t ignore = 1;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+                const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+                const uint64_t interp = (l * i + r * (100 - i)) / 100;
+                const uint64_t value = to_big_endian_order(interp);
+                s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+                keys.emplace_back(interp, bits_to_zero_out);
+            }
+
+            const uint32_t shamt = 16;
+            for (int32_t i = 1; i < 50; i++) {
+                const uint32_t shared = 34;
+                const uint32_t ignore = 1;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+
+                const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
+                const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
+                const uint64_t value = to_big_endian_order(interp);
+                s.InsertSimple({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+                keys.emplace_back(interp, bits_to_zero_out);
+            }
+
+            {
+                uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
+                auto it = boundary_keys.upper_bound(value);
+                const uint64_t next_key = to_big_endian_order(*it);
+                --it;
+                const uint64_t prev_key = to_big_endian_order(*it);
+                auto [shared, ignore, implicit_size] = s.GetSharedIgnoreImplicitLengths(
+                        {reinterpret_cast<const uint8_t *>(&prev_key), sizeof(prev_key)},
+                        {reinterpret_cast<const uint8_t *>(&next_key), sizeof(next_key)});
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - implicit_size - s.infix_size_;
+
+                value = to_big_endian_order(value);
+                s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
+                const uint64_t rev_value = __bswap_64(value);
+                keys.emplace_back(rev_value, bits_to_zero_out);
+                boundary_keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
+            }
+
+            for (int32_t i = 0; i < keys.size(); i++) {
+                const uint64_t query = to_big_endian_order(keys[i].first);
+                REQUIRE(s.PointQuery(reinterpret_cast<const uint8_t *>(&query), sizeof(query)));
+            }
+
+            const uint32_t shuffle_seed = 10;
+            std::mt19937 shuffle_gen(shuffle_seed);
+            std::shuffle(keys.begin(), keys.end(), shuffle_gen);
+
+            for (int32_t i = 0; i < keys.size(); i++) {
+                if (boundary_keys.find(keys[i].first) != boundary_keys.end())
+                    boundary_keys.erase(keys[i].first);
+                else if (0b00011101000010110000000000000000UL == (keys[i].first & (~BITMASK(keys[i].second + 1)))) {
+                    const uint64_t l = 0b00011101000010110000000000000000UL;
+                    const uint64_t r = 0b00011101000010111111111111111111UL;
+                    const bool found = std::find_if(keys.begin() + i + 1, keys.end(),
+                                                    [&](std::pair<uint64_t, uint64_t> key) { return l <= key.first && key.first <= r; })
+                                            != keys.end();
+                    if (!found)
+                        boundary_keys.erase(keys[i].first & (~BITMASK(keys[i].second + 1)));
+                }
+                const uint64_t del_value = to_big_endian_order(keys[i].first);
+                s.Delete(reinterpret_cast<const uint8_t *>(&del_value), sizeof(del_value));
+
+                for (int32_t j = 0; j < keys.size(); j++) {
+                    const uint64_t query = to_big_endian_order(keys[j].first);
+                    auto it = boundary_keys.lower_bound(keys[j].first);
+                    bool expected_res = true;
+                    if (*it != keys[j].first) {
+                        const uint64_t next_key = to_big_endian_order(*it);
+                        --it;
+                        const uint64_t prev_key = to_big_endian_order(*it);
+                        auto [shared, ignore, implicit_size] = s.GetSharedIgnoreImplicitLengths(
+                                {reinterpret_cast<const uint8_t *>(&prev_key), sizeof(prev_key)},
+                                {reinterpret_cast<const uint8_t *>(&next_key), sizeof(next_key)});
+                        const uint32_t bits_to_zero_out = std::max(sizeof(uint64_t) * 8 - shared - ignore - implicit_size - s.infix_size_,
+                                keys[j].second);
+                        const uint64_t l = keys[j].first & (~BITMASK(bits_to_zero_out + 1));
+                        const uint64_t r = keys[j].first | BITMASK(bits_to_zero_out + 1);
+                        expected_res = std::find_if(keys.begin() + i + 1, keys.end(),
+                                                    [&](std::pair<uint64_t, uint64_t> key) { return *it < key.first
+                                                                                                        && (l <= key.first && key.first <= r); })
+                                                != keys.end();
+                    }
+                    REQUIRE_EQ(s.PointQuery(reinterpret_cast<const uint8_t *>(&query), sizeof(query)), expected_res);
+                }
             }
         }
     }
@@ -2601,6 +2969,10 @@ TEST_SUITE("steroids") {
 
     TEST_CASE("range query") {
         SteroidsTests::RangeQuery();
+    }
+
+    TEST_CASE("delete") {
+        SteroidsTests::Delete();
     }
 
     TEST_CASE("shrink infix size") {

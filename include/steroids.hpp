@@ -2,21 +2,21 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <endian.h>
 #include <iomanip>
 #include <iostream>
-#include <iterator>
 #include <random>
-#include <string>
 #include <string_view>
 #include <tuple>
 
 #include "wormhole/wh.h"
 #include "util.hpp"
+
+// TODO: We have a pointer that goes out of the arrays bounds when calling
+// `GetSharedIgnoreImplicitLengths`. Okay, maybe?
 
 static void print_key(const uint8_t *key, const uint32_t key_len, const bool binary=true) {
     for (int32_t i = 0; i < key_len; i++) {
@@ -229,8 +229,7 @@ private:
     void AddTreeKey(const uint8_t *key, const uint32_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
-    void DeleteSimple(const InfiniteByteString key);
-    void DeleteMerge(const InfiniteByteString key);
+    void DeleteMerge(wormhole_iter *const it);
     template <class t_itr>
     void BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len);
     template <class t_itr>
@@ -284,6 +283,9 @@ private:
     void UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt, 
                          const uint64_t lower_lim, const uint64_t upper_lim,
                          uint64_t *res, const uint32_t res_len);
+    void UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
+                               const InfiniteByteString left_key, const InfiniteByteString right_key,
+                               uint64_t *infix_list, const uint32_t infix_list_len);
 };
 
 
@@ -333,13 +335,11 @@ inline void Steroids::InsertSimple(const InfiniteByteString key) {
 
     wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                           reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key.IsPrefixOf(key)) {
+    if (next_key == key) {
         prev_key = next_key;
         wh_iter_skip1(&it);
         wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                               reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        // Didn't need to do this!
-        //wh_iter_skip1_rev(&it);
     }
     else {
         wh_iter_skip1_rev(&it);
@@ -390,8 +390,11 @@ inline bool Steroids::RangeQuery(const uint8_t *input_l, const uint32_t input_l_
 
     wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                           reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key <= r_key)
+    if (next_key <= r_key) {
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
         return true;
+    }
     wh_iter_skip1_rev(&it);
     wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
                           reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
@@ -441,8 +444,11 @@ inline bool Steroids::PointQuery(const uint8_t *input_key, const uint32_t key_le
 
     wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                           reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key == key)
+    if (next_key == key) {
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
         return true;
+    }
     wh_iter_skip1_rev(&it);
     wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
                           reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
@@ -760,6 +766,8 @@ inline uint32_t Steroids::Size() const {
                               reinterpret_cast<void **>(&store), &dummy);
         res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
     }
+    if (it.leaf)
+        wormleaf_unlock_read(it.leaf);
     return res;
 }
 
@@ -783,6 +791,193 @@ inline void Steroids::Delete(std::string_view input_key) {
 
 
 inline void Steroids::Delete(const uint8_t *input_key, const uint32_t input_key_len) {
+    InfiniteByteString key {input_key, input_key_len};
+
+    wormhole_iter it;
+    it.ref = better_tree_;
+    it.map = better_tree_->map;
+    it.leaf = nullptr;
+    it.is = 0;
+    wh_iter_seek(&it, key.str, key.length);
+
+    InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
+    uint32_t dummy_val;
+
+    InfiniteByteString next_key {};
+    InfiniteByteString prev_key {};
+
+    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+    if (next_key == key) {
+        if (!infix_store_ptr->IsPartialKey()) {
+            DeleteMerge(&it);
+            return;
+        }
+        prev_key = next_key;
+        wh_iter_skip1(&it);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        wh_iter_skip1_rev(&it);
+    }
+    else {
+        wh_iter_skip1_rev(&it);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+    }
+
+    assert(prev_key <= key);
+    assert(key < next_key);
+
+    InfixStore& infix_store = *infix_store_ptr;
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+
+    const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
+    const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
+    const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    const uint64_t deletee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+
+    if (infix_store.IsPartialKey()) {
+        const uint32_t longest_match_len = GetLongestMatchingInfixSize(infix_store, deletee);
+        if (longest_match_len == 0 || 8 * prev_key.length - infix_store.GetInvalidBits() 
+                                        > shared + ignore + implicit_size + longest_match_len - 1) {
+            DeleteMerge(&it);
+            return;
+        }
+    }
+
+    if (it.leaf)
+        wormleaf_unlock_read(it.leaf);
+
+    DeleteRawFromInfixStore(infix_store, deletee, total_implicit);
+}
+
+
+inline void Steroids::DeleteMerge(wormhole_iter *const it) {
+    InfiniteByteString middle_key {};
+    InfiniteByteString left_key {};
+    InfiniteByteString right_key {};
+    InfixStore *store_l, *store_r;
+    uint32_t dummy;
+
+    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
+                         reinterpret_cast<void **>(&store_r), &dummy);
+    wh_iter_skip1(it);
+    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
+                         reinterpret_cast<void **>(&store_l), &dummy);
+    wh_iter_skip1_rev(it);
+    wh_iter_skip1_rev(it);
+    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
+                         reinterpret_cast<void **>(&store_l), &dummy);
+    if (it->leaf)
+        wormleaf_unlock_read(it->leaf);
+
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+
+    uint32_t total_elem_count = store_l->GetElemCount() + store_r->GetElemCount();
+    uint64_t infix_list[total_elem_count];
+    GetInfixList(*store_l, infix_list);
+    GetInfixList(*store_r, infix_list + store_l->GetElemCount());
+
+    UpdateInfixListDelete(shared, ignore, implicit_size, left_key, middle_key, infix_list, store_l->GetElemCount());
+    UpdateInfixListDelete(shared, ignore, implicit_size, middle_key, right_key, infix_list + store_l->GetElemCount(), store_r->GetElemCount());
+    const uint64_t implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+    for (int32_t i = 0; i < total_elem_count; i++)
+        infix_list[i] -= implicit << infix_size_;
+
+    for (int32_t i = 1; i < total_elem_count; i++) {
+        const uint64_t prev_l = infix_list[i - 1] - (infix_list[i - 1] & -infix_list[i - 1]);
+        const uint64_t cur_l = infix_list[i] - (infix_list[i] & -infix_list[i]);
+        assert(prev_l <= cur_l);
+    }
+
+    delete[] store_l->ptr;
+    delete[] store_r->ptr;
+    wh_del(better_tree_, middle_key.str, middle_key.length);
+
+    const uint64_t left_extraction = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0);
+    const uint64_t right_extraction = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1);
+    const uint32_t total_implicit = ((right_extraction >> infix_size_) - (left_extraction >> infix_size_)) + 1;
+
+    InfixStore store = AllocateInfixStoreWithList(infix_list, total_elem_count, total_implicit);
+    store.SetPartialKey(store_l->IsPartialKey());
+    store.SetInvalidBits(store_l->GetInvalidBits());
+    wh_put(better_tree_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
+}
+
+inline void Steroids::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
+                                            const InfiniteByteString left_key, const InfiniteByteString right_key,
+                                            uint64_t *infix_list, const uint32_t infix_list_len) {
+    const uint32_t shared_word_byte = (shared / 64) * 8;
+
+    auto [old_shared, old_ignore, old_implicit_size] = GetSharedIgnoreImplicitLengths(
+            {left_key.str + shared_word_byte, left_key.length < shared_word_byte ? 0 : left_key.length - shared_word_byte},
+            {right_key.str + shared_word_byte, right_key.length < shared_word_byte ? 0 : right_key.length - shared_word_byte});
+    old_shared += shared_word_byte * 8;
+
+    const uint64_t old_left_implicit = ExtractPartialKey(left_key, old_shared, old_ignore,
+                                                         old_implicit_size, 0) >> infix_size_;
+    const uint32_t old_infix_size = old_implicit_size + infix_size_;
+    const uint32_t new_infix_size = implicit_size + infix_size_;
+    if (old_shared == shared) {
+        for (int32_t i = 0; i < infix_list_len; i++) {
+            infix_list[i] += old_left_implicit << infix_size_;
+            const uint64_t old_diff_bit = infix_list[i] >> (old_infix_size - 1);
+            infix_list[i] &= BITMASK(old_infix_size - 1);
+            infix_list[i] = (new_infix_size > old_infix_size ? infix_list[i] << (new_infix_size - old_infix_size)
+                                                             : (infix_list[i] >> (old_infix_size - new_infix_size))
+                                                                    | (infix_list[i] & 1ULL));
+            uint32_t recovered_bit_cnt = 0, recovery_bits = 1;
+            recovered_bit_cnt += recovery_bits;
+            uint64_t recovered_infix = old_diff_bit << (new_infix_size - recovered_bit_cnt);
+            recovery_bits = std::min(old_ignore - ignore, new_infix_size - recovered_bit_cnt);
+            recovered_bit_cnt += recovery_bits;
+            recovered_infix |= (((1ULL << recovery_bits) - (1ULL ^ old_diff_bit)) & BITMASK(recovery_bits))
+                                    << (new_infix_size - recovered_bit_cnt);
+            if (recovered_bit_cnt < new_infix_size) {
+                recovered_infix |= infix_list[i] >> (recovered_bit_cnt - 1);
+                recovered_infix |= (lowbit_pos(infix_list[i]) < recovered_bit_cnt - 1 ? 1ULL : 0ULL);
+            }
+            else 
+                recovered_infix |= 1ULL;
+            assert(recovered_bit_cnt <= new_infix_size);
+            infix_list[i] = recovered_infix;
+        }
+    }
+    else {
+        for (int32_t i = 0; i < infix_list_len; i++) {
+            infix_list[i] += old_left_implicit << infix_size_;
+            const uint64_t old_diff_bit = infix_list[i] >> (old_infix_size - 1);
+            infix_list[i] &= BITMASK(old_infix_size - 1);
+            infix_list[i] = (new_infix_size > old_infix_size ? infix_list[i] << (new_infix_size - old_infix_size)
+                                                             : (infix_list[i] >> (old_infix_size - new_infix_size))
+                                                                    | (infix_list[i] & 1ULL));
+            uint32_t recovered_bit_cnt = 1, recovery_bits = 1;
+            uint64_t recovered_infix = left_key.GetBit(shared) << (new_infix_size - recovered_bit_cnt);
+            
+            recovery_bits = std::min(old_shared - shared - ignore - 1, new_infix_size - recovered_bit_cnt);
+            recovered_bit_cnt += recovery_bits;
+            recovered_infix |= left_key.BitsAt(shared + ignore + 1, recovery_bits)
+                                    << (new_infix_size - recovered_bit_cnt);
+            if (recovered_bit_cnt < new_infix_size) {
+                recovered_infix |= old_diff_bit << (new_infix_size - recovered_bit_cnt - 1);
+                recovery_bits = std::min(old_ignore + 1, new_infix_size - recovered_bit_cnt);
+                recovered_bit_cnt += recovery_bits;
+                recovered_infix |= (recovery_bits > 1 ? (((1ULL << (recovery_bits - 1)) - (1ULL ^ old_diff_bit)) 
+                                                            & BITMASK(recovery_bits - 1)) 
+                                                                << (new_infix_size - recovered_bit_cnt)
+                                                      : 0ULL);
+            }
+            if (recovered_bit_cnt < new_infix_size) {
+                recovered_infix |= infix_list[i] >> (recovered_bit_cnt - 1);
+                recovered_infix |= (lowbit_pos(infix_list[i]) < recovered_bit_cnt - 1 ? 1ULL : 0ULL);
+            }
+            else 
+                recovered_infix |= 1ULL;
+            assert(recovered_bit_cnt <= new_infix_size);
+            infix_list[i] = recovered_infix;
+        }
+    }
 }
 
 
@@ -1282,7 +1477,7 @@ inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t 
                                         // further checking.
     int32_t cur_occupied = implicit_part;
     int32_t cur_runend = runend_pos, prev_runend;
-    int32_t shift_start = -1, shift_end = -1;
+    int32_t shift_start = -1, shift_end = runend_pos;
     while (cur_runend < scaled_sizes_[size_grade]) {
         // Find last run that starts in its canonical slot.
         prev_runend = cur_runend;
@@ -1346,8 +1541,8 @@ inline uint32_t Steroids::GetLongestMatchingInfixSize(const InfixStore &store, c
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
 
     uint64_t *occupieds = store.ptr;
-    const bool is_occupied = get_bitmap_bit(occupieds, implicit_part);
-    assert(is_occupied);
+    if (!get_bitmap_bit(occupieds, implicit_part))
+        return 0;   // No matching infix found
 
     const uint32_t key_rank = RankOccupieds(store, implicit_part);
     const int32_t runend_pos = SelectRunends(store, key_rank);
