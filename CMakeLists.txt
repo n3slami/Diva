@@ -14,7 +14,7 @@ else()
     set(USE_MULTI_THREADED OFF)
 endif ()
 
-set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
+set(BITHACKING_COMPILE_FLAGS -march=native)
 #set(BITHACKING_COMPILE_FLAGS -Ofast -mbmi2 -msse4.2 -D__SSE4_2_)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c

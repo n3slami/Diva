@@ -156,13 +156,13 @@ static inline uint32_t bit_rank(uint64_t val, uint32_t i) {
 
 
 __attribute__((always_inline))
-static inline uint32_t lowbit_pos(uint64_t val) {
+static inline int32_t lowbit_pos(uint64_t val) {
     return __builtin_ia32_tzcnt_u64(val);
 }
 
 
 __attribute__((always_inline))
-static inline uint32_t highbit_pos(uint64_t val) {
+static inline int32_t highbit_pos(uint64_t val) {
     return 8 * sizeof(val) - __builtin_ia32_lzcnt_u64(val) - 1;
 }
 
