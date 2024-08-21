@@ -676,12 +676,13 @@ public:
         Steroids s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
                    seed, load_factor);
 
-        const uint32_t extra_n = 10000;
+        const uint32_t extra_n = 1400000;
         for (int32_t i = 0; i < extra_n; i++) {
             const uint64_t key = to_big_endian_order(rng());
             s.Insert(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
         }
 
+        /*
         wormhole_iter *it = wh_iter_create(s.better_tree_);
         wh_iter_seek(it, nullptr, 0);
         {
@@ -1127,7 +1128,22 @@ public:
             REQUIRE_EQ(memcmp(res_key, expected_key, expected_size), 0);
             AssertStoreContents(s, *store, occupieds_pos, checks);
         }
+        {
+            const std::vector<uint32_t> occupieds_pos = {228};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks =
+                {{275,1,0b00001}};
+
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            Steroids::InfixStore *store;
+
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                 reinterpret_cast<void **>(&store), &dummy);
+            print_key(res_key, res_size);
+            PrintStore(s, *store);
+        }
         wh_iter_destroy(it);
+         */
     }
 
 

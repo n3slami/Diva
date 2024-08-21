@@ -101,7 +101,7 @@ private:
     static constexpr uint32_t base_implicit_size = 9;
     static constexpr uint32_t scale_shift = 15;
     static constexpr uint32_t scale_implicit_shift = 15;
-    static constexpr uint32_t size_scalar_count = 50;
+    static constexpr uint32_t size_scalar_count = 100;
 
     struct InfiniteByteString {
         const uint8_t *str;
@@ -1353,7 +1353,9 @@ inline int32_t Steroids::FindEmptySlotBefore(const InfixStore &store, const uint
         current_pos = PreviousRunend(store, current_pos);
     } while (current_pos >= 0 && GetSlot(store, current_pos + 1));
 
-    while (GetSlot(store, --previous_pos));
+    do {
+        previous_pos--;
+    } while (current_pos < previous_pos && GetSlot(store, previous_pos));
     return previous_pos;
 
     // Maybe binary searching would be better?
@@ -1373,6 +1375,7 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t elem_count = store.GetElemCount();
     if (elem_count >= (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size)) {
+        assert(size_grade < size_scalar_count);
         ResizeInfixStore(store, true, total_implicit);
         size_grade++;
     }
