@@ -1362,10 +1362,9 @@ inline int32_t Steroids::FindEmptySlotBefore(const InfixStore &store, const uint
     int32_t l = current_pos, r = previous_pos, mid;
     while (r - l > 1) {
         mid = (l + r) / 2;
-        if (GetSlot(store, mid) == 0)
-            l = mid;
-        else
-            r = mid;
+        const bool cond = GetSlot(store, mid) == 0;
+        l = cond ? mid : l;
+        r = cond ? r : mid;
     }
     return l;
 }
@@ -1407,12 +1406,10 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
         int32_t mid;
         while (r - l > 1) {
             mid = (l + r) / 2;
-            uint64_t range_l = GetSlot(store, mid);
-            range_l -= range_l & (-range_l);
-            if (range_l <= explicit_part - 1)
-                l = mid;
-            else 
-                r = mid;
+            const uint64_t range_l = GetSlot(store, mid);
+            const bool cond = (range_l - (range_l & -range_l)) <= explicit_part - 1;
+            l = cond ? mid : l;
+            r = cond ? r : mid;
         }
         if (next_empty < scaled_sizes_[size_grade]) {
             ShiftSlotsRight(store, r, next_empty, 1);
@@ -1633,6 +1630,7 @@ inline bool Steroids::RangeQueryInfixStore(InfixStore &store, const uint64_t l_k
                 slot_value = GetSlot(store, --pos);
             } while (slot_value && !get_bitmap_bit(runends, pos));
         }
+        return false;
     }
 
     // l_implicit_part == r_implicit_part
@@ -1670,7 +1668,7 @@ inline bool Steroids::PointQueryInfixStore(InfixStore &store, const uint64_t key
     const uint32_t runend_pos = SelectRunends(store, rank);
     uint32_t pos = runend_pos;
     uint64_t slot_value = GetSlot(store, pos);
-    // TODO: Faster implementation via binary search?
+    // TODO: Faster implementation via broadword operations?
     do {
         const uint64_t mask = ((slot_value & (-slot_value)) << 1) - 1;
         if ((explicit_part | mask) == (slot_value | mask))
