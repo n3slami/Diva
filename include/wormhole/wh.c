@@ -21,7 +21,7 @@
 #define WH_SLABLEAF_SIZE ((1lu << 21)) // 2MB for valgrind
 #endif
 
-#define WH_KPN ((128u)) // keys per node; power of 2
+#define WH_KPN ((32u)) // keys per node; power of 2
 #define WH_HDIV (((1u << 16)) / WH_KPN)
 #define WH_MID ((WH_KPN >> 1)) // ideal cut point for split, the closer the better
 #define WH_BKT_NR ((8))
@@ -1574,29 +1574,13 @@ wormleaf_search_ss(const struct wormleaf * const leaf, const struct kref * const
 {
   u32 lo = 0;
   u32 hi = leaf->nr_sorted;
-  while ((lo + 2) < hi) {
-    const u32 i = (lo + hi) >> 1;
-    const struct kv * const curr = wormleaf_kv_at_is(leaf, i);
-    cpu_prefetch0(curr);
-    cpu_prefetch0(leaf->hs + leaf->ss[(lo + i) >> 1]);
-    cpu_prefetch0(leaf->hs + leaf->ss[(i + 1 + hi) >> 1]);
-    const int cmp = kref_kv_compare(key, curr);
-    debug_assert(cmp != 0);
-    if (cmp < 0)
-      hi = i;
-    else
-      lo = i + 1;
-  }
-
   while (lo < hi) {
     const u32 i = (lo + hi) >> 1;
     const struct kv * const curr = wormleaf_kv_at_is(leaf, i);
     const int cmp = kref_kv_compare(key, curr);
     debug_assert(cmp != 0);
-    if (cmp < 0)
-      hi = i;
-    else
-      lo = i + 1;
+    lo = cmp < 0 ? lo : i + 1;
+    hi = cmp < 0 ? i : hi;
   }
   return lo;
 }
@@ -1605,7 +1589,6 @@ wormleaf_search_ss(const struct wormleaf * const leaf, const struct kref * const
 wormleaf_seek(const struct wormleaf * const leaf, const struct kref * const key)
 {
   debug_assert(leaf->nr_sorted == leaf->nr_keys);
-  wormleaf_prefetch_ss(leaf); // effective for both hit and miss
   const u32 ih = wormleaf_match_hs(leaf, key);
   if (ih < WH_KPN) { // hit
     return wormleaf_search_is(leaf, (u8)ih);

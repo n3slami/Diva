@@ -113,6 +113,7 @@ private:
             return *this;
         }
 
+        __attribute__((always_inline))
         uint64_t WordAt(const uint32_t byte_pos) const {
             if (byte_pos >= length)
                 return 0;
@@ -121,6 +122,7 @@ private:
             return __bswap_64(res);
         };
 
+        __attribute__((always_inline))
         uint64_t BitsAt(const uint32_t bit_pos, const uint32_t res_width) const {
             if (bit_pos / 8 >= length)
                 return 0;
@@ -130,10 +132,12 @@ private:
             return res & BITMASK(res_width);
         };
 
+        __attribute__((always_inline))
         uint32_t GetBit(const uint32_t pos) const {
             return (pos / 8 < length ? (str[pos / 8] >> (7 - pos % 8)) & 1 : 0);
         };
 
+        __attribute__((always_inline))
         bool IsPrefixOf(const InfiniteByteString& other, const uint32_t bits_to_ignore=0) const {
             if (length <= other.length && memcmp(str, other.str, length - 1) == 0)
                 return (str[length - 1] | BITMASK(bits_to_ignore)) == (other.str[length - 1] | BITMASK(bits_to_ignore));
@@ -1640,7 +1644,7 @@ inline bool Steroids::RangeQueryInfixStore(InfixStore &store, const uint64_t l_k
     const uint32_t runend_pos = SelectRunends(store, rank);
     uint32_t pos = runend_pos;
     uint64_t slot_value = GetSlot(store, pos);
-    // TODO: Faster implementation via binary search?
+    // TODO: Faster implementation via broadword operations?
     do {
         if (l_explicit_part <= (slot_value | (slot_value - 1))
             && (slot_value - (slot_value & (-slot_value))) <= r_explicit_part)

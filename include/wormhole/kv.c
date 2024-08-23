@@ -643,6 +643,13 @@ kref_kv_compare(const struct kref * const kref, const struct kv * const k)
 {
   debug_assert(kref);
   debug_assert(k);
+  if (kref->len == 8 && k->klen == 8) {
+      const s64 a = *((s64 *) kref->ptr);
+      const s64 b = *((s64 *) k->kv);
+      if (a == b)
+          return 0;
+      return a < b ? -1 : 1;
+  }
   const u32 len = kref->len < k->klen ? kref->len : k->klen;
   const int cmp = memcmp(kref->ptr, k->kv, (size_t)len);
   return cmp ? cmp : klen_compare(kref->len, k->klen);
