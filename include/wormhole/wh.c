@@ -600,26 +600,10 @@ wormleaf_version_store(struct wormleaf * const leaf, const u64 v)
 // }}} hmap-version
 
 // co {{{
-  static inline void
-wormhmap_prefetch_pmap(const struct wormhmap * const hmap, const u32 idx)
-{
-#if defined(CORR)
-  (void)hmap;
-  (void)idx;
-#else
-  cpu_prefetch0(&(hmap->pmap[idx]));
-#endif
-}
-
   static inline struct wormmeta *
 wormhmap_get_meta(const struct wormhmap * const hmap, const u32 mid, const u32 i)
 {
-  struct wormmeta * const meta = hmap->pmap[mid].e[i];
-#if defined(CORR)
-  cpu_prefetch0(meta);
-  corr_yield();
-#endif
-  return meta;
+  return hmap->pmap[mid].e[i];
 }
 
   static inline void
@@ -639,16 +623,6 @@ wormleaf_prefetch(struct wormleaf * const leaf, const u32 hashlo)
   static inline bool
 wormhole_kref_kv_match(const struct kref * const key, const struct kv * const curr)
 {
-#if defined(CORR)
-  const u8 * const ptr = (typeof(ptr))curr;
-  cpu_prefetch0(ptr);
-  cpu_prefetch0(ptr + 64);
-  if (key->len > 56) {
-    cpu_prefetch0(ptr + 128);
-    cpu_prefetch0(ptr + 192);
-  }
-  corr_yield();
-#endif
   return kref_kv_match(key, curr);
 }
 
@@ -773,9 +747,7 @@ wormhmap_get(const struct wormhmap * const hmap, const struct kv * const key)
 {
   const u32 hash32 = key->hashlo;
   const u32 midx = hash32 & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midx);
   const u32 midy = wormhole_bswap(hash32) & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midy);
   const m128 skey = wormhmap_m128_pkey(wormhole_pkey(hash32));
 
   struct wormmeta * const r = wormhmap_get_slot(hmap, midx, skey, key);
@@ -807,9 +779,7 @@ wormhmap_get_kref(const struct wormhmap * const hmap, const struct kref * const 
 {
   const u32 hash32 = kref->hash32;
   const u32 midx = hash32 & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midx);
   const u32 midy = wormhole_bswap(hash32) & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midy);
   const m128 skey = wormhmap_m128_pkey(wormhole_pkey(hash32));
 
   struct wormmeta * const r = wormhmap_get_kref_slot(hmap, midx, skey, kref);
@@ -827,7 +797,6 @@ wormhmap_get_kref1_slot(const struct wormhmap * const hmap, const u32 mid,
   while (mask) {
     const u32 i2 = (u32)__builtin_ctz(mask);
     struct wormmeta * const meta = wormhmap_get_meta(hmap, mid, i2>>1);
-    //cpu_prefetch0(wormmeta_rmost_load(meta)); // will access
     if (likely(wormhole_kref1_meta_match(kref, meta, cid)))
       return meta;
 
@@ -843,9 +812,7 @@ wormhmap_get_kref1(const struct wormhmap * const hmap,
 {
   const u32 hash32 = crc32c_u8(kref->hash32, cid);
   const u32 midx = hash32 & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midx);
   const u32 midy = wormhole_bswap(hash32) & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midy);
   const m128 skey = wormhmap_m128_pkey(wormhole_pkey(hash32));
 
   struct wormmeta * const r = wormhmap_get_kref1_slot(hmap, midx, skey, kref, cid);
@@ -999,9 +966,7 @@ wormhmap_set(struct wormhmap * const hmap, struct wormmeta * const meta)
 {
   const u32 hash32 = wormmeta_hash32_load(meta);
   const u32 midx = hash32 & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midx);
   const u32 midy = wormhole_bswap(hash32) & hmap->mask;
-  wormhmap_prefetch_pmap(hmap, midy);
   const u16 pkey = wormhole_pkey(hash32);
   // insert with cuckoo
   if (likely(wormhmap_cuckoo(hmap, midx, meta, pkey, 1)))
@@ -1354,7 +1319,6 @@ wormhole_jump_leaf_read(struct wormref * const ref, const struct kref * const ke
     const u64 v = wormhmap_version_load(hmap);
     qsbr_update(&ref->qref, v);
     struct wormleaf * const leaf = wormhole_jump_leaf(hmap, key);
-    wormleaf_prefetch(leaf, key->hash32);
 #pragma nounroll
     do {
       if (rwlock_trylock_read_nr(&(leaf->leaflock), 64)) {
@@ -1414,13 +1378,6 @@ wormleaf_kv_at_ih(const struct wormleaf * const leaf, const u32 ih)
 wormleaf_kv_at_is(const struct wormleaf * const leaf, const u32 is)
 {
   return u64_to_ptr(leaf->hs[leaf->ss[is]].e3);
-}
-
-  static inline void
-wormleaf_prefetch_ss(const struct wormleaf * const leaf)
-{
-  for (u32 i = 0; i < WH_KPN; i+=64)
-    cpu_prefetch0(&leaf->ss[i]);
 }
 
 // leaf must have been sorted
