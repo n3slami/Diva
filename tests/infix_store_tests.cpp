@@ -25,10 +25,10 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
-        const uint32_t total_words = (Steroids::infix_store_target_size + (s.infix_size_ + 1) * s.scaled_sizes_[0] + 63) / 64;
+        const uint32_t total_words = (Steroids<false>::infix_store_target_size + (s.infix_size_ + 1) * s.scaled_sizes_[0] + 63) / 64;
         for (int32_t i = 0; i < total_words; i++)
             REQUIRE_EQ(store.ptr[i], 0);
     }
@@ -38,8 +38,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         const uint32_t total_slots = s.scaled_sizes_[0];
         for (int32_t i = 0; i < total_slots; i++)
@@ -157,10 +157,10 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
-        uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
         runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
         runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
         runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
@@ -235,9 +235,9 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
-        uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
         uint64_t inserts[100];
 
         inserts[0] = 0b010000000001100;
@@ -382,8 +382,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         const std::vector<uint64_t> keys {0b00000010011000, 0b00000010010100,
             0b00000010010110, 0b00000010010101, 0b00000010011111,
@@ -585,8 +585,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         const std::vector<uint64_t> keys {0b00000010011000, 0b00000010010100,
             0b00000010010110, 0b00000010010101, 0b00000010011111,
@@ -609,8 +609,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
             0b00000000010101, 0b00000000100001, 0b00000000100011,
@@ -633,8 +633,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         SUBCASE("fetch") {
             const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
@@ -661,7 +661,7 @@ public:
             std::mt19937_64 rng(rng_seed);
             std::vector<uint64_t> keys;
             for (int32_t i = 0; i < n_keys; i++)
-                keys.push_back((rng() & BITMASK(Steroids::base_implicit_size + infix_size)) | 1ULL);
+                keys.push_back((rng() & BITMASK(Steroids<false>::base_implicit_size + infix_size)) | 1ULL);
             auto comp = [](uint64_t a, uint64_t b) {
                             const uint64_t a_lb = a & (-a), b_lb = b & (-b);
                             const uint64_t a_nolb = a - a_lb;
@@ -879,8 +879,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
         const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
             0b00000000010101, 0b00000000100001, 0b00000000101000,
@@ -909,7 +909,7 @@ public:
 
         SUBCASE("negatives") {
             std::vector<uint64_t> queries;
-            for (uint64_t query_key = 0; query_key < (1ULL << (s.infix_size_ + Steroids::base_implicit_size)); query_key++) {
+            for (uint64_t query_key = 0; query_key < (1ULL << (s.infix_size_ + Steroids<false>::base_implicit_size)); query_key++) {
                 
                 bool valid = true;
                 for (uint64_t key : keys)
@@ -930,8 +930,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
         
         const uint32_t n_queries = 100000;
         const uint32_t rng_seed = 2;
@@ -951,8 +951,8 @@ public:
         SUBCASE("no false negatives") {
             std::vector<std::pair<uint64_t, uint64_t>> queries;
             while (queries.size() < n_queries) {
-                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
-                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids<false>::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids<false>::base_implicit_size);
                 if (l > r)
                     std::swap(l, r);
 
@@ -975,8 +975,8 @@ public:
         SUBCASE("negatives") {
             std::vector<std::pair<uint64_t, uint64_t>> queries;
             while (queries.size() < n_queries) {
-                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
-                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids::base_implicit_size);
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Steroids<false>::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Steroids<false>::base_implicit_size);
                 if (l > r)
                     std::swap(l, r);
 
@@ -1001,8 +1001,8 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
         
         const std::vector<uint64_t> keys {0b00000000000001, 0b00000000000101,
             0b00000000010101, 0b00000000100001, 0b00000000101000,
@@ -1055,14 +1055,14 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
-        Steroids::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
+        Steroids<false> s(infix_size, seed, load_factor);
+        Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
         
         const uint32_t n_keys = 512;
         const uint32_t rng_seed = 2;
         std::mt19937_64 rng(rng_seed);
         for (int32_t i = 0; i < n_keys; i++)
-            s.InsertRawIntoInfixStore(store, (rng() & BITMASK(Steroids::base_implicit_size + infix_size)) | 1ULL);
+            s.InsertRawIntoInfixStore(store, (rng() & BITMASK(Steroids<false>::base_implicit_size + infix_size)) | 1ULL);
 
         s.ResizeInfixStore(store, true);
 
@@ -1476,15 +1476,15 @@ public:
     }
 
 private:
-    static void AssertStoreContents(const Steroids& s, const Steroids::InfixStore& store,
+    static void AssertStoreContents(const Steroids<false>& s, const Steroids<false>::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
         REQUIRE_EQ(store.GetElemCount(), checks.size());
         const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
         uint32_t ind = 0;
-        for (uint32_t i = 0; i < Steroids::infix_store_target_size; i++) {
+        for (uint32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
@@ -1519,15 +1519,15 @@ private:
         REQUIRE_EQ(occupieds_pos.size(), runend_count);
     }
 
-    static void PrintStore(const Steroids& s, const Steroids::InfixStore& store) {
+    static void PrintStore(const Steroids<false>& s, const Steroids<false>::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
 
         std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
         std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetElemCount() << std::endl;
         std::cerr << "occupieds: ";
-        for (int32_t i = 0; i < Steroids::infix_store_target_size; i++) {
+        for (int32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if ((store.ptr[i / 64] >> (i % 64)) & 1ULL)
                 std::cerr << i << ' ';
         }

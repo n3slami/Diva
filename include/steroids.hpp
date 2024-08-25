@@ -15,6 +15,7 @@
 
 #include "wormhole/wh.h"
 #include "util.hpp"
+#include "wormhole/wh_int.h"
 
 // TODO: We have a pointer that goes out of the arrays bounds when calling
 // `GetSharedIgnoreImplicitLengths`. Okay, maybe?
@@ -38,50 +39,21 @@ static void print_key(const char *key, const uint32_t key_len, const bool binary
 }
 
 
+template <bool int_optimized>
 class Steroids {
     friend class SteroidsTests;
     friend class InfixStoreTests;
 
 public:
-    Steroids(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor):
-            wh(wh_create()),
-            better_tree_(wh_ref(wh)),
-            infix_size_(infix_size),
-            load_factor_(load_factor) {
-        rng_.seed(rng_seed);
-        SetupScaleFactors();
-    }
+    Steroids(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor);
 
     template <class t_itr>
     Steroids(const uint32_t infix_size, t_itr begin, t_itr end, const uint32_t key_len,
-             const uint32_t rng_seed, const float load_factor):
-            wh(wh_create()),
-            better_tree_(wh_ref(wh)),
-            infix_size_(infix_size),
-            load_factor_(load_factor) {
-        rng_.seed(rng_seed);
-        SetupScaleFactors();
-
-        uint8_t key[key_len];
-        memset(key, 0x00, key_len);
-        AddTreeKey(key, key_len);
-        memset(key, 0xFF, key_len);
-        AddTreeKey(key, key_len);
-
-        BulkLoadFixedLength(begin, end, key_len);
-    }
+             const uint32_t rng_seed, const float load_factor);
 
     template <class t_itr>
     Steroids(const uint32_t infix_size, t_itr begin, t_itr end, 
-             const uint32_t rng_seed, const float load_factor):
-            wh(wh_create()),
-            better_tree_(wh_ref(wh)),
-            infix_size_(infix_size),
-            load_factor_(load_factor) {
-        rng_.seed(rng_seed);
-        SetupScaleFactors();
-        BulkLoad(begin, end);
-    }
+             const uint32_t rng_seed, const float load_factor);
 
     void Insert(std::string_view key);
     void Insert(const uint8_t *key, const uint32_t key_len);
@@ -231,8 +203,10 @@ private:
     };
 
     uint32_t infix_size_;
-    wormhole *wh;
+    wormhole *wh_;
     wormref *better_tree_;
+    wormhole_int *wh_int_;
+    wormref_int *better_tree_int_;
     std::mt19937 rng_;
     const float load_factor_ = 0.95;
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count];
@@ -241,7 +215,7 @@ private:
     void AddTreeKey(const uint8_t *key, const uint32_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
-    void DeleteMerge(wormhole_iter *const it);
+    void DeleteMerge(void *const it_inp);
     template <class t_itr>
     void BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len);
     template <class t_itr>
@@ -301,7 +275,87 @@ private:
 };
 
 
-inline void Steroids::SetupScaleFactors() {
+template <bool int_optimized>
+inline Steroids<int_optimized>::Steroids(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor):
+            wh_(nullptr),
+            better_tree_(nullptr),
+            wh_int_(nullptr),
+            better_tree_int_(nullptr),
+            infix_size_(infix_size),
+            load_factor_(load_factor) {
+    if constexpr (int_optimized) {
+        wh_int_ = wh_int_create();
+        better_tree_int_ = wh_int_ref(wh_int_);
+    }
+    else {
+        wh_ = wh_create();
+        better_tree_ = wh_ref(wh_);
+    }
+    rng_.seed(rng_seed);
+    SetupScaleFactors();
+}
+
+
+template <bool int_optimized>
+template <class t_itr>
+Steroids<int_optimized>::Steroids(const uint32_t infix_size, t_itr begin, t_itr end, const uint32_t key_len,
+         const uint32_t rng_seed, const float load_factor):
+        wh_(nullptr),
+        better_tree_(nullptr),
+        wh_int_(nullptr),
+        better_tree_int_(nullptr),
+        infix_size_(infix_size),
+        load_factor_(load_factor) {
+    if constexpr (int_optimized) {
+        wh_int_ = wh_int_create();
+        better_tree_int_ = wh_int_ref(wh_int_);
+    }
+    else {
+        wh_ = wh_create();
+        better_tree_ = wh_ref(wh_);
+    }
+
+    rng_.seed(rng_seed);
+    SetupScaleFactors();
+
+    uint8_t key[key_len];
+    memset(key, 0x00, key_len);
+    AddTreeKey(key, key_len);
+    memset(key, 0xFF, key_len);
+    AddTreeKey(key, key_len);
+
+    BulkLoadFixedLength(begin, end, key_len);
+}
+
+
+template <bool int_optimized>
+template <class t_itr>
+Steroids<int_optimized>::Steroids(const uint32_t infix_size, t_itr begin, t_itr end, 
+         const uint32_t rng_seed, const float load_factor):
+        wh_(nullptr),
+        better_tree_(nullptr),
+        wh_int_(nullptr),
+        better_tree_int_(nullptr),
+        infix_size_(infix_size),
+        load_factor_(load_factor) {
+    if constexpr (int_optimized) {
+        wh_int_ = wh_int_create();
+        better_tree_int_ = wh_int_ref(wh_int_);
+    }
+    else {
+        wh_ = wh_create();
+        better_tree_ = wh_ref(wh_);
+    }
+
+    rng_.seed(rng_seed);
+    SetupScaleFactors();
+    BulkLoad(begin, end);
+}
+
+
+
+template <bool int_optimized>
+inline void Steroids<int_optimized>::SetupScaleFactors() {
     double pw = 1.0 / load_factor_;
     for (int32_t i = 0; i < size_scalar_count; i++) {
         size_scalars_[i] = static_cast<uint64_t>(pw * (1ULL << scale_shift));
@@ -317,12 +371,14 @@ inline void Steroids::SetupScaleFactors() {
 }
 
 
-inline void Steroids::Insert(std::string_view key) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::Insert(std::string_view key) {
     Insert(reinterpret_cast<const uint8_t *>(key.data()), key.size());
 }
 
 
-inline void Steroids::Insert(const uint8_t *key, const uint32_t key_len) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::Insert(const uint8_t *key, const uint32_t key_len) {
     const InfiniteByteString converted_key {key, static_cast<uint32_t>(key_len)};
 
     if (rng_() % infix_store_target_size == 0)
@@ -331,35 +387,73 @@ inline void Steroids::Insert(const uint8_t *key, const uint32_t key_len) {
         InsertSimple(converted_key);
 }
 
-inline void Steroids::InsertSimple(const InfiniteByteString key) {
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, key.str, key.length);
-
+template <bool int_optimized>
+inline void Steroids<int_optimized>::InsertSimple(const InfiniteByteString key) {
     InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
     uint32_t dummy_val;
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key == key) {
-        prev_key = next_key;
-        wh_iter_skip1(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, key.str, key.length);
+
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            prev_key = next_key;
+            wh_int_iter_skip1(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        }
+        else {
+            wh_int_iter_skip1_rev(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
     }
     else {
-        wh_iter_skip1_rev(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, key.str, key.length);
+
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                               reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+
+        std::cerr << "WTF? next_key=";
+        print_key(next_key.str, next_key.length);
+
+        if (next_key == key) {
+            prev_key = next_key;
+            wh_iter_skip1(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        }
+        else {
+            wh_iter_skip1_rev(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
     }
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
+
+    std::cerr << "key=";
+    print_key(key.str, key.length);
+    std::cerr << "prev_key=";
+    print_key(prev_key.str, prev_key.length);
+    std::cerr << "next_key=";
+    print_key(next_key.str, next_key.length);
 
     assert(prev_key <= key);
     assert(key < next_key);
@@ -377,42 +471,66 @@ inline void Steroids::InsertSimple(const InfiniteByteString key) {
 }
 
 
-inline bool Steroids::RangeQuery(std::string_view input_l, std::string_view input_r) const {
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::RangeQuery(std::string_view input_l, std::string_view input_r) const {
     return RangeQuery(reinterpret_cast<const uint8_t *>(input_l.data()), input_l.size(),
                       reinterpret_cast<const uint8_t *>(input_r.data()), input_r.size());
 }
 
 
-inline bool Steroids::RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
-                                 const uint8_t *input_r, const uint32_t input_r_len) const {
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
+                                                const uint8_t *input_r, const uint32_t input_r_len) const {
     const InfiniteByteString l_key {input_l, static_cast<uint32_t>(input_l_len)};
     const InfiniteByteString r_key {input_r, static_cast<uint32_t>(input_r_len)};
 
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, l_key.str, l_key.length);
-    
     InfixStore *infix_store_ptr;
     uint32_t dummy_val;
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key <= r_key) {
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, l_key.str, l_key.length);
+
+        wh_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key <= r_key) {
+            if (it_int.leaf)
+                wormleaf_int_unlock_read(it_int.leaf);
+            return true;
+        }
+        wh_int_iter_skip1_rev(&it_int);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, l_key.str, l_key.length);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key <= r_key) {
+            if (it.leaf)
+                wormleaf_unlock_read(it.leaf);
+            return true;
+        }
+        wh_iter_skip1_rev(&it);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
         if (it.leaf)
             wormleaf_unlock_read(it.leaf);
-        return true;
     }
-    wh_iter_skip1_rev(&it);
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
-
+    
     InfixStore& infix_store = *infix_store_ptr;
 
     if (infix_store.IsPartialKey() && prev_key.IsPrefixOf(l_key, infix_store.GetInvalidBits())) {
@@ -433,19 +551,14 @@ inline bool Steroids::RangeQuery(const uint8_t *input_l, const uint32_t input_l_
 }
 
 
-inline bool Steroids::PointQuery(std::string_view key) const {
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::PointQuery(std::string_view key) const {
     return PointQuery(reinterpret_cast<const uint8_t *>(key.data()), key.size());
 }
 
 
-inline bool Steroids::PointQuery(const uint8_t *input_key, const uint32_t key_len) const {
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, input_key, key_len);
-    
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::PointQuery(const uint8_t *input_key, const uint32_t key_len) const {
     const InfiniteByteString key {input_key, static_cast<uint32_t>(key_len)};
     
     InfixStore *infix_store_ptr;
@@ -454,19 +567,49 @@ inline bool Steroids::PointQuery(const uint8_t *input_key, const uint32_t key_le
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key == key) {
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, input_key, key_len);
+
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            if (it_int.leaf)
+                wormleaf_int_unlock_read(it_int.leaf);
+            return true;
+        }
+        wh_int_iter_skip1_rev(&it_int);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, input_key, key_len);
+
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            if (it.leaf)
+                wormleaf_unlock_read(it.leaf);
+            return true;
+        }
+        wh_iter_skip1_rev(&it);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
         if (it.leaf)
             wormleaf_unlock_read(it.leaf);
-        return true;
     }
-    wh_iter_skip1_rev(&it);
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
-
+    
     assert(prev_key <= key);
     assert(key < next_key);
 
@@ -487,41 +630,72 @@ inline bool Steroids::PointQuery(const uint8_t *input_key, const uint32_t key_le
 }
 
 
-inline void Steroids::AddTreeKey(const uint8_t *key, const uint32_t key_len) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::AddTreeKey(const uint8_t *key, const uint32_t key_len) {
     InfixStore infix_store(scaled_sizes_[0], infix_size_);
-    wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store));
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, key, key_len, &infix_store, sizeof(infix_store));
+    else
+        wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store));
 }
 
 
-inline void Steroids::InsertSplit(InfiniteByteString key) {
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, key.str, key.length);
-
+template <bool int_optimized>
+inline void Steroids<int_optimized>::InsertSplit(InfiniteByteString key) {
     InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
     uint32_t dummy_val;
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key == key) {
-        prev_key = next_key;
-        wh_iter_skip1(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, key.str, key.length);
+
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            prev_key = next_key;
+            wh_int_iter_skip1(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        }
+        else {
+            wh_int_iter_skip1_rev(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
     }
     else {
-        wh_iter_skip1_rev(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, key.str, key.length);
+
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                               reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            prev_key = next_key;
+            wh_iter_skip1(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        }
+        else {
+            wh_iter_skip1_rev(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
     }
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
 
     assert(prev_key <= key);
     assert(key < next_key);
@@ -631,25 +805,37 @@ inline void Steroids::InsertSplit(InfiniteByteString key) {
                                                      right_list_len - (zero_pos != -1),
                                                      total_implicit_gt);
     auto *ptr_to_free = infix_store.ptr;
-    wh_put(better_tree_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
+    else 
+        wh_put(better_tree_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
     if (zero_pos != -1) {
         const uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
         InsertRawIntoInfixStore(store_gt, key_extraction & BITMASK(infix_size_) | 1, total_implicit_gt);
         store_gt.SetInvalidBits(7 - (zero_pos - 1) % 8);
         store_gt.SetPartialKey(true);
-        wh_put(better_tree_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore));
+        if constexpr (int_optimized)
+            wh_int_put(better_tree_int_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore));
+        else 
+            wh_put(better_tree_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore));
     }
-    else
-        wh_put(better_tree_, key.str, key.length, &store_gt, sizeof(InfixStore));
+    else {
+        if constexpr (int_optimized)
+            wh_int_put(better_tree_int_, key.str, key.length, &store_gt, sizeof(InfixStore));
+        else
+            wh_put(better_tree_, key.str, key.length, &store_gt, sizeof(InfixStore));
+    }
 
     // No memory leaks!
     delete[] ptr_to_free;
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline uint32_t Steroids::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len, const uint32_t implicit_size,
-                                                     const uint32_t shamt, const uint64_t lower_lim, const uint64_t upper_lim) {
+inline uint32_t Steroids<int_optimized>::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len,
+                                                                    const uint32_t implicit_size, const uint32_t shamt,
+                                                                    const uint64_t lower_lim, const uint64_t upper_lim) {
     uint32_t actual_list_len = list_len;
     const uint64_t lower_implicit_lim = lower_lim >> infix_size_;
     const uint64_t upper_implicit_lim = upper_lim >> infix_size_;
@@ -667,10 +853,11 @@ inline uint32_t Steroids::GetExpandedInfixListLength(const uint64_t *list, const
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
-                                      const uint64_t lower_lim, const uint64_t upper_lim,
-                                      uint64_t *res, const uint32_t res_len) {
+inline void Steroids<int_optimized>::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
+                                                     const uint64_t lower_lim, const uint64_t upper_lim,
+                                                     uint64_t *res, const uint32_t res_len) {
     if (list_len == res_len) {
         for (int32_t i = 0; i < list_len; i++)
             res[i] = (list[i] << shamt) - lower_lim;
@@ -707,9 +894,10 @@ inline void Steroids::UpdateInfixList(const uint64_t *list, const uint32_t list_
 }
 
 
+template <bool int_optimized>
 inline std::tuple<uint32_t, uint32_t, uint32_t> 
-Steroids::GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
-                                         const InfiniteByteString key_2) const {
+Steroids<int_optimized>::GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
+                                                        const InfiniteByteString key_2) const {
     uint32_t share = 0, ignore = 0, implicit = 0;
 
     uint32_t ind = 0, delta;
@@ -740,54 +928,93 @@ Steroids::GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
 }
 
 
-inline void Steroids::ShrinkInfixSize(const uint32_t new_infix_size) {
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, nullptr, 0);
+template <bool int_optimized>
+inline void Steroids<int_optimized>::ShrinkInfixSize(const uint32_t new_infix_size) {
     InfixStore *store_ptr;
     const uint8_t *key;
     uint32_t key_len, dummy_val;
-    do {
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&key), &key_len,
-                              reinterpret_cast<void **>(&store_ptr), &dummy_val);
-        ShrinkInfixStoreInfixSize(*store_ptr, new_infix_size);
-        wh_iter_skip1(&it);
-    } while (wh_iter_valid(&it));
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, nullptr, 0);
+        do {
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&key), &key_len,
+                                          reinterpret_cast<void **>(&store_ptr), &dummy_val);
+            ShrinkInfixStoreInfixSize(*store_ptr, new_infix_size);
+            wh_int_iter_skip1(&it_int);
+        } while (wh_int_iter_valid(&it_int));
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, nullptr, 0);
+        do {
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&key), &key_len,
+                                  reinterpret_cast<void **>(&store_ptr), &dummy_val);
+            ShrinkInfixStoreInfixSize(*store_ptr, new_infix_size);
+            wh_iter_skip1(&it);
+        } while (wh_iter_valid(&it));
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
 
     infix_size_ = new_infix_size;
-
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
 }
 
-inline uint32_t Steroids::Size() const {
+
+template <bool int_optimized>
+inline uint32_t Steroids<int_optimized>::Size() const {
     uint32_t res = 0;
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
     InfixStore *store;
-    for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key_len), &tree_key_len, 
-                              reinterpret_cast<void **>(&store), &dummy);
-        res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        for (wh_int_iter_seek(&it_int, nullptr, 0); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int)) {
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key_len), &tree_key_len, 
+                                          reinterpret_cast<void **>(&store), &dummy);
+            res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
+        }
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
     }
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key_len), &tree_key_len, 
+                                  reinterpret_cast<void **>(&store), &dummy);
+            res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
+        }
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
     return res;
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline uint64_t Steroids::ExtractPartialKey(const InfiniteByteString key,
-                                            const uint32_t shared, const uint32_t ignore,
-                                            const uint32_t implicit_size, const uint64_t msb) const {
+inline uint64_t Steroids<int_optimized>::ExtractPartialKey(const InfiniteByteString key,
+                                                           const uint32_t shared, const uint32_t ignore,
+                                                           const uint32_t implicit_size, const uint64_t msb) const {
     const uint32_t real_diff_pos = shared + ignore;
     uint64_t res = key.WordAt(real_diff_pos / 8);
     res >>= (63 - (implicit_size - 1) - infix_size_ - real_diff_pos % 8);
@@ -797,20 +1024,15 @@ inline uint64_t Steroids::ExtractPartialKey(const InfiniteByteString key,
 }
 
 
-inline void Steroids::Delete(std::string_view input_key) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::Delete(std::string_view input_key) {
     Delete(reinterpret_cast<const uint8_t *>(input_key.data()), input_key.size());
 }
 
 
-inline void Steroids::Delete(const uint8_t *input_key, const uint32_t input_key_len) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::Delete(const uint8_t *input_key, const uint32_t input_key_len) {
     InfiniteByteString key {input_key, input_key_len};
-
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
-    wh_iter_seek(&it, key.str, key.length);
 
     InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
     uint32_t dummy_val;
@@ -818,23 +1040,59 @@ inline void Steroids::Delete(const uint8_t *input_key, const uint32_t input_key_
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-    if (next_key == key) {
-        if (!infix_store_ptr->IsPartialKey()) {
-            DeleteMerge(&it);
-            return;
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    if constexpr (int_optimized) {
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, key.str, key.length);
+
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            if (!infix_store_ptr->IsPartialKey()) {
+                DeleteMerge(&it_int);
+                return;
+            }
+            prev_key = next_key;
+            wh_int_iter_skip1(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+            wh_int_iter_skip1_rev(&it_int);
         }
-        prev_key = next_key;
-        wh_iter_skip1(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        wh_iter_skip1_rev(&it);
+        else {
+            wh_int_iter_skip1_rev(&it_int);
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
     }
     else {
-        wh_iter_skip1_rev(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, key.str, key.length);
+
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                               reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        if (next_key == key) {
+            if (!infix_store_ptr->IsPartialKey()) {
+                DeleteMerge(&it);
+                return;
+            }
+            prev_key = next_key;
+            wh_iter_skip1(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+            wh_iter_skip1_rev(&it);
+        }
+        else {
+            wh_iter_skip1_rev(&it);
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        }
     }
 
     assert(prev_key <= key);
@@ -853,36 +1111,64 @@ inline void Steroids::Delete(const uint8_t *input_key, const uint32_t input_key_
         const uint32_t longest_match_len = GetLongestMatchingInfixSize(infix_store, deletee);
         if (longest_match_len == 0 || 8 * prev_key.length - infix_store.GetInvalidBits() 
                                         > shared + ignore + implicit_size + longest_match_len - 1) {
-            DeleteMerge(&it);
+            if constexpr (int_optimized)
+                DeleteMerge(&it_int);
+            else
+                DeleteMerge(&it);
             return;
         }
     }
 
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
+    if constexpr (int_optimized) {
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
 
     DeleteRawFromInfixStore(infix_store, deletee, total_implicit);
 }
 
 
-inline void Steroids::DeleteMerge(wormhole_iter *const it) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::DeleteMerge(void *const it_inp) {
+
     InfiniteByteString middle_key {};
     InfiniteByteString left_key {};
     InfiniteByteString right_key {};
     InfixStore *store_l, *store_r;
     uint32_t dummy;
 
-    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
-                         reinterpret_cast<void **>(&store_r), &dummy);
-    wh_iter_skip1(it);
-    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
-                         reinterpret_cast<void **>(&store_l), &dummy);
-    wh_iter_skip1_rev(it);
-    wh_iter_skip1_rev(it);
-    wh_iter_peek_ref(it, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
-                         reinterpret_cast<void **>(&store_l), &dummy);
-    if (it->leaf)
-        wormleaf_unlock_read(it->leaf);
+    if constexpr (int_optimized) {
+        wormhole_int_iter *const it_int = reinterpret_cast<wormhole_int_iter *const>(it_inp);
+        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
+                                     reinterpret_cast<void **>(&store_r), &dummy);
+        wh_int_iter_skip1(it_int);
+        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
+                                     reinterpret_cast<void **>(&store_l), &dummy);
+        wh_int_iter_skip1_rev(it_int);
+        wh_int_iter_skip1_rev(it_int);
+        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
+                                     reinterpret_cast<void **>(&store_l), &dummy);
+        if (it_int->leaf)
+            wormleaf_int_unlock_read(it_int->leaf);
+    }
+    else {
+        wormhole_iter *const it = reinterpret_cast<wormhole_iter *const>(it_inp);
+        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
+                             reinterpret_cast<void **>(&store_r), &dummy);
+        wh_iter_skip1(it);
+        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
+                             reinterpret_cast<void **>(&store_l), &dummy);
+        wh_iter_skip1_rev(it);
+        wh_iter_skip1_rev(it);
+        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
+                             reinterpret_cast<void **>(&store_l), &dummy);
+        if (it->leaf)
+            wormleaf_unlock_read(it->leaf);
+    }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
 
@@ -905,7 +1191,10 @@ inline void Steroids::DeleteMerge(wormhole_iter *const it) {
 
     delete[] store_l->ptr;
     delete[] store_r->ptr;
-    wh_del(better_tree_, middle_key.str, middle_key.length);
+    if constexpr (int_optimized)
+        wh_int_del(better_tree_int_, middle_key.str, middle_key.length);
+    else
+        wh_del(better_tree_, middle_key.str, middle_key.length);
 
     const uint64_t left_extraction = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0);
     const uint64_t right_extraction = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1);
@@ -914,12 +1203,16 @@ inline void Steroids::DeleteMerge(wormhole_iter *const it) {
     InfixStore store = AllocateInfixStoreWithList(infix_list, total_elem_count, total_implicit);
     store.SetPartialKey(store_l->IsPartialKey());
     store.SetInvalidBits(store_l->GetInvalidBits());
-    wh_put(better_tree_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
+    else
+        wh_put(better_tree_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
 }
 
-inline void Steroids::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
-                                            const InfiniteByteString left_key, const InfiniteByteString right_key,
-                                            uint64_t *infix_list, const uint32_t infix_list_len) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
+                                                           const InfiniteByteString left_key, const InfiniteByteString right_key,
+                                                           uint64_t *infix_list, const uint32_t infix_list_len) {
     const uint32_t shared_word_byte = (shared / 64) * 8;
 
     auto [old_shared, old_ignore, old_implicit_size] = GetSharedIgnoreImplicitLengths(
@@ -993,8 +1286,9 @@ inline void Steroids::UpdateInfixListDelete(const uint32_t shared, const uint32_
 }
 
 
+template <bool int_optimized>
 template <class t_itr>
-inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len) {
+inline void Steroids<int_optimized>::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len) {
     uint64_t infix_list[infix_store_target_size];
     t_itr last_key_it = begin, key_it = begin;
     InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
@@ -1007,19 +1301,33 @@ inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t
             AddTreeKey(right_key.str, right_key.length);
 
             InfixStore *store;
-
-            wormhole_iter it;
-            it.ref = better_tree_;
-            it.map = better_tree_->map;
-            it.leaf = nullptr;
-            it.is = 0;
             const uint8_t *tree_key;
             uint32_t tree_key_len, dummy;
-            wh_iter_seek(&it, left_key.str, left_key.length);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                  reinterpret_cast<void **>(&store), &dummy);
-            if (it.leaf)
-                wormleaf_unlock_read(it.leaf);
+
+            if constexpr (int_optimized) {
+                wormhole_int_iter it_int;
+                it_int.ref = better_tree_int_;
+                it_int.map = better_tree_int_->map;
+                it_int.leaf = nullptr;
+                it_int.is = 0;
+                wh_int_iter_seek(&it_int, left_key.str, left_key.length);
+                wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                              reinterpret_cast<void **>(&store), &dummy);
+                if (it_int.leaf)
+                    wormleaf_int_unlock_read(it_int.leaf);
+            }
+            else {
+                wormhole_iter it;
+                it.ref = better_tree_;
+                it.map = better_tree_->map;
+                it.leaf = nullptr;
+                it.is = 0;
+                wh_iter_seek(&it, left_key.str, left_key.length);
+                wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                      reinterpret_cast<void **>(&store), &dummy);
+                if (it.leaf)
+                    wormleaf_unlock_read(it.leaf);
+            }
 
             auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
             const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1048,19 +1356,33 @@ inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t
     right_key = {max_str, key_len};
 
     InfixStore *store;
-
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
-    wh_iter_seek(&it, left_key.str, left_key.length);
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-            reinterpret_cast<void **>(&store), &dummy);
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, left_key.str, left_key.length);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                      reinterpret_cast<void **>(&store), &dummy);
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, left_key.str, left_key.length);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                              reinterpret_cast<void **>(&store), &dummy);
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
     const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1079,8 +1401,9 @@ inline void Steroids::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t
 }
 
 
+template <bool int_optimized>
 template <class t_itr>
-inline void Steroids::BulkLoad(t_itr begin, t_itr end) {
+inline void Steroids<int_optimized>::BulkLoad(t_itr begin, t_itr end) {
     uint64_t infix_list[infix_store_target_size];
     t_itr last_key_it = begin, key_it = begin;
     std::string_view sv {*key_it};
@@ -1098,19 +1421,33 @@ inline void Steroids::BulkLoad(t_itr begin, t_itr end) {
             AddTreeKey(right_key.str, right_key.length);
 
             InfixStore *store;
-
-            wormhole_iter it;
-            it.ref = better_tree_;
-            it.map = better_tree_->map;
-            it.leaf = nullptr;
-            it.is = 0;
             const uint8_t *tree_key;
             uint32_t tree_key_len, dummy;
-            wh_iter_seek(&it, left_key.str, left_key.length);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                  reinterpret_cast<void **>(&store), &dummy);
-            if (it.leaf)
-                wormleaf_unlock_read(it.leaf);
+
+            if constexpr (int_optimized) {
+                wormhole_int_iter it_int;
+                it_int.ref = better_tree_int_;
+                it_int.map = better_tree_int_->map;
+                it_int.leaf = nullptr;
+                it_int.is = 0;
+                wh_int_iter_seek(&it_int, left_key.str, left_key.length);
+                wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                              reinterpret_cast<void **>(&store), &dummy);
+                if (it_int.leaf)
+                    wormleaf_int_unlock_read(it_int.leaf);
+            }
+            else {
+                wormhole_iter it;
+                it.ref = better_tree_;
+                it.map = better_tree_->map;
+                it.leaf = nullptr;
+                it.is = 0;
+                wh_iter_seek(&it, left_key.str, left_key.length);
+                wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                      reinterpret_cast<void **>(&store), &dummy);
+                if (it.leaf)
+                    wormleaf_unlock_read(it.leaf);
+            }
 
             auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
             const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1143,19 +1480,33 @@ inline void Steroids::BulkLoad(t_itr begin, t_itr end) {
     right_key = {max_str, max_len};
 
     InfixStore *store;
-
-    wormhole_iter it;
-    it.ref = better_tree_;
-    it.map = better_tree_->map;
-    it.leaf = nullptr;
-    it.is = 0;
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
-    wh_iter_seek(&it, left_key.str, left_key.length);
-    wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                          reinterpret_cast<void **>(&store), &dummy);
-    if (it.leaf)
-        wormleaf_unlock_read(it.leaf);
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, left_key.str, left_key.length);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                                      reinterpret_cast<void **>(&store), &dummy);
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, left_key.str, left_key.length);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                              reinterpret_cast<void **>(&store), &dummy);
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
     const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1176,8 +1527,9 @@ inline void Steroids::BulkLoad(t_itr begin, t_itr end) {
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
+inline uint32_t Steroids<int_optimized>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr;
     uint32_t res = 0;
     for (int32_t i = 0; i < pos / 64; i++)
@@ -1186,8 +1538,9 @@ inline uint32_t Steroids::RankOccupieds(const InfixStore &store, const uint32_t 
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t rank) const {
+inline uint32_t Steroids<int_optimized>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_words = (scaled_sizes_[size_grade] + 63) / 64;
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
@@ -1202,7 +1555,8 @@ inline uint32_t Steroids::SelectRunends(const InfixStore &store, const uint32_t 
 }
 
 
-inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t pos) const {
+template <bool int_optimized>
+inline int32_t Steroids<int_optimized>::NextOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr;
     int32_t res = pos + 1, lb_pos;
     do {
@@ -1213,8 +1567,9 @@ inline int32_t Steroids::NextOccupied(const InfixStore &store, const uint32_t po
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline int32_t Steroids::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
+inline int32_t Steroids<int_optimized>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr;
     int32_t res = pos - 1, hb_pos;
     do {
@@ -1227,8 +1582,9 @@ inline int32_t Steroids::PreviousOccupied(const InfixStore &store, const uint32_
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos) const {
+inline int32_t Steroids<int_optimized>::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t runends_size = scaled_sizes_[size_grade];
@@ -1241,8 +1597,9 @@ inline int32_t Steroids::NextRunend(const InfixStore &store, const uint32_t pos)
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline int32_t Steroids::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
+inline int32_t Steroids<int_optimized>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
     int32_t res = pos - 1, hb_pos;
     do {
@@ -1255,8 +1612,9 @@ inline int32_t Steroids::PreviousRunend(const InfixStore &store, const uint32_t 
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline uint64_t Steroids::GetSlot(const InfixStore &store, const uint32_t pos) const {
+inline uint64_t Steroids<int_optimized>::GetSlot(const InfixStore &store, const uint32_t pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
     const uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
@@ -1266,8 +1624,9 @@ inline uint64_t Steroids::GetSlot(const InfixStore &store, const uint32_t pos) c
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
+inline void Steroids<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
     uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
@@ -1279,8 +1638,9 @@ inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint6
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width) {
+inline void Steroids<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = infix_store_target_size + scaled_sizes_[size_grade] + pos * width;
     uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
@@ -1292,9 +1652,10 @@ inline void Steroids::SetSlot(InfixStore &store, const uint32_t pos, const uint6
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                      const uint32_t shamt) {
+inline void Steroids<int_optimized>::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                     const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
     for (int32_t i = r - 1; i >= l; i--)
         SetSlot(store, i + shamt, GetSlot(store, i));
@@ -1309,9 +1670,10 @@ inline void Steroids::ShiftSlotsRight(const InfixStore &store, const uint32_t l,
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                     const uint32_t shamt) {
+inline void Steroids<int_optimized>::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                    const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
     for (int32_t i = l; i < r; i--)
         SetSlot(store, i - shamt, GetSlot(store, i));
@@ -1324,22 +1686,25 @@ inline void Steroids::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, 
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
-                                        const uint32_t shamt) {
+inline void Steroids<int_optimized>::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
+                                                       const uint32_t shamt) {
     shift_bitmap_right(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline void Steroids::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                       const uint32_t shamt) {
+inline void Steroids<int_optimized>::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                      const uint32_t shamt) {
     shift_bitmap_left(store.ptr + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline int32_t Steroids::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
+inline int32_t Steroids<int_optimized>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
     while (current_pos < scaled_sizes_[size_grade] && GetSlot(store, current_pos + 1)) {
@@ -1349,8 +1714,9 @@ inline int32_t Steroids::FindEmptySlotAfter(const InfixStore &store, const uint3
 }
 
 
+template <bool int_optimized>
 __attribute__((always_inline))
-inline int32_t Steroids::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
+inline int32_t Steroids<int_optimized>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
         previous_pos = current_pos;
@@ -1374,7 +1740,8 @@ inline int32_t Steroids::FindEmptySlotBefore(const InfixStore &store, const uint
 }
 
 
-inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::InsertRawIntoInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t elem_count = store.GetElemCount();
     if (elem_count >= (size_grade ? scaled_sizes_[size_grade - 1] : infix_store_target_size)) {
@@ -1456,7 +1823,8 @@ inline void Steroids::InsertRawIntoInfixStore(InfixStore &store, const uint64_t 
 }
 
 
-inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) {
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t elem_count = store.GetElemCount();
     if (size_grade > 0 && elem_count <= (size_grade > 1 ? scaled_sizes_[size_grade - 2] : infix_store_target_size)) {
@@ -1562,8 +1930,9 @@ inline void Steroids::DeleteRawFromInfixStore(InfixStore &store, const uint64_t 
 }
 
 
-inline uint32_t Steroids::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
-                                                      const uint32_t total_implicit) const {
+template <bool int_optimized>
+inline uint32_t Steroids<int_optimized>::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                                                     const uint32_t total_implicit) const {
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
@@ -1599,8 +1968,9 @@ inline uint32_t Steroids::GetLongestMatchingInfixSize(const InfixStore &store, c
 }
 
 
-inline bool Steroids::RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
-                                           const uint32_t total_implicit) const {
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
+                                                          const uint32_t total_implicit) const {
     const uint64_t l_implicit_part = l_key >> infix_size_;
     const uint64_t l_explicit_part = l_key & BITMASK(infix_size_);
     const uint64_t r_implicit_part = r_key >> infix_size_;
@@ -1657,7 +2027,8 @@ inline bool Steroids::RangeQueryInfixStore(InfixStore &store, const uint64_t l_k
 }
 
 
-inline bool Steroids::PointQueryInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) const {
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::PointQueryInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) const {
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
@@ -1685,7 +2056,8 @@ inline bool Steroids::PointQueryInfixStore(InfixStore &store, const uint64_t key
 }
 
 
-inline void Steroids::ResizeInfixStore(InfixStore &store, const bool expand, const uint32_t total_implicit) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::ResizeInfixStore(InfixStore &store, const bool expand, const uint32_t total_implicit) {
     // TODO: Optimize further?
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t infix_count = store.GetElemCount();
@@ -1704,7 +2076,8 @@ inline void Steroids::ResizeInfixStore(InfixStore &store, const bool expand, con
 }
 
 
-inline void Steroids::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t infix_count = store.GetElemCount();
     const uint32_t slot_count = scaled_sizes_[size_grade];
@@ -1727,8 +2100,9 @@ inline void Steroids::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_
 }
 
 
-inline void Steroids::LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
-                                           const uint32_t total_implicit, const bool zero_out) {
+template <bool int_optimized>
+inline void Steroids<int_optimized>::LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
+                                                          const uint32_t total_implicit, const bool zero_out) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_size = scaled_sizes_[size_grade];
     assert(total_implicit >= infix_store_target_size / 2);
@@ -1791,8 +2165,10 @@ inline void Steroids::LoadListToInfixStore(InfixStore &store, const uint64_t *li
 }
 
 
-inline Steroids::InfixStore Steroids::AllocateInfixStoreWithList(const uint64_t *list, const uint32_t list_len,
-                                                                 const uint32_t total_implicit) {
+template <bool int_optimized>
+inline typename Steroids<int_optimized>::InfixStore Steroids<int_optimized>::AllocateInfixStoreWithList(const uint64_t *list,
+                                                                                                        const uint32_t list_len,
+                                                                                                        const uint32_t total_implicit) {
     const uint32_t scaled_len = (size_scalars_[0] * list_len) >> scale_shift;
     uint32_t size_grade;
     for (size_grade = 0; size_grade < size_scalar_count && scaled_sizes_[size_grade] < scaled_len; size_grade++);
@@ -1802,7 +2178,8 @@ inline Steroids::InfixStore Steroids::AllocateInfixStoreWithList(const uint64_t 
 }
 
 
-inline uint32_t Steroids::GetInfixList(const InfixStore &store, uint64_t *res) const {
+template <bool int_optimized>
+inline uint32_t Steroids<int_optimized>::GetInfixList(const InfixStore &store, uint64_t *res) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t store_size = scaled_sizes_[size_grade];
     const uint64_t *occupieds = store.ptr;

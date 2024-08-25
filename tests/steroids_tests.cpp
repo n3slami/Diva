@@ -31,7 +31,7 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
+        Steroids<false> s(infix_size, seed, load_factor);
 
         uint64_t value;
         uint8_t buf[9];
@@ -108,7 +108,7 @@ public:
                    {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             const uint64_t value = to_big_endian_order(0x0000000011111111UL);
@@ -177,7 +177,7 @@ public:
                       {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             const uint64_t value = to_big_endian_order(0x0000000011111111UL);
@@ -263,7 +263,7 @@ public:
                      {519,1,0b11111}, {525,1,0b10101}, {531,1,0b01101}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             const uint64_t value = to_big_endian_order(0x0000000011111111UL);
@@ -321,7 +321,7 @@ public:
                      {537,1,0b01010}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             const uint64_t value = to_big_endian_order(0x0000000011111111UL);
@@ -372,13 +372,13 @@ public:
                      {501,1,0b10100}, {519,1,0b10100}};
             uint8_t res_key[sizeof(uint64_t)];
             uint32_t res_size, dummy;
-            Steroids::InfixStore store;
+            Steroids<false>::InfixStore store;
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8);
 
             wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
-                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(Steroids<false>::InfixStore), &dummy);
             REQUIRE(store.IsPartialKey());
             REQUIRE_EQ(store.GetInvalidBits(), 0);
             AssertStoreContents(s, store, occupieds_pos, checks);
@@ -393,9 +393,9 @@ public:
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8);
             uint32_t dummy;
-            Steroids::InfixStore store;
+            Steroids<false>::InfixStore store;
             wh_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
-                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(Steroids<false>::InfixStore), &dummy);
             wh_iter_destroy(it);
         }
         uint32_t extended_key_len = old_boundary_size + 1;
@@ -436,7 +436,7 @@ public:
                      {482,1,0b11100}, {501,1,0b10100}, {519,1,0b10100}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
             value &= ~BITMASK(shamt);
@@ -570,7 +570,7 @@ public:
                      {532,1,0b10000}, {534,1,0b10000}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             uint64_t value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -600,10 +600,10 @@ public:
             uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value));
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
             uint32_t dummy;
             wh_iter_peek(it, reinterpret_cast<void *>(new_extended_key), sizeof(new_extended_key), &new_extended_key_len, 
-                             reinterpret_cast<void *>(&store), sizeof(Steroids::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(Steroids<false>::InfixStore), &dummy);
             wh_iter_destroy(it);
         }
         memset(new_extended_key + new_extended_key_len, 0, 3);
@@ -617,7 +617,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             const uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -639,7 +639,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{403,1,0b00001}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             const uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -673,7 +673,7 @@ public:
         std::sort(init_keys.begin(), init_keys.end());
         for (int32_t i = 0; i < init_n; i++)
             init_keys[i] = to_big_endian_order(init_keys[i]);
-        Steroids s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
+        Steroids<false> s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
                    seed, load_factor);
 
         const uint32_t extra_n = 1400000;
@@ -692,7 +692,7 @@ public:
 
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
@@ -781,7 +781,7 @@ public:
                     {520,1,0b10100}, {524,0,0b11100}, {525,1,0b11100}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
@@ -1115,7 +1115,7 @@ public:
 
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
@@ -1135,7 +1135,7 @@ public:
 
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            Steroids::InfixStore *store;
+            Steroids<false>::InfixStore *store;
 
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
@@ -1151,7 +1151,7 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
+        Steroids<false> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -1166,7 +1166,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1180,7 +1180,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1195,7 +1195,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1293,7 +1293,7 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
+        Steroids<false> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -1308,7 +1308,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1322,7 +1322,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1337,7 +1337,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1500,7 +1500,7 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
+        Steroids<false> s(infix_size, seed, load_factor);
 
         SUBCASE("merge") {
             SUBCASE("1") {
@@ -1517,7 +1517,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 uint32_t dummy;
 
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -1560,7 +1560,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    Steroids::InfixStore *store;
+                    Steroids<false>::InfixStore *store;
 
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                             reinterpret_cast<void **>(&store), &dummy);
@@ -1595,7 +1595,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 uint32_t dummy;
 
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -1638,7 +1638,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    Steroids::InfixStore *store;
+                    Steroids<false>::InfixStore *store;
 
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                             reinterpret_cast<void **>(&store), &dummy);
@@ -1672,7 +1672,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 uint32_t dummy;
 
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -1715,7 +1715,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    Steroids::InfixStore *store;
+                    Steroids<false>::InfixStore *store;
 
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                             reinterpret_cast<void **>(&store), &dummy);
@@ -1759,7 +1759,7 @@ public:
             for (int32_t i = 1; i < 100; i++) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1771,7 +1771,7 @@ public:
             for (int32_t i = 90; i >= 70; i -= 2) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1784,7 +1784,7 @@ public:
             for (int32_t i = 1; i < 50; i++) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1866,7 +1866,7 @@ public:
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Steroids s(infix_size, seed, load_factor);
+        Steroids<false> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -1881,7 +1881,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1895,7 +1895,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1910,7 +1910,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Steroids<false>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1933,7 +1933,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2012,7 +2012,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2038,7 +2038,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2116,7 +2116,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2147,7 +2147,7 @@ public:
             for (int32_t i = 0; i < n_keys; i++)
                 keys[i] = to_big_endian_order(keys[i]);
 
-            Steroids s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
+            Steroids<false> s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, nullptr, 0);
@@ -2160,7 +2160,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2375,7 +2375,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2589,7 +2589,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2717,7 +2717,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2737,7 +2737,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2761,7 +2761,7 @@ public:
                 string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
             }
 
-            Steroids s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+            Steroids<false> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
 
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, nullptr, 0);
@@ -2775,7 +2775,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2991,7 +2991,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -3206,7 +3206,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -3335,7 +3335,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
                 REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
@@ -3355,7 +3355,7 @@ public:
 
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                Steroids::InfixStore *store;
+                Steroids<false>::InfixStore *store;
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -3369,15 +3369,15 @@ public:
     }
 
 private:
-    static void AssertStoreContents(const Steroids& s, const Steroids::InfixStore& store,
+    static void AssertStoreContents(const Steroids<false>& s, const Steroids<false>::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
         REQUIRE_EQ(store.GetElemCount(), checks.size());
         const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
         uint32_t ind = 0;
-        for (uint32_t i = 0; i < Steroids::infix_store_target_size; i++) {
+        for (uint32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
@@ -3413,16 +3413,16 @@ private:
     }
 
 
-    static void PrintStore(const Steroids& s, const Steroids::InfixStore& store) {
+    static void PrintStore(const Steroids<false>& s, const Steroids<false>::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
 
         std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
         std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetElemCount();
         std::cerr << " --- ptr=" << store.ptr << std::endl;
         std::cerr << "occupieds: ";
-        for (int32_t i = 0; i < Steroids::infix_store_target_size; i++) {
+        for (int32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if ((store.ptr[i / 64] >> (i % 64)) & 1ULL)
                 std::cerr << i << ' ';
         }

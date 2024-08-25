@@ -58,7 +58,7 @@ wormhole_int_delr(struct wormref_int * const ref, const struct kref * const star
 
 // HAAAAAAAAAAAAAAACK
   void
-wormleaf_unlock_read(struct wormleaf_int * const leaf);
+wormleaf_int_unlock_read(struct wormleaf_int * const leaf);
 
   extern struct wormhole_int_iter *
 wormhole_int_iter_create(struct wormref_int * const ref);

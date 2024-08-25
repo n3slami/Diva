@@ -1561,6 +1561,7 @@ wormleaf_seek(const struct wormleaf * const leaf, const struct kref * const key)
   if (ih < WH_KPN) { // hit
     return wormleaf_search_is(leaf, (u8)ih);
   } else { // miss, binary search for gt
+    perror("SOL GOODOMAN");
     return wormleaf_search_ss(leaf, key);
   }
 }
@@ -3098,9 +3099,9 @@ wormhole_iter_fix_rev(struct wormhole_iter * const iter)
       wormleaf_unlock_read(iter->leaf);
     }
     iter->leaf = prev;
-    iter->is = prev->nr_keys - 1;
     if (!wormhole_iter_valid(iter))
       return;
+    iter->is = prev->nr_keys - 1;
   }
 }
 
