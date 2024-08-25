@@ -12,3 +12,8 @@ add_executable(InfixStoreTests ./infix_store_tests.cpp)
 target_link_libraries(InfixStoreTests SteroidsLib doctest)
 add_test(NAME test_infix_store COMMAND InfixStoreTests)
 
+add_executable(WormholeIntTests ./wormhole_int_tests.cpp)
+target_link_libraries(WormholeIntTests WormholeIntLib doctest)
+add_test(NAME test_wormhole_int COMMAND WormholeIntTests)
+
+

@@ -31,6 +31,20 @@ target_include_directories(
     "$<INSTALL_INTERFACE:include/wormhole>"
 )
 
+add_library(WormholeIntLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh_int.c
+                                  ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh_int.h)
+set_target_properties(WormholeIntLib PROPERTIES LINKER_LANGUAGE CXX)
+target_compile_options(WormholeIntLib PUBLIC ${BITHACKING_COMPILE_FLAGS} -pthread -fno-stack-protector -flto
+                                             -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memcmp
+                                             -fmax-errors=3 -shared -fPIC)
+target_compile_definitions(WormholeIntLib PUBLIC __x86_64__ NDEBUG)
+target_include_directories(
+    WormholeIntLib
+    INTERFACE
+    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/wormhole>"
+    "$<INSTALL_INTERFACE:include/wormhole>"
+)
+
 add_library(SteroidsLib STATIC ./include/steroids.hpp)
 set_target_properties(SteroidsLib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(SteroidsLib PUBLIC ./include)

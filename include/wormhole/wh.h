@@ -317,7 +317,7 @@ wh_iter_peek(struct wormhole_iter * const iter,
     void * const kbuf_out, const u32 kbuf_size, u32 * const klen_out,
     void * const vbuf_out, const u32 vbuf_size, u32 * const vlen_out);
 
-  bool
+  void
 wh_iter_peek_ref(struct wormhole_iter * const iter,
     const void ** kbuf_out, u32 * const klen_out,
     void ** vbuf_out, u32 * const vlen_out);
