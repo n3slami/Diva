@@ -51,3 +51,19 @@ target_include_directories(SteroidsLib PUBLIC ./include)
 target_compile_options(SteroidsLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
 target_link_libraries(SteroidsLib PRIVATE WormholeLib WormholeIntLib)
 
+if (BUILD_TESTS)
+    # enable testing 
+    include(CTest)
+    message(STATUS "Building tests")
+    add_subdirectory(tests)
+endif ()
+
+if (BUILD_EXAMPLES)
+    message(STATUS "Building examples")
+    add_subdirectory(examples)
+endif ()
+
+if (BUILD_BENCHMARKS)
+    message(STATUS "Building benchmarks")
+    #add_subdirectory(bench)
+endif ()

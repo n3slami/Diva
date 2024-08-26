@@ -160,7 +160,7 @@ public:
         Steroids<false> s(infix_size, seed, load_factor);
         Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
 
-        uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
+        uint64_t *runends = store.ptr + 1 + Steroids<false>::infix_store_target_size / 64;
         runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
         runends[1] = 0b0101010101010101010101010101010101010101010101010101010101010101;
         runends[2] = 0b1010101010101010101010101010101010101010101010101010101010101010;
@@ -237,7 +237,7 @@ public:
         const float load_factor = 0.95;
         Steroids<false> s(infix_size, seed, load_factor);
         Steroids<false>::InfixStore store(s.scaled_sizes_[0], s.infix_size_);
-        uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
+        uint64_t *runends = store.ptr + 1 + Steroids<false>::infix_store_target_size / 64;
         uint64_t inserts[100];
 
         inserts[0] = 0b010000000001100;
@@ -1481,8 +1481,9 @@ private:
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
         REQUIRE_EQ(store.GetElemCount(), checks.size());
-        const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
+        const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
+        const uint64_t *occupieds = store.ptr + 1;
+        const uint64_t *runends = store.ptr + 1 + Steroids<false>::infix_store_target_size / 64;
         uint32_t ind = 0;
         for (uint32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
@@ -1517,15 +1518,25 @@ private:
             }
         }
         REQUIRE_EQ(occupieds_pos.size(), runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<false>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        REQUIRE_EQ(popcnts[0], check_popcnts[0]);
+        REQUIRE_EQ(popcnts[1], check_popcnts[1]);
     }
 
     static void PrintStore(const Steroids<false>& s, const Steroids<false>::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
-        const uint64_t *occupieds = store.ptr;
-        const uint64_t *runends = store.ptr + Steroids<false>::infix_store_target_size / 64;
+        const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
+        const uint64_t *occupieds = store.ptr + 1;
+        const uint64_t *runends = store.ptr + 1 + Steroids<false>::infix_store_target_size / 64;
 
         std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
         std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetElemCount() << std::endl;
+        std::cerr << "popcnts=[" << popcnts[0] << ", " << popcnts[1] << ']' << std::endl;
         std::cerr << "occupieds: ";
         for (int32_t i = 0; i < Steroids<false>::infix_store_target_size; i++) {
             if ((store.ptr[i / 64] >> (i % 64)) & 1ULL)

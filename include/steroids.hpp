@@ -69,7 +69,7 @@ public:
     uint32_t Size() const;
 
 private:
-    static constexpr uint32_t infix_store_target_size = 1024;
+    static constexpr uint32_t infix_store_target_size = 512;
     static_assert(infix_store_target_size % 64 == 0);
     static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
     static constexpr uint32_t scale_shift = 15;
@@ -1859,6 +1859,14 @@ inline void Steroids<int_optimized>::InsertRawIntoInfixStore(InfixStore &store, 
     for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
         runend_count += get_bitmap_bit(runends, i);
     assert(occupied_count == runend_count);
+
+    uint32_t check_popcnts[2] = {};
+    for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+        check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+        check_popcnts[1] += __builtin_popcountll(runends[i]);
+    }
+    assert(popcnts[0] == check_popcnts[0]);
+    assert(popcnts[1] == check_popcnts[1]);
 }
 
 
@@ -1959,8 +1967,8 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
         ShiftSlotsLeft(store, match_pos + 1, shift_end + 1, 1);
         if (!run_destroyed)
             set_bitmap_bit(runends, runend_pos - 1);
-        else 
-            popcnts[1] -= runend_pos - 1 < infix_store_target_size / 2;
+        else
+            popcnts[1] -= runend_pos <= infix_store_target_size / 2;
     }
     else {  // Shift to the right
         ShiftRunendsRight(store, shift_start, match_pos, 1);
@@ -1979,6 +1987,14 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
         popcnts[0] -= implicit_part < infix_store_target_size / 2;
     }
     store.UpdateElemCount(-1);
+
+    uint32_t check_popcnts[2] = {};
+    for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+        check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+        check_popcnts[1] += __builtin_popcountll(runends[i]);
+    }
+    assert(popcnts[0] == check_popcnts[0]);
+    assert(popcnts[1] == check_popcnts[1]);
 }
 
 
