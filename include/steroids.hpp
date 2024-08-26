@@ -69,9 +69,9 @@ public:
     uint32_t Size() const;
 
 private:
-    static constexpr uint32_t infix_store_target_size = 512;
+    static constexpr uint32_t infix_store_target_size = 1024;
     static_assert(infix_store_target_size % 64 == 0);
-    static constexpr uint32_t base_implicit_size = 9;
+    static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
     static constexpr uint32_t scale_shift = 15;
     static constexpr uint32_t scale_implicit_shift = 15;
     static constexpr uint32_t size_scalar_count = 100;
@@ -157,7 +157,7 @@ private:
         }
 
         static uint32_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size) {
-            return Steroids::infix_store_target_size + (slot_count * (slot_size + 1) + 63) / 64;
+            return (Steroids::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
         }
 
         uint32_t GetElemCount() const {
@@ -530,14 +530,40 @@ inline bool Steroids<int_optimized>::RangeQuery(const uint8_t *input_l, const ui
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
 
-    const uint64_t l_extraction = ExtractPartialKey(l_key, shared, ignore, implicit_size, l_key.GetBit(shared));
-    const uint64_t r_extraction = ExtractPartialKey(r_key, shared, ignore, implicit_size, r_key.GetBit(shared));
-    const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
-    const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
-    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
-    const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
-    const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
-    return RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+    if constexpr (int_optimized) {
+        const uint64_t l_key_int = _bswap64(*((uint64_t *) l_key.str));
+        const uint64_t r_key_int = _bswap64(*((uint64_t *) r_key.str));
+        const uint64_t prev_key_int = _bswap64(*((uint64_t *) prev_key.str));
+        const uint64_t next_key_int = _bswap64(*((uint64_t *) next_key.str));
+
+        const uint32_t shamt_left = std::max<int>(0, shared + ignore + implicit_size + infix_size_ - 64);
+        const uint32_t shamt_right = std::max<int>(0, 64 - shared - ignore - implicit_size - infix_size_);
+        const uint32_t shamt_left_impl = std::max<int>(0, shared + ignore + implicit_size - 64);
+        const uint32_t shamt_right_impl = std::max<int>(0, 64 - shared - ignore - implicit_size);
+
+        const uint64_t l_extraction = (((l_key_int >> (63 - shared)) & 1) << (implicit_size - 1 + infix_size_)) 
+                                    | (((l_key_int << shamt_left) >> shamt_right) & BITMASK(implicit_size - 1 + infix_size_));
+        const uint64_t r_extraction = (((r_key_int >> (63 - shared)) & 1) << (implicit_size - 1 + infix_size_)) 
+                                    | (((r_key_int << shamt_left) >> shamt_right) & BITMASK(implicit_size - 1 + infix_size_));
+
+        const uint64_t prev_implicit = ((prev_key_int << shamt_left_impl) >> shamt_right_impl) & BITMASK(implicit_size - 1);
+        const uint64_t next_implicit = (1ULL << (implicit_size - 1)) 
+                                    | (((next_key_int << shamt_left_impl) >> shamt_right_impl) & BITMASK(implicit_size - 1));
+        const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+        const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
+        const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
+        return RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+    }
+    else {
+        const uint64_t l_extraction = ExtractPartialKey(l_key, shared, ignore, implicit_size, l_key.GetBit(shared));
+        const uint64_t r_extraction = ExtractPartialKey(r_key, shared, ignore, implicit_size, r_key.GetBit(shared));
+        const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
+        const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
+        const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+        const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
+        const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
+        return RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+    }
 }
 
 
@@ -1534,11 +1560,10 @@ inline uint32_t Steroids<int_optimized>::SelectRunends(const InfixStore &store, 
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_words = (scaled_sizes_[size_grade] + 63) / 64;
     const uint64_t *runends = store.ptr + infix_store_target_size / 64;
-    uint32_t i = 0, old_total_set_bits = 0, total_set_bits = 0;
-    while (total_set_bits <= rank && i < total_words) {
+    uint32_t i, old_total_set_bits = 0, total_set_bits = 0;
+    for (i = 0; total_set_bits <= rank && i < total_words; i++) {
         old_total_set_bits = total_set_bits;
         total_set_bits += __builtin_popcountll(runends[i]);
-        i++;
     }
     i--;
     return i * 64 + bit_select(runends[i], rank - old_total_set_bits);
@@ -2004,6 +2029,7 @@ inline bool Steroids<int_optimized>::RangeQueryInfixStore(InfixStore &store, con
     const uint32_t runend_pos = SelectRunends(store, rank);
     uint32_t pos = runend_pos;
     uint64_t slot_value = GetSlot(store, pos);
+
     // TODO: Faster implementation via broadword operations?
     do {
         if (l_explicit_part <= (slot_value | (slot_value - 1))
