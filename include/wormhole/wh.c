@@ -1561,7 +1561,6 @@ wormleaf_seek(const struct wormleaf * const leaf, const struct kref * const key)
   if (ih < WH_KPN) { // hit
     return wormleaf_search_is(leaf, (u8)ih);
   } else { // miss, binary search for gt
-    perror("SOL GOODOMAN");
     return wormleaf_search_ss(leaf, key);
   }
 }

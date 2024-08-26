@@ -120,30 +120,30 @@ struct wormhole_int {
 // helpers {{{
 
   inline static int 
-compare_int_isp(u64 a, const struct int_store_pair * const b) 
+compare_int_isp(u64 a, u8 alen, const struct int_store_pair * const b) 
 {
-    if (a != b->key)
-        return a < b->key ? -1 : 1;
-    return b->key_size < sizeof(a) ? 1 : 0;
+    const u64 bkey = _bswap64(b->key);
+    if (a != bkey)
+        return a < bkey ? -1 : 1;
+    if (alen == b->key_size)
+        return 0;
+    return alen < b->key_size ? -1 : 1;
 }
 
   static inline u32
 isp_key_lcp(const struct int_store_pair * const key1, const struct int_store_pair * const key2)
 {
   const u32 max = (key1->key_size < key2->key_size) ? key1->key_size : key2->key_size;
-  u8 k1[max], k2[max];
-  u64 tmp = _bswap64(key1->key);
-  memcpy(k1, &tmp, sizeof(tmp));
-  tmp = _bswap64(key2->key);
-  memcpy(k2, &tmp, sizeof(tmp));
-  return memlcp(k1, k2, max);
+  return memlcp((const u8 *) &(key1->key), (const u8 *) &(key2->key), max);
 }
 
   inline static int 
 compare_isp_isp(const struct int_store_pair * const a, const struct int_store_pair * const b) 
 {
-    if (a->key != b->key)
-        return a->key < b->key ? -1 : 1;
+    const u64 akey = _bswap64(a->key);
+    const u64 bkey = _bswap64(b->key);
+    if (akey != bkey)
+        return akey < bkey ? -1 : 1;
     if (a->key_size == b->key_size)
         return 0;
     return a->key_size < b->key_size ? -1 : 1;
@@ -1421,18 +1421,18 @@ wormleaf_kv_at_is1(const struct wormleaf_int * const leaf, const u32 i, const u3
   static u32
 wormleaf_int_search_eq(const struct wormleaf_int * const leaf, const struct kref * const key)
 {
-  u64 search_key = _bswap64((*((u64 *) key->ptr)) & BITMASK(key->len * 8));
-  u32 lo = 0;
+  const u64 search_key = _bswap64((*((u64 *) key->ptr)) & BITMASK(key->len * 8));
+  u32 lo = -1;
   u32 hi = leaf->nr_sorted;
   while (hi - lo > 1) {
     const u32 i = (lo + hi) >> 1;
     const struct int_store_pair * const curr = leaf->kvs + i;
-    const int cmp = compare_int_isp(search_key, curr);
-    debug_assert(cmp != 0);
-    lo = cmp < 0 ? lo : i;
-    hi = cmp < 0 ? i : hi;
+    const int cmp = compare_int_isp(search_key, key->len, curr);
+    lo = cmp <= 0 ? lo : i;
+    hi = cmp <= 0 ? i : hi;
   }
-  return compare_int_isp(search_key, leaf->kvs + lo) == 0 ? lo : WH_KPN;
+  u32 res = (hi < leaf->nr_keys && compare_int_isp(search_key, key->len, leaf->kvs + hi) == 0) ? hi : WH_KPN;
+  return res;
 }
 
 
@@ -1441,13 +1441,15 @@ wormleaf_int_search_eq(const struct wormleaf_int * const leaf, const struct kref
   static u32
 wormleaf_int_search(const struct wormleaf_int * const leaf, const struct kref * const key)
 {
+  if (key->ptr == NULL)
+    return 0;
   u64 search_key = _bswap64((*((u64 *) key->ptr)) & BITMASK(key->len * 8));
   int lo = -1;
   int hi = leaf->nr_sorted;
   while (hi - lo > 1) {
     const int i = (lo + hi) >> 1;
     const struct int_store_pair * const curr = leaf->kvs + i;
-    const int cmp = compare_int_isp(search_key, curr);
+    const int cmp = compare_int_isp(search_key, key->len, curr);
     lo = cmp <= 0 ? lo : i;
     hi = cmp <= 0 ? i : hi;
   }
@@ -1468,7 +1470,7 @@ wormleaf_int_seek_end(const struct wormleaf_int * const leaf, const struct kref 
   u64 search_key = _bswap64((*((u64 *) key->ptr)) & BITMASK(key->len * 8));
   debug_assert(leaf->nr_keys == leaf->nr_sorted);
   if (leaf->nr_sorted) {
-    const int cmp = compare_int_isp(search_key, leaf->kvs + leaf->nr_sorted - 1);
+    const int cmp = compare_int_isp(search_key, key->len, leaf->kvs + leaf->nr_sorted - 1);
     if (cmp > 0)
       return leaf->nr_sorted;
     else if (cmp == 0)
@@ -1588,7 +1590,7 @@ wormleaf_int_insert(struct wormleaf_int * const leaf, const struct kv * const ne
   // insert
   const u32 nr0 = leaf->nr_keys;
   leaf->kvs[nr0].key_size = new->klen;
-  leaf->kvs[nr0].key = _bswap64((*((u64 *) new->kv)) & BITMASK(new->klen * 8));
+  leaf->kvs[nr0].key = (*((u64 *) new->kv)) & BITMASK(new->klen * 8);
   memcpy(leaf->kvs[nr0].store, new->kv + new->klen, new->vlen);
   leaf->nr_keys++;
 
@@ -1652,7 +1654,7 @@ wormleaf_int_update(struct wormleaf_int * const leaf, const u32 ih, const struct
 {
   debug_assert(new->hash == kv_crc32c_extend(kv_crc32c(new->kv, new->klen)));
   leaf->kvs[ih].key_size = new->klen;
-  leaf->kvs[ih].key = _bswap64((*((u64 *) new->kv)) & BITMASK(new->klen * 8));
+  leaf->kvs[ih].key = (*((u64 *) new->kv)) & BITMASK(new->klen * 8);
   memcpy(leaf->kvs[ih].store, new->kv + new->klen, new->vlen);
 }
 // }}} leaf-write
@@ -1729,7 +1731,7 @@ wormhole_split_leaf_move1(struct wormleaf_int * const leaf1, struct wormleaf_int
   const u32 nr_keys = leaf1->nr_keys;
   struct int_store_pair new_isp;
   new_isp.key_size = new->klen;
-  new_isp.key = _bswap64((*((u64 *) new->kv)) & BITMASK(8 * new->klen));
+  new_isp.key = (*((u64 *) new->kv)) & BITMASK(8 * new->klen);
   memcpy(new_isp.store, new->kv + new->klen, new->vlen);
   struct int_store_pair es[WH_KPN];
 
@@ -1790,8 +1792,7 @@ wormhole_isp_split_alloc_anchor(const struct int_store_pair * const key1, const 
   struct kv * const anchor = wormhole_alloc_akey(alen);
   if (anchor) {
     u8 buf[key2->key_size + sizeof(key2->store)];
-    const u64 tmp = _bswap64(key2->key);
-    memcpy(buf, &tmp, key2->key_size);
+    memcpy(buf, &key2->key, key2->key_size);
     memcpy(buf + key2->key_size, key2->store, sizeof(key2->store));
     kv_refill(anchor, buf, alen, NULL, 0);
   }
@@ -1805,7 +1806,7 @@ wormhole_split_leaf(struct wormhole_int * const map, struct wormleaf_int * const
 {
   struct int_store_pair new_isp;
   new_isp.key_size = new->klen;
-  new_isp.key = _bswap64((*((u64 *) new->kv)) & BITMASK(8 * new->klen));
+  new_isp.key = (*((u64 *) new->kv)) & BITMASK(8 * new->klen);
   memcpy(new_isp.store, new->kv + new->klen, new->vlen);
 
   wormleaf_int_sync_sorted(leaf1);
@@ -1904,8 +1905,7 @@ wormhole_int_get(struct wormref_int * const ref, const struct kref * const key, 
 
   struct int_store_pair * const res = leaf->kvs + i;
   out->klen = res->key_size;
-  const u64 tmp = _bswap64(res->key) & BITMASK(res->key_size * 8);
-  memcpy(out->kv, &tmp, out->klen);
+  memcpy(out->kv, &res->key, out->klen);
   out->vlen = sizeof(res->store);
   memcpy(out->kv + out->klen, res->store, out->vlen);
 
@@ -1932,8 +1932,7 @@ whunsafe_int_get(struct wormhole_int * const map, const struct kref * const key,
 
   struct int_store_pair * const res = leaf->kvs + i;
   out->klen = res->key_size;
-  const u64 tmp = _bswap64(res->key) & BITMASK(res->key_size * 8);
-  memcpy(out->kv, &tmp, out->klen);
+  memcpy(out->kv, &res->key, out->klen);
   out->vlen = sizeof(res->store);
   memcpy(out->kv + out->klen, res->store, out->vlen);
 
@@ -2353,7 +2352,7 @@ wormhole_meta_leaf_merge(struct wormref_int * const ref, struct wormleaf_int * c
 }
 
   static void
-whunsafe_meta_leaf_merge(struct wormhole_int * const map, struct wormleaf_int * const leaf1,
+whunsafe_int_meta_leaf_merge(struct wormhole_int * const map, struct wormleaf_int * const leaf1,
     struct wormleaf_int * const leaf2)
 {
   debug_assert(leaf1->next == leaf2);
@@ -2412,7 +2411,7 @@ whsafe_int_put(struct wormref_int * const ref, struct kv * const kv)
 }
 
   bool
-whunsafe_put(struct wormhole_int * const map, struct kv * const kv)
+whunsafe_int_put(struct wormhole_int * const map, struct kv * const kv)
 {
   if (unlikely(kv == NULL))
     return false;
@@ -2455,7 +2454,7 @@ whsafe_int_merge(struct wormref_int * const ref, const struct kref * const kref,
 }
 
   bool
-whunsafe_merge(struct wormhole_int * const map, const struct kref * const kref,
+whunsafe_int_merge(struct wormhole_int * const map, const struct kref * const kref,
     kv_merge_func uf, void * const priv)
 {
     return false;
@@ -2503,21 +2502,21 @@ whsafe_int_del(struct wormref_int * const ref, const struct kref * const key)
 }
 
   static void
-whunsafe_del_try_merge(struct wormhole_int * const map, struct wormleaf_int * const leaf)
+whunsafe_int_del_try_merge(struct wormhole_int * const map, struct wormleaf_int * const leaf)
 {
   const u32 n0 = leaf->prev ? leaf->prev->nr_keys : WH_KPN;
   const u32 n1 = leaf->nr_keys;
   const u32 n2 = leaf->next ? leaf->next->nr_keys : WH_KPN;
 
   if ((leaf->prev && (n1 == 0)) || ((n0 + n1) < WH_KPN_MRG)) {
-    whunsafe_meta_leaf_merge(map, leaf->prev, leaf);
+    whunsafe_int_meta_leaf_merge(map, leaf->prev, leaf);
   } else if ((leaf->next && (n1 == 0)) || ((n1 + n2) < WH_KPN_MRG)) {
-    whunsafe_meta_leaf_merge(map, leaf, leaf->next);
+    whunsafe_int_meta_leaf_merge(map, leaf, leaf->next);
   }
 }
 
   bool
-whunsafe_del(struct wormhole_int * const map, const struct kref * const key)
+whunsafe_int_del(struct wormhole_int * const map, const struct kref * const key)
 {
   struct wormleaf_int * const leaf = wormhole_jump_leaf(map->hmap, key);
   const u32 im = wormleaf_int_search_eq(leaf, key);
@@ -2525,7 +2524,7 @@ whunsafe_del(struct wormhole_int * const map, const struct kref * const key)
     wormleaf_int_remove(leaf, im);
     debug_assert(kv);
 
-    whunsafe_del_try_merge(map, leaf);
+    whunsafe_int_del_try_merge(map, leaf);
     return true;
   }
   return false;
@@ -2582,7 +2581,7 @@ whsafe_int_delr(struct wormref_int * const ref, const struct kref * const start,
 }
 
   u64
-whunsafe_delr(struct wormhole_int * const map, const struct kref * const start,
+whunsafe_int_delr(struct wormhole_int * const map, const struct kref * const start,
     const struct kref * const end)
 {
   // first leaf
@@ -2602,7 +2601,7 @@ whunsafe_delr(struct wormhole_int * const map, const struct kref * const start,
   u64 ndel = iaz - ia;
 
   if (leafa == leafz) { // one node only
-    whunsafe_del_try_merge(map, leafa);
+    whunsafe_int_del_try_merge(map, leafa);
     return ndel;
   }
 
@@ -2612,7 +2611,7 @@ whunsafe_delr(struct wormhole_int * const map, const struct kref * const start,
     ndel += leafx->nr_keys;
     leafx->nr_keys = 0;
     leafx->nr_sorted = 0;
-    whunsafe_meta_leaf_merge(map, leafa, leafx);
+    whunsafe_int_meta_leaf_merge(map, leafa, leafx);
   }
   // delete the smaller keys in leafz
   if (leafz) {
@@ -2620,7 +2619,7 @@ whunsafe_delr(struct wormhole_int * const map, const struct kref * const start,
     const u32 iz = wormleaf_int_seek_end(leafz, end);
     wormleaf_int_delete_range(leafz, 0, iz);
     ndel += iz;
-    whunsafe_del_try_merge(map, leafa);
+    whunsafe_int_del_try_merge(map, leafa);
   }
   return ndel;
 }
@@ -2744,8 +2743,7 @@ wormhole_int_iter_peek(struct wormhole_int_iter * const iter, struct kv * const 
   struct int_store_pair * const res = wormhole_int_iter_current(iter);
   if (res) {
     out->klen = res->key_size;
-    const u64 tmp = _bswap64(res->key) & BITMASK(res->key_size * 8);
-    memcpy(out->kv, &tmp, out->klen);
+    memcpy(out->kv, &res->key, out->klen);
     out->vlen = sizeof(res->store);
     memcpy(out->kv + out->klen, res->store, out->vlen);
     return out;
@@ -2817,7 +2815,16 @@ wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const 
   bool
 wormhole_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * const priv)
 {
-  return false;
+  struct int_store_pair * const kv = wormhole_int_iter_current(iter);
+  uint8_t buf[sizeof(struct kv) + kv->key_size + sizeof(kv->store)];
+  struct kv * res = (struct kv *) buf;
+  res->klen = kv->key_size;
+  memcpy(res->kv, &kv->key, res->klen);
+  res->vlen = sizeof(kv->store);
+  memcpy(res->kv + kv->key_size, kv->store, res->vlen);
+
+  uf(res, priv); // call uf even if (kv == NULL)
+  return kv != NULL;
 }
 
   void
@@ -2982,7 +2989,7 @@ wormhole_int_fprint(struct wormhole_int * const map, FILE * const out)
 // }}} misc
 
 // api {{{
-const struct kvmap_api kvmap_api_wormhole = {
+const struct kvmap_api kvmap_api_wormhole_int = {
   .hashkey = true,
   .ordered = true,
   .threadsafe = true,
@@ -3018,7 +3025,7 @@ const struct kvmap_api kvmap_api_wormhole = {
   .fprint = (void *)wormhole_int_fprint,
 };
 
-const struct kvmap_api kvmap_api_whsafe = {
+const struct kvmap_api kvmap_api_whsafe_int = {
   .hashkey = true,
   .ordered = true,
   .threadsafe = true,
@@ -3066,8 +3073,8 @@ __attribute__((constructor))
   static void
 wormhole_kvmap_api_init(void)
 {
-  kvmap_api_register(0, "wormhole", "", wormhole_kvmap_api_create, &kvmap_api_wormhole);
-  kvmap_api_register(0, "whsafe", "", wormhole_kvmap_api_create, &kvmap_api_whsafe);
+  kvmap_api_register(0, "wormhole", "", wormhole_kvmap_api_create, &kvmap_api_wormhole_int);
+  kvmap_api_register(0, "whsafe", "", wormhole_kvmap_api_create, &kvmap_api_whsafe_int);
 }
 // }}} api
 
@@ -3077,7 +3084,7 @@ wormhole_kvmap_api_init(void)
 // This example library shows you how to use Wormhole efficiently in the most intuitive way.
 
 // Use the worry-free api
-static const struct kvmap_api * const wh_api = &kvmap_api_whsafe;
+static const struct kvmap_api * const wh_api = &kvmap_api_whsafe_int;
 
 // You can change the wh_api to kvmap_api_wormhole with a one-line replacement
 // The standard Wormhole api can give you ~5% boost; read README for thread-safety tips

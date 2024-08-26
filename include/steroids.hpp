@@ -12,6 +12,7 @@
 #include <random>
 #include <string_view>
 #include <tuple>
+#include <x86intrin.h>
 
 #include "wormhole/wh.h"
 #include "util.hpp"
@@ -429,10 +430,6 @@ inline void Steroids<int_optimized>::InsertSimple(const InfiniteByteString key) 
 
         wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
                               reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-
-        std::cerr << "WTF? next_key=";
-        print_key(next_key.str, next_key.length);
-
         if (next_key == key) {
             prev_key = next_key;
             wh_iter_skip1(&it);
@@ -447,13 +444,6 @@ inline void Steroids<int_optimized>::InsertSimple(const InfiniteByteString key) 
         if (it.leaf)
             wormleaf_unlock_read(it.leaf);
     }
-
-    std::cerr << "key=";
-    print_key(key.str, key.length);
-    std::cerr << "prev_key=";
-    print_key(prev_key.str, prev_key.length);
-    std::cerr << "next_key=";
-    print_key(next_key.str, next_key.length);
 
     assert(prev_key <= key);
     assert(key < next_key);
@@ -497,8 +487,8 @@ inline bool Steroids<int_optimized>::RangeQuery(const uint8_t *input_l, const ui
         it_int.is = 0;
         wh_int_iter_seek(&it_int, l_key.str, l_key.length);
 
-        wh_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
         if (next_key <= r_key) {
             if (it_int.leaf)
                 wormleaf_int_unlock_read(it_int.leaf);

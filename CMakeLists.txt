@@ -14,7 +14,8 @@ else()
     set(USE_MULTI_THREADED OFF)
 endif ()
 
-set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
+set(BITHACKING_COMPILE_FLAGS -march=native)
+#set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
 #set(BITHACKING_COMPILE_FLAGS -Ofast -mbmi2 -msse4.2 -D__SSE4_2_)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
@@ -49,7 +50,7 @@ add_library(SteroidsLib STATIC ./include/steroids.hpp)
 set_target_properties(SteroidsLib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(SteroidsLib PUBLIC ./include)
 target_compile_options(SteroidsLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
-target_link_libraries(SteroidsLib PRIVATE WormholeLib)
+target_link_libraries(SteroidsLib PRIVATE WormholeLib WormholeIntLib)
 
 
 if (BUILD_TESTS)

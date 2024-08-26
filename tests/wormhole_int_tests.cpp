@@ -46,7 +46,7 @@ TEST_SUITE("wormhole_int") {
                 uint32_t fetched_key_size, fetched_value_size;
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
                                          reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = *((uint64_t *) fetched_key);
+                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
                 REQUIRE_EQ(recovered_key, keys[ind++]);
             }
             const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
@@ -56,7 +56,7 @@ TEST_SUITE("wormhole_int") {
                 uint32_t fetched_key_size, fetched_value_size;
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
                                          reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = *((uint64_t *) fetched_key);
+                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
                 REQUIRE_EQ(recovered_key, keys[--ind]);
             }
             wh_int_iter_destroy(it);
@@ -81,7 +81,7 @@ TEST_SUITE("wormhole_int") {
                 uint32_t fetched_key_size, fetched_value_size;
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
                                          reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = *((uint64_t *) fetched_key);
+                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
                 REQUIRE_EQ(recovered_key, keys[ind++]);
             }
             const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
@@ -91,7 +91,7 @@ TEST_SUITE("wormhole_int") {
                 uint32_t fetched_key_size, fetched_value_size;
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
                                          reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = *((uint64_t *) fetched_key);
+                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
                 REQUIRE_EQ(recovered_key, keys[--ind]);
             }
             wh_int_iter_destroy(it);
