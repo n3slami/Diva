@@ -32,70 +32,47 @@ TEST_SUITE("wormhole_int") {
         SUBCASE("increasing keys") {
             for (int32_t i = 0; i < total_puts; i++)
                 keys.push_back(550 * i);
-            for (uint64_t key : keys) {
-                const uint64_t key_rev = _bswap64(key);
-                memcpy(value + 3, &key, sizeof(key));
-                wh_int_put(better_tree, &key_rev, sizeof(key_rev), value, value_size);
-            }
-
-            wormhole_int_iter *it = wh_int_iter_create(better_tree);
-            int32_t ind = 0;
-            for (wh_int_iter_seek(it, "", 0); wh_int_iter_valid(it); wh_int_iter_skip1(it)) {
-                const uint8_t *fetched_key;
-                uint8_t *fetched_value;
-                uint32_t fetched_key_size, fetched_value_size;
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
-                                         reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
-                REQUIRE_EQ(recovered_key, keys[ind++]);
-            }
-            const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
-            for (wh_int_iter_seek(it, &tmp, sizeof(tmp)); wh_int_iter_valid(it); wh_int_iter_skip1_rev(it)) {
-                const uint8_t *fetched_key;
-                uint8_t *fetched_value;
-                uint32_t fetched_key_size, fetched_value_size;
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
-                                         reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
-                REQUIRE_EQ(recovered_key, keys[--ind]);
-            }
-            wh_int_iter_destroy(it);
         }
-
+        SUBCASE("increasing random keys") {
+            for (int32_t i = 0; i < total_puts; i++)
+                keys.push_back(rng());
+            std::sort(keys.begin(), keys.end());
+        }
         SUBCASE("random keys") {
             for (int32_t i = 0; i < total_puts; i++)
                 keys.push_back(rng());
-            for (uint64_t key : keys) {
-                const uint64_t key_rev = _bswap64(key);
-                memcpy(value + 3, &key, sizeof(key));
-                wh_int_put(better_tree, &key_rev, sizeof(key_rev), value, value_size);
-            }
-
-            std::sort(keys.begin(), keys.end());
-
-            wormhole_int_iter *it = wh_int_iter_create(better_tree);
-            int32_t ind = 0;
-            for (wh_int_iter_seek(it, "", 0); wh_int_iter_valid(it); wh_int_iter_skip1(it)) {
-                const uint8_t *fetched_key;
-                uint8_t *fetched_value;
-                uint32_t fetched_key_size, fetched_value_size;
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
-                                         reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
-                REQUIRE_EQ(recovered_key, keys[ind++]);
-            }
-            const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
-            for (wh_int_iter_seek(it, &tmp, sizeof(tmp)); wh_int_iter_valid(it); wh_int_iter_skip1_rev(it)) {
-                const uint8_t *fetched_key;
-                uint8_t *fetched_value;
-                uint32_t fetched_key_size, fetched_value_size;
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
-                                         reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
-                const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
-                REQUIRE_EQ(recovered_key, keys[--ind]);
-            }
-            wh_int_iter_destroy(it);
         }
+
+        for (uint64_t key : keys) {
+            const uint64_t key_rev = _bswap64(key);
+            memcpy(value + 3, &key, sizeof(key));
+            wh_int_put(better_tree, &key_rev, sizeof(key_rev), value, value_size);
+        }
+
+        std::sort(keys.begin(), keys.end());
+
+        wormhole_int_iter *it = wh_int_iter_create(better_tree);
+        int32_t ind = 0;
+        for (wh_int_iter_seek(it, "", 0); wh_int_iter_valid(it); wh_int_iter_skip1(it)) {
+            const uint8_t *fetched_key;
+            uint8_t *fetched_value;
+            uint32_t fetched_key_size, fetched_value_size;
+            wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
+                                     reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
+            const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
+            REQUIRE_EQ(recovered_key, keys[ind++]);
+        }
+        const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
+        for (wh_int_iter_seek(it, &tmp, sizeof(tmp)); wh_int_iter_valid(it); wh_int_iter_skip1_rev(it)) {
+            const uint8_t *fetched_key;
+            uint8_t *fetched_value;
+            uint32_t fetched_key_size, fetched_value_size;
+            wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&fetched_key), &fetched_key_size,
+                                     reinterpret_cast<void **>(&fetched_value), &fetched_value_size);
+            const uint64_t recovered_key = _bswap64(*((uint64_t *) fetched_key));
+            REQUIRE_EQ(recovered_key, keys[--ind]);
+        }
+        wh_int_iter_destroy(it);
     }
 }
 
