@@ -1,7 +1,11 @@
 # doctest
-set(DOCTEST_INCLUDE_DIR ./doctest/doctest/)
-add_library(doctest INTERFACE)
-target_include_directories(doctest INTERFACE ${DOCTEST_INCLUDE_DIR})
+include(FetchContent)
+FetchContent_Declare(
+    doctest
+    GIT_REPOSITORY https://github.com/doctest/doctest.git
+    GIT_TAG        v2.4.11
+)
+FetchContent_MakeAvailable(doctest)
 
 # tests
 add_executable(SteroidsTests ./steroids_tests.cpp)

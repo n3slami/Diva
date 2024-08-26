@@ -1,3 +1,0 @@
-[submodule "tests/doctest"]
-	path = tests/doctest
-	url = https://github.com/doctest/doctest.git
