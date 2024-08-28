@@ -65,5 +65,5 @@ endif ()
 
 if (BUILD_BENCHMARKS)
     message(STATUS "Building benchmarks")
-    #add_subdirectory(bench)
+    add_subdirectory(bench)
 endif ()
