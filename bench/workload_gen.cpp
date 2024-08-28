@@ -45,8 +45,8 @@ static const std::vector<std::string> kdist_default = {"unif"};
 static const std::vector<std::string> qdist_names = {"unif", "norm", "real", "corr", "true"};
 static const std::vector<std::string> qdist_default = {"unif", "corr"};
 
-auto default_n_keys = 200'000'000;
-auto default_n_queries = 10'000'000;
+uint64_t default_n_keys = 200'000'000;
+uint64_t default_n_queries = 10'000'000;
 std::vector<uint64_t> default_string_lens {8, 16, 32, 64, 128, 256, 512, 1024};
 uint64_t range_size_min = 1, range_size_max = std::numeric_limits<uint64_t>::max();
 std::uniform_int_distribution<uint64_t> query_size_dist;
@@ -644,8 +644,8 @@ void construction_bench(argparse::ArgumentParser& parser) {
 
 std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> benches = {
     {"correlated", correlated_bench},
-    {"standard_int", standard_int_bench},
-    {"standard_string", standard_string_bench},
+    {"standard-int", standard_int_bench},
+    {"standard-string", standard_string_bench},
     {"true", true_bench},
     {"expansion", expansion_bench},
     {"delete", delete_bench},
@@ -689,13 +689,14 @@ int main(int argc, char const *argv[]) {
             .required()
             .default_value(qdist_default);
 
-    parser.add_argument("--range-size-min")
+    parser.add_argument("--min-range-size")
             .help("The minimum accepted length of a range query")
             .nargs(1)
             .required()
-            .scan<'u', uint64_t>();
+            .scan<'u', uint64_t>()
+            .default_value(static_cast<uint64_t>(1));
 
-    parser.add_argument("--range-size-max")
+    parser.add_argument("--max-range-size")
             .help("The maximum accepted length of a range query")
             .nargs(1)
             .required()
@@ -763,8 +764,8 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
 
-    range_size_min = parser.get<uint64_t>("--range-size-min");
-    range_size_max = parser.get<uint64_t>("--range-size-max");
+    range_size_min = parser.get<uint64_t>("--min-range-size");
+    range_size_max = parser.get<uint64_t>("--max-range-size");
     if (range_size_min > range_size_max)
         std::runtime_error("Error: Invalid accepted range query size range");
     query_size_dist = std::uniform_int_distribution<uint64_t>(range_size_min, range_size_max);

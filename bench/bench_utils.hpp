@@ -19,8 +19,10 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <limits>
 #include <ostream>
 #include <set>
@@ -217,17 +219,39 @@ public:
     };
 
 
-    WorkloadIO(std::string_view file_path, iomode mode, bool string_keys)
+    WorkloadIO() { }
+
+    WorkloadIO(std::string_view file_path, iomode mode, bool string_keys=false)
             : mode_(mode),
               string_keys_(string_keys) {
         if (mode == iomode::Read) {
+            buf_size_ = std::filesystem::file_size(file_path);
+            buf_ = new uint8_t[buf_size_];
             io_ = std::fstream(file_path.data(), std::ios::in | std::ios::binary);
-            io_.read(reinterpret_cast<char *>(&string_keys_), sizeof(string_keys_));
+            io_.read(reinterpret_cast<char *>(buf_), buf_size_);
+            string_keys_ = buf_[head_++];
         }
         else {
             io_ = std::fstream(file_path.data(), std::ios::out | std::ios::binary);
             io_.write(reinterpret_cast<const char *>(&string_keys_), sizeof(string_keys_));
         }
+    }
+
+    WorkloadIO& operator=(const WorkloadIO& other) {
+        if (mode_ == iomode::Write)
+            throw std::runtime_error("Cannot copy a WorkloadIO in write mode");
+        string_keys_ = other.string_keys_;
+        delete[] buf_;
+        buf_ = new uint8_t[other.buf_size_];
+        memcpy(buf_, other.buf_, other.buf_size_);
+        buf_size_ = other.buf_size_;
+        head_ = other.head_;
+        return *this;
+    }
+
+    ~WorkloadIO() {
+        delete[] buf_;
+        io_.close();
     }
 
 
@@ -244,6 +268,30 @@ public:
         }
     }
 
+    template <typename T>
+    void WriteValue(T value) {
+        io_.write(reinterpret_cast<const char *>(&value), sizeof(value));
+    }
+
+    void WriteOpcode(opcode value) {
+        const uint8_t value_byte = static_cast<uint8_t>(value);
+        io_.write(reinterpret_cast<const char *>(&value_byte), 1);
+    }
+
+    void WriteByteString(ByteString& s) {
+        WriteValue(s.length);
+        io_.write(reinterpret_cast<const char *>(s.str), s.length);
+    }
+
+    template <typename T>
+    T ReadValue() {
+        T value;
+        memcpy(&value, buf_ + head_, sizeof(value));
+        head_ += sizeof(value);
+        return value;
+    }
+
+
     void Bulk(InputKeys<uint64_t>& keys) {
         if (!std::is_sorted(keys.begin(), keys.end()))
             throw std::runtime_error("Keys are not sorted");
@@ -259,109 +307,119 @@ public:
     }
 
     void Insert(ByteString& key) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Insert);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&key.length), sizeof(key.length));
-        io_.write(reinterpret_cast<const char *>(key.str), key.length);
+        WriteOpcode(opcode::Insert);
+        WriteByteString(key);
     }
 
     void Insert(uint64_t key) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Insert);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&key), sizeof(key));
+        WriteOpcode(opcode::Insert);
+        WriteValue(key);
     }
 
 
     void Delete(ByteString& key) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Delete);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&key.length), sizeof(key.length));
-        io_.write(reinterpret_cast<const char *>(key.str), key.length);
+        WriteOpcode(opcode::Delete);
+        WriteByteString(key);
     }
 
     void Delete(uint64_t key) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Delete);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&key), sizeof(key));
+        WriteOpcode(opcode::Delete);
+        WriteValue(key);
     }
 
 
     void Query(ByteString& l_key, ByteString& r_key, bool res) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Query);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&l_key.length), sizeof(l_key.length));
-        io_.write(reinterpret_cast<const char *>(l_key.str), l_key.length);
-        io_.write(reinterpret_cast<const char *>(&r_key.length), sizeof(r_key.length));
-        io_.write(reinterpret_cast<const char *>(r_key.str), r_key.length);
-        io_.write(reinterpret_cast<const char *>(&res), sizeof(res));
+        WriteOpcode(opcode::Query);
+        WriteByteString(l_key);
+        WriteByteString(r_key);
+        WriteValue(res);
     }
 
     void Query(uint64_t l_key, uint64_t r_key, bool res) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Query);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(reinterpret_cast<const char *>(&l_key), sizeof(l_key));
-        io_.write(reinterpret_cast<const char *>(&r_key), sizeof(r_key));
-        io_.write(reinterpret_cast<const char *>(&res), sizeof(res));
+        WriteOpcode(opcode::Query);
+        WriteValue(l_key);
+        WriteValue(r_key);
+        WriteValue(res);
     }
 
 
     void Timer(char timer_stamp) {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Timer);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
-        io_.write(&timer_stamp, sizeof(timer_stamp));
+        WriteOpcode(opcode::Timer);
+        WriteValue(timer_stamp);
     }
 
 
     void Flush() {
-        const uint8_t opcode = static_cast<uint8_t>(opcode::Flush);
-        io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
+        WriteOpcode(opcode::Flush);
     }
 
 
     bool Done() const {
-        return mode_ == iomode::Write ? false : io_.eof();
+        return mode_ == iomode::Write ? false : head_ < buf_size_;
     }
 
 
+    std::vector<std::tuple<uint64_t, uint64_t, bool>> GetIntQueries() const {
+        std::vector<std::tuple<uint64_t, uint64_t, bool>> res;
+        uint64_t dup_head = head_;
+        while (dup_head < buf_size_) {
+            opcode op = static_cast<opcode>(buf_[dup_head++]);
+            switch (op) {
+                case opcode::Query:
+                    uint64_t l, r;
+                    memcpy(&l, buf_ + dup_head, sizeof(l));
+                    dup_head += sizeof(l);
+                    memcpy(&r, buf_ + dup_head, sizeof(r));
+                    dup_head += sizeof(r);
+                    res.emplace_back(l, r, buf_[dup_head++]);
+                    break;
+                case opcode::Timer:
+                    dup_head++;
+                    break;
+                case opcode::Flush:
+                    break;
+                default:
+                    dup_head += sizeof(uint64_t);
+            }
+        }
+        return res;
+    }
+
     opcode GetOpcode() {
-        uint8_t res;
-        io_.read(reinterpret_cast<char *>(&res), sizeof(res));
-        return static_cast<opcode>(res);
+        return static_cast<opcode>(buf_[head_++]);
     }
 
     void GetStringKey(uint16_t& length, uint8_t *key) {
-        io_.read(reinterpret_cast<char *>(&length), sizeof(length));
-        io_.read(reinterpret_cast<char *>(key), length);
+        length = ReadValue<uint16_t>();
+        memcpy(key, buf_ + head_, length);
+        head_ += length;
     }
-
-    uint64_t GetIntKey() {
-        uint64_t key;
-        io_.read(reinterpret_cast<char *>(&key), sizeof(key));
-        return key;
-    }
-
 
     void GetStringQuery(uint16_t& l_length, uint8_t *l_key, uint16_t& r_length, uint8_t* r_key, bool& res) {
-        io_.read(reinterpret_cast<char *>(&l_length), sizeof(l_length));
-        io_.read(reinterpret_cast<char *>(l_key), l_length);
-        io_.read(reinterpret_cast<char *>(&r_length), sizeof(r_length));
-        io_.read(reinterpret_cast<char *>(r_key), r_length);
-        io_.read(reinterpret_cast<char *>(&res), sizeof(res));
+        l_length = ReadValue<uint16_t>();
+        memcpy(l_key, buf_ + head_, l_length);
+        head_ += l_length;
+        r_length = ReadValue<uint16_t>();
+        memcpy(r_key, buf_ + head_, r_length);
+        head_ += r_length;
+        res = ReadValue<bool>();
     }
 
     std::tuple<uint64_t, uint64_t, bool> GetIntQuery() {
-        uint64_t l_key, r_key;
-        bool res;
-        io_.read(reinterpret_cast<char *>(&l_key), sizeof(l_key));
-        io_.read(reinterpret_cast<char *>(&r_key), sizeof(r_key));
-        io_.read(reinterpret_cast<char *>(&res), sizeof(res));
-        return {l_key, r_key, res};
+        return {ReadValue<uint64_t>(), ReadValue<uint64_t>(), ReadValue<bool>()};
+    }
+
+    bool StringKeys() const {
+        return string_keys_;
     }
 
 private:
     std::fstream io_;
     iomode mode_;
     bool string_keys_;
+    uint8_t *buf_ = nullptr;
+    uint64_t head_ = 0;
+    size_t buf_size_ = 0;
 };
 
 
@@ -395,7 +453,7 @@ public:
         return test_values[key];
     }
 
-    std::string ToJson(bool print_header=true) {
+    std::string ToJson() {
         std::string res = "{\n";
         for (auto it = test_values.begin(); it != test_values.end(); ++it) {
             res += "\t\"";
