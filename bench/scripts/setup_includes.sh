@@ -7,8 +7,10 @@ cd ../include/memento_expandable/ && git checkout expandable
 cd -
 
 git submodule update --init ../include/grafite/
-git submodule update --init ../include/grafite/lib/sux/
-git submodule update --init ../include/grafite/lib/sdsl-lite/
+cd ../include/grafite/
+git submodule update --init lib/sux/
+git submodule update --init lib/sdsl-lite/
+cd -
 
 git submodule update --init ../include/surf/
 
