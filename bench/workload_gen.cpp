@@ -85,22 +85,24 @@ bool create_dir_recursive(const std::string_view& dir_name) {
 std::set<uint64_t> generate_int_keys_uniform(uint64_t n_keys, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    std::cout << "Generating keys..." << std::endl;
     while (keys.size() < n_keys) {
         keys.insert(dist(rng));
         print_progress(1.0 * keys.size() / n_keys);
     }
-    std::cerr << std::endl;
+    std::cout << std::endl;
     return keys;
 }
 
 std::set<uint64_t> generate_int_keys_normal(uint64_t n_keys, long double mu, long double std, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
     std::normal_distribution<long double> dist(mu, std);
+    std::cout << "Generating keys..." << std::endl;;
     while (keys.size() < n_keys) {
         keys.insert(static_cast<uint64_t>(dist(rng)));
         print_progress(1.0 * keys.size() / n_keys);
     }
-    std::cerr << std::endl;
+    std::cout << std::endl;
     return keys;
 }
 
@@ -108,6 +110,7 @@ std::set<ByteString> generate_string_keys_uniform(uint64_t n_keys, std::vector<u
     std::set<ByteString> keys;
     std::uniform_int_distribution<uint64_t> len_dist(0, key_lens.size() - 1);
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    std::cout << "Generating keys..." << std::endl;
     while (keys.size() < n_keys) {
         const uint32_t len = key_lens[len_dist(rng)];
         const uint32_t word_len = ((len + 7) / 8) * 8;
@@ -117,7 +120,7 @@ std::set<ByteString> generate_string_keys_uniform(uint64_t n_keys, std::vector<u
         keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
         print_progress(1.0 * keys.size() / n_keys);
     }
-    std::cerr << std::endl;
+    std::cout << std::endl;
     return keys;
 }
 
@@ -133,6 +136,7 @@ std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<ui
     std::set<ByteString> keys;
     std::uniform_int_distribution<uint64_t> len_dist(0, key_lens.size() - 1);
     std::normal_distribution<long double> dist(mu, std);
+    std::cout << "Generating keys..." << std::endl;
     while (keys.size() < n_keys) {
         const uint32_t len = key_lens[len_dist(rng)];
         uint8_t buf[len + 8];
@@ -142,7 +146,7 @@ std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<ui
         keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
         print_progress(1.0 * keys.size() / n_keys);
     }
-    std::cerr << std::endl;
+    std::cout << std::endl;
     return keys;
 }
 
@@ -211,6 +215,7 @@ void correlated_bench(argparse::ArgumentParser& parser) {
     wio.Bulk(keys_vec);
 
     wio.Timer('q');
+    std::cout << "Generating queries..." << std::endl;
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     const double corr_deg = parser.get<double>("--corr-degree");
     const uint64_t corr_distance = static_cast<uint64_t>(std::min(std::pow(2.0, 64 * (1 - corr_deg)),
@@ -260,6 +265,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
     keys = std::set<uint64_t>(keys_vec.begin(), keys_vec.end());
 
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
+    std::cout << "Generating queries..." << std::endl;
     if (query_dist == "unif") {
         wio.Bulk(keys_vec);
         wio.Timer('q');
@@ -354,6 +360,7 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     wio.Bulk(keys_vec);
     wio.Timer('q');
+    std::cout << "Generating queries..." << std::endl;
     std::uniform_int_distribution<uint32_t> picker(0, n_keys - 2);
     std::uniform_int_distribution<uint32_t> length_picker(0, key_lens.size() - 1);
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
@@ -410,6 +417,7 @@ void true_bench(argparse::ArgumentParser& parser) {
     std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
 
     wio.Timer('q');
+    std::cout << "Generating queries..." << std::endl;
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     std::uniform_int_distribution<uint64_t> picker(0, n_keys - 1);
     for (uint32_t i = 0; i < n_queries;) {
@@ -461,6 +469,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
         wio.Bulk(init_keys_vec);
 
         wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
         if (query_dist == "unif") {
             std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
             for (uint32_t i = 0; i < n_queries;) {
@@ -530,6 +539,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
         wio.Timer('i');
 
         wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
         if (query_dist == "unif") {
             std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
             for (uint32_t i = 0; i < n_queries;) {
@@ -585,6 +595,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
             throw std::runtime_error("Invalid query distribution type for this benchmark");
         wio.Timer('q');
         wio.Flush();
+        std::cout << std::endl;
 
         if (expansion % 4 == 3)
             cur_n_keys *= 2;
@@ -616,6 +627,7 @@ void delete_bench(argparse::ArgumentParser& parser) {
     const uint32_t n_deletes = parser.get<uint64_t>("--n-deletes");
     wio.Timer('d');
     std::uniform_int_distribution<uint32_t> op_dist(0, 2);
+    std::cout << "Generating deletes..." << std::endl;
     for (uint32_t i = 0; i < n_deletes;) {
         if (op_dist(rng) == 2 && !deleted_keys.empty()) {     // Insert
             auto it = deleted_keys.begin();
@@ -803,6 +815,8 @@ int main(int argc, char const *argv[]) {
             msg += bench.first + " ";
         throw std::runtime_error(msg);
     }
+
+    std::cout << "done" << std::endl;
 
     return 0;
 }
