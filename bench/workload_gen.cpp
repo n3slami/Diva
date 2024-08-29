@@ -234,7 +234,7 @@ void correlated_bench(argparse::ArgumentParser& parser) {
             continue;
         wio.Query(l_key, r_key, false);
         i++;
-        print_progress(1.0 * i / n_keys);
+        print_progress(1.0 * i / n_queries);
     }
     wio.Timer('q');
     wio.Flush();
@@ -280,7 +280,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             wio.Query(l_key, r_key, false);
             i++;
-            print_progress(1.0 * i / n_keys);
+            print_progress(1.0 * i / n_queries);
         }
         wio.Timer('q');
     }
@@ -298,7 +298,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             wio.Query(l_key, r_key, false);
             i++;
-            print_progress(1.0 * i / n_keys);
+            print_progress(1.0 * i / n_queries);
         }
         wio.Timer('q');
     }
@@ -318,7 +318,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             keys.erase(l_key);
             queries.emplace_back(l_key, r_key);
-            print_progress(1.0 * queries.size() / n_keys);
+            print_progress(1.0 * queries.size() / n_queries);
         }
         std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
         wio.Bulk(keys_vec);
@@ -391,7 +391,7 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
             continue;
         wio.Query(l, r, false);
         i++;
-        print_progress(1.0 * i / n_keys);
+        print_progress(1.0 * i / n_queries);
     }
     wio.Timer('q');
     wio.Flush();
@@ -430,7 +430,7 @@ void true_bench(argparse::ArgumentParser& parser) {
         const uint64_t r_key = l_key + query_size - 1;
         wio.Query(l_key, r_key, true);
         i++;
-        print_progress(1.0 * i / n_keys);
+        print_progress(1.0 * i / n_queries);
     }
     wio.Timer('q');
     wio.Flush();
@@ -482,7 +482,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else if (query_dist == "norm") {
@@ -497,7 +497,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else if (query_dist == "corr") {
@@ -518,7 +518,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else 
@@ -552,7 +552,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else if (query_dist == "norm") {
@@ -567,7 +567,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else if (query_dist == "corr") {
@@ -588,7 +588,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
-                print_progress(1.0 * i / n_keys);
+                print_progress(1.0 * i / n_queries);
             }
         }
         else 
