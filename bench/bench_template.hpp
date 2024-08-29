@@ -35,8 +35,6 @@
 
 inline auto test_out = TestOutput();
 
-inline auto test_verbose = true;
-inline bool print_json = false;
 inline std::string json_file = "";
 inline double memory_budget = 10.0;
 
@@ -249,13 +247,5 @@ inline void read_workload(const std::string& workload_file) {
 
 
 inline void print_test() {
-    if (test_verbose)
-        std::cout << test_out.ToJson() << std::endl;
-
-    if (print_json) {
-        std::cout << "[+] writing results in " << json_file << std::endl;
-        std::ofstream outFile(std::filesystem::path(json_file), std::ios::app);
-        outFile << test_out.ToJson();
-        outFile.close();
-    }
+    std::cout << test_out.ToJson() << std::endl;
 }
