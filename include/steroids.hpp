@@ -49,11 +49,11 @@ public:
     Steroids(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor);
 
     template <class t_itr>
-    Steroids(const uint32_t infix_size, t_itr begin, t_itr end, const uint32_t key_len,
+    Steroids(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
              const uint32_t rng_seed, const float load_factor);
 
     template <class t_itr>
-    Steroids(const uint32_t infix_size, t_itr begin, t_itr end, 
+    Steroids(const uint32_t infix_size, const t_itr begin, const t_itr end, 
              const uint32_t rng_seed, const float load_factor);
 
     void Insert(std::string_view key);
@@ -299,8 +299,8 @@ inline Steroids<int_optimized>::Steroids(const uint32_t infix_size, const uint32
 
 template <bool int_optimized>
 template <class t_itr>
-Steroids<int_optimized>::Steroids(const uint32_t infix_size, t_itr begin, t_itr end, const uint32_t key_len,
-         const uint32_t rng_seed, const float load_factor):
+Steroids<int_optimized>::Steroids(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
+                                  const uint32_t rng_seed, const float load_factor):
         wh_(nullptr),
         better_tree_(nullptr),
         wh_int_(nullptr),
@@ -331,8 +331,8 @@ Steroids<int_optimized>::Steroids(const uint32_t infix_size, t_itr begin, t_itr 
 
 template <bool int_optimized>
 template <class t_itr>
-Steroids<int_optimized>::Steroids(const uint32_t infix_size, t_itr begin, t_itr end, 
-         const uint32_t rng_seed, const float load_factor):
+Steroids<int_optimized>::Steroids(const uint32_t infix_size, const t_itr begin, const t_itr end, 
+                                  const uint32_t rng_seed, const float load_factor):
         wh_(nullptr),
         better_tree_(nullptr),
         wh_int_(nullptr),
@@ -1304,16 +1304,20 @@ inline void Steroids<int_optimized>::UpdateInfixListDelete(const uint32_t shared
 
 template <bool int_optimized>
 template <class t_itr>
-inline void Steroids<int_optimized>::BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len) {
+inline void Steroids<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_itr end, const uint32_t key_len) {
     uint64_t infix_list[infix_store_target_size];
     t_itr last_key_it = begin, key_it = begin;
     InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
+    if constexpr (int_optimized)
+        *key_it = _bswap64(*key_it);
     InfiniteByteString right_key {};
     AddTreeKey(left_key.str, left_key.length);
     int32_t cnt = 1;
     for (++key_it; key_it != end; ++key_it) {
         if (cnt % infix_store_target_size == 0) {   // New boundary key
             right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
+            if constexpr (int_optimized)
+                *key_it = _bswap64(*key_it);
             AddTreeKey(right_key.str, right_key.length);
 
             InfixStore *store;
@@ -1419,7 +1423,7 @@ inline void Steroids<int_optimized>::BulkLoadFixedLength(t_itr begin, t_itr end,
 
 template <bool int_optimized>
 template <class t_itr>
-inline void Steroids<int_optimized>::BulkLoad(t_itr begin, t_itr end) {
+inline void Steroids<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
     uint64_t infix_list[infix_store_target_size];
     t_itr last_key_it = begin, key_it = begin;
     std::string_view sv {*key_it};

@@ -429,7 +429,7 @@ class TestOutput {
 public:
     template<typename TestValueType>
     void AddMeasure(const std::string& key, TestValueType value) {
-        auto str = std::to_string(value);
+        std::string str = std::to_string(value);
         if (key == "fpr" && str == "0.000000")
             str = "0.000001";
         test_values[key] = str;

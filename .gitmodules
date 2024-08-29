@@ -1,0 +1,24 @@
+[submodule "bench/include/memento"]
+	path = bench/include/memento
+	url = git@github.com:n3slami/Memento_Filter.git
+[submodule "bench/include/grafite"]
+	path = bench/include/grafite
+	url = git@github.com:marcocosta97/grafite.git
+[submodule "bench/include/memento_expandable"]
+	path = bench/include/memento_expandable
+	url = git@github.com:n3slami/Memento_Filter.git
+[submodule "bench/include/rencoder"]
+	path = bench/include/rencoder
+	url = git@github.com:Range-Filter/REncoder.git
+[submodule "bench/include/snarf"]
+	path = bench/include/snarf
+	url = git@github.com:kapilvaidya24/SNARF.git
+[submodule "bench/include/proteus"]
+	path = bench/include/proteus
+	url = git@github.com:Erins-Ransom/Proteus.git
+[submodule "bench/include/surf"]
+	path = bench/include/surf
+	url = git@github.com:efficient/SuRF.git
+[submodule "bench/include/oasis"]
+	path = bench/include/oasis
+	url = git@github.com:Woooooow-Pro/Oasis-RangeFilter.git
