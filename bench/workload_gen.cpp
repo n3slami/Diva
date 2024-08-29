@@ -58,7 +58,7 @@ const size_t pbwidth = 60;
 uint32_t seed = 1380;
 
 
-void printProgress(double percentage) {
+void print_progress(double percentage) {
     static int last_percentage = 0;
     int val = (int) (percentage * 100);
     if (last_percentage == val)
@@ -85,16 +85,22 @@ bool create_dir_recursive(const std::string_view& dir_name) {
 std::set<uint64_t> generate_int_keys_uniform(uint64_t n_keys, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    while (keys.size() < n_keys)
+    while (keys.size() < n_keys) {
         keys.insert(dist(rng));
+        print_progress(1.0 * keys.size() / n_keys);
+    }
+    std::cerr << std::endl;
     return keys;
 }
 
 std::set<uint64_t> generate_int_keys_normal(uint64_t n_keys, long double mu, long double std, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
     std::normal_distribution<long double> dist(mu, std);
-    while (keys.size() < n_keys)
+    while (keys.size() < n_keys) {
         keys.insert(static_cast<uint64_t>(dist(rng)));
+        print_progress(1.0 * keys.size() / n_keys);
+    }
+    std::cerr << std::endl;
     return keys;
 }
 
@@ -109,7 +115,9 @@ std::set<ByteString> generate_string_keys_uniform(uint64_t n_keys, std::vector<u
         for (int32_t i = 0; i < word_len; i++)
             buf[i] = dist(rng);
         keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
+        print_progress(1.0 * keys.size() / n_keys);
     }
+    std::cerr << std::endl;
     return keys;
 }
 
@@ -132,7 +140,9 @@ std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<ui
         const uint64_t pert = __builtin_bswap64(static_cast<uint64_t>(dist(rng)));
         *reinterpret_cast<uint64_t *>(buf + norm_byte) += pert;
         keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
+        print_progress(1.0 * keys.size() / n_keys);
     }
+    std::cerr << std::endl;
     return keys;
 }
 
@@ -219,6 +229,7 @@ void correlated_bench(argparse::ArgumentParser& parser) {
             continue;
         wio.Query(l_key, r_key, false);
         i++;
+        print_progress(1.0 * i / n_keys);
     }
     wio.Timer('q');
     wio.Flush();
@@ -263,6 +274,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             wio.Query(l_key, r_key, false);
             i++;
+            print_progress(1.0 * i / n_keys);
         }
         wio.Timer('q');
     }
@@ -280,6 +292,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             wio.Query(l_key, r_key, false);
             i++;
+            print_progress(1.0 * i / n_keys);
         }
         wio.Timer('q');
     }
@@ -299,6 +312,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
                 continue;
             keys.erase(l_key);
             queries.emplace_back(l_key, r_key);
+            print_progress(1.0 * queries.size() / n_keys);
         }
         std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
         wio.Bulk(keys_vec);
@@ -370,6 +384,7 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
             continue;
         wio.Query(l, r, false);
         i++;
+        print_progress(1.0 * i / n_keys);
     }
     wio.Timer('q');
     wio.Flush();
@@ -407,6 +422,7 @@ void true_bench(argparse::ArgumentParser& parser) {
         const uint64_t r_key = l_key + query_size - 1;
         wio.Query(l_key, r_key, true);
         i++;
+        print_progress(1.0 * i / n_keys);
     }
     wio.Timer('q');
     wio.Flush();
@@ -457,6 +473,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else if (query_dist == "norm") {
@@ -471,6 +488,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else if (query_dist == "corr") {
@@ -491,6 +509,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else 
@@ -523,6 +542,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else if (query_dist == "norm") {
@@ -537,6 +557,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else if (query_dist == "corr") {
@@ -557,6 +578,7 @@ void expansion_bench(argparse::ArgumentParser& parser) {
                     continue;
                 wio.Query(l_key, r_key, false);
                 i++;
+                print_progress(1.0 * i / n_keys);
             }
         }
         else 
@@ -613,6 +635,7 @@ void delete_bench(argparse::ArgumentParser& parser) {
             wio.Delete(victim);
             deleted_keys.insert(victim);
             i++;
+            print_progress(1.0 * i / n_deletes);
         }
     }
     wio.Timer('d');
