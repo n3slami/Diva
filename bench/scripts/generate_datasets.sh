@@ -62,12 +62,12 @@ generate_fpr_bench() {
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
-        $WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${j}
-        $WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${j}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
         $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
         $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
-        $WORKLOAD_GEN_PATH -t standard-string --kdist unif --qdist unif --max-range-size $range_size -o unif_string_${j}
-        $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_string_${j}
+        $WORKLOAD_GEN_PATH -t standard-string --kdist unif --qdist unif --max-range-size $range_size -o unif_string_${i}
+        $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_string_${i}
         i=$(($i + 4))
     done
 }
