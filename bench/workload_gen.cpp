@@ -47,7 +47,7 @@ static const std::vector<std::string> qdist_default = {"unif", "corr"};
 
 uint64_t default_n_keys = 200'000'000;
 uint64_t default_n_queries = 10'000'000;
-std::vector<uint64_t> default_string_lens {8, 16, 32, 64, 128, 256, 512, 1024};
+std::vector<uint64_t> default_string_lens {8, 16, 32, 64, 128, 256};
 uint64_t range_size_min = 1, range_size_max = std::numeric_limits<uint64_t>::max();
 std::uniform_int_distribution<uint64_t> query_size_dist;
 
@@ -55,7 +55,7 @@ InputKeys<uint64_t> keys_from_file = InputKeys<uint64_t>();
 
 const char pbstr[] = "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||";
 const size_t pbwidth = 60;
-uint32_t seed = 1380;
+uint32_t seed = 2024;
 
 
 void print_progress(double percentage) {
@@ -143,7 +143,7 @@ std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<ui
         memcpy(buf, base_key, len);
         const uint64_t pert = __builtin_bswap64(static_cast<uint64_t>(dist(rng)));
         *reinterpret_cast<uint64_t *>(buf + norm_byte) += pert;
-        keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
+        keys.insert({reinterpret_cast<const uint8_t *>(buf), len});
         print_progress(1.0 * keys.size() / n_keys);
     }
     std::cout << std::endl;

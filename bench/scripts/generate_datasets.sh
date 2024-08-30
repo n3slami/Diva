@@ -59,7 +59,7 @@ generate_fpr_bench() {
     i=0
     norm_mu=$(echo 2 ^ 63 | bc)
     norm_std=$(echo 2 ^ 50 | bc)
-    norm_byte=6
+    norm_byte=2
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
