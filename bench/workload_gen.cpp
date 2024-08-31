@@ -46,6 +46,7 @@ static const std::vector<std::string> qdist_names = {"unif", "norm", "real", "co
 static const std::vector<std::string> qdist_default = {"unif", "corr"};
 
 uint64_t default_n_keys = 200'000'000;
+uint64_t default_n_deletes = 10'000'000;
 uint64_t default_n_queries = 10'000'000;
 std::vector<uint64_t> default_string_lens {8, 16, 32, 64, 128, 256};
 uint64_t range_size_min = 1, range_size_max = std::numeric_limits<uint64_t>::max();
@@ -415,6 +416,7 @@ void true_bench(argparse::ArgumentParser& parser) {
     else
         keys = read_data_binary<uint64_t>(key_file);
     std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+    wio.Bulk(keys_vec);
 
     wio.Timer('q');
     std::cout << "Generating queries..." << std::endl;
@@ -622,34 +624,36 @@ void delete_bench(argparse::ArgumentParser& parser) {
         keys = read_data_binary<uint64_t>(key_file);
     std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
     wio.Bulk(keys_vec);
+    std::vector<bool> is_deleted(keys.size(), false);
 
-    std::set<uint64_t> deleted_keys;
+    std::vector<uint64_t> deleted_keys;
     const uint32_t n_deletes = parser.get<uint64_t>("--n-deletes");
     wio.Timer('d');
     std::uniform_int_distribution<uint32_t> op_dist(0, 2);
     std::cout << "Generating deletes..." << std::endl;
     for (uint32_t i = 0; i < n_deletes;) {
         if (op_dist(rng) == 2 && !deleted_keys.empty()) {     // Insert
-            auto it = deleted_keys.begin();
-            std::advance(it, rng() % deleted_keys.size());
-            wio.Insert(*it);
-            deleted_keys.erase(it);
+            uint32_t insertee_ind = rng() % deleted_keys.size();
+            const uint64_t insertee = deleted_keys[insertee_ind];
+            wio.Insert(insertee);
+            is_deleted[std::lower_bound(keys_vec.begin(), keys_vec.end(), insertee) - keys_vec.begin()] = false;
+            std::swap(deleted_keys[insertee_ind], deleted_keys[deleted_keys.size() - 1]);
+            deleted_keys.pop_back();
         }
         else {                                               // Delete
-            bool found = false;
-            uint64_t victim;
-            while (!found) {
-                auto it = keys.begin();
-                std::advance(it, rng() % n_keys);
-                victim = *it;
-                found = deleted_keys.find(victim) == deleted_keys.end();
-            }
+            uint32_t victim_ind;
+            do {
+                victim_ind = rng() % n_keys;
+            } while (is_deleted[victim_ind]);
+            uint64_t victim = keys_vec[victim_ind];
             wio.Delete(victim);
-            deleted_keys.insert(victim);
+            is_deleted[victim_ind] = true;
+            deleted_keys.push_back(victim);
             i++;
             print_progress(1.0 * i / n_deletes);
         }
     }
+    std::cout << std::endl;
     wio.Timer('d');
     wio.Flush();
 }
@@ -761,7 +765,7 @@ int main(int argc, char const *argv[]) {
     parser.add_argument("-d", "--n-deletes")
             .help("The number of delete operations")
             .required()
-            .default_value(static_cast<uint64_t>(default_n_keys))
+            .default_value(static_cast<uint64_t>(default_n_deletes))
             .scan<'u', uint64_t>()
             .nargs(1);
 
@@ -816,7 +820,7 @@ int main(int argc, char const *argv[]) {
         throw std::runtime_error(msg);
     }
 
-    std::cout << "done" << std::endl;
+    std::cout << "Done" << std::endl;
 
     return 0;
 }

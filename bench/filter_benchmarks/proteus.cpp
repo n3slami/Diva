@@ -90,7 +90,6 @@ int main(int argc, char const *argv[]) {
     auto queries = wio.GetIntQueries();
     experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size),
                queries, default_sample_rate);
-    print_test();
 
     return 0;
 }

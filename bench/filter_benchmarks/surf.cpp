@@ -23,8 +23,7 @@
 
 template <typename t_itr, typename... Args>
 inline surf::SuRF init(const t_itr begin, const t_itr end, const int suffix_bits, Args... args) {
-    std::vector<std::string> string_keys(std::distance(begin, end));
-    std::transform(begin, end, string_keys.begin(), [&](auto k) { return uint64ToString(k); });
+    std::vector<std::string> string_keys {begin, end};
     time_points['c'] = timer::now();
     surf::SuRF s = surf::SuRF(string_keys, surf::kReal, 0, suffix_bits);
     return s;
@@ -32,27 +31,27 @@ inline surf::SuRF init(const t_itr begin, const t_itr end, const int suffix_bits
 
 template <typename t_itr, typename... Args>
 inline surf::SuRF init_hash(const t_itr begin, const t_itr end, const int suffix_bits, Args... args) {
-    std::vector<std::string> string_keys(std::distance(begin, end));
-    std::transform(begin, end, string_keys.begin(), [&](auto k) { return uint64ToString(k); });
+    std::vector<std::string> string_keys {begin, end};
     time_points['c'] = timer::now();
     surf::SuRF s = surf::SuRF(string_keys, surf::kHash, suffix_bits, 0);
     return s;
 }
 
-template <typename T>
-inline void insert(surf::SuRF& f, T key) {
+inline void insert(surf::SuRF& f, const uint8_t *key, uint16_t key_length) {
     throw std::runtime_error("Fitler does not support inserts");
 }
 
-template <typename T>
-inline void del(surf::SuRF& f, T key) {
+inline void del(surf::SuRF& f, const uint8_t *key, uint16_t key_length) {
     throw std::runtime_error("Fitler does not support deletes");
 }
 
-inline bool query(surf::SuRF& f, uint64_t left, uint64_t right) {
-    if (left == right)
-        return f.lookupKey(uint64ToString(left));
-    return f.lookupRange(uint64ToString(left), true, uint64ToString(right), true);
+inline bool query(surf::SuRF& f, const uint8_t *left, uint16_t left_length,
+                                 const uint8_t *right, uint16_t right_length) {
+    std::string left_str {reinterpret_cast<const char *>(left), left_length};
+    std::string right_str {reinterpret_cast<const char *>(right), right_length};
+    if (left_str == right_str)
+        return f.lookupKey(left_str);
+    return f.lookupRange(left_str, true, right_str, true);
 }
 
 inline bool query(surf::SuRF& f, std::string& left, std::string& right) {
@@ -90,10 +89,9 @@ int main(int argc, char const *argv[]) {
     }
 
     if (surf_hash)
-        experiment(pass_fun(init_hash), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
+        experiment_string(pass_fun(init_hash), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
     else
-        experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
-    print_test();
+        experiment_string(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
 
     return 0;
 }

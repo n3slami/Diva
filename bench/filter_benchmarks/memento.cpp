@@ -178,7 +178,5 @@ int main(int argc, char const *argv[]) {
     experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_ref(query), pass_ref(size),
                wio.GetIntQueries(), -1);
 
-    print_test();
-
     return 0;
 }

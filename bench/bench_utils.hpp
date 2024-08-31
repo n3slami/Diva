@@ -299,11 +299,8 @@ public:
         io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
         uint32_t key_count = keys.size();
         io_.write(reinterpret_cast<const char *>(&key_count), sizeof(key_count));
-        for (auto key : keys) {
-            const uint16_t key_len = sizeof(key);
-            io_.write(reinterpret_cast<const char *>(&key_len), sizeof(key_len));
-            io_.write(reinterpret_cast<const char *>(&key), key_len);
-        }
+        for (auto key : keys)
+            io_.write(reinterpret_cast<const char *>(&key), sizeof(key));
     }
 
     void Insert(ByteString& key) {
@@ -355,7 +352,7 @@ public:
 
 
     bool Done() const {
-        return mode_ == iomode::Write ? false : head_ < buf_size_;
+        return mode_ == iomode::Write ? false : head_ >= buf_size_;
     }
 
 
@@ -460,7 +457,7 @@ public:
             res += (*it).first;
             res += "\": ";
             res += (*it).second;
-            res += "\",\n";
+            res += ",\n";
         }
         res += "}\n";
         return res;

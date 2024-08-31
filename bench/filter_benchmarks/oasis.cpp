@@ -58,7 +58,6 @@ int main(int argc, char const *argv[]) {
     read_workload(parser.get<std::string>("--workload"));
 
     experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
-    print_test();
 
     return 0;
 }

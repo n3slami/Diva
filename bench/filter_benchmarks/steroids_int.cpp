@@ -68,7 +68,5 @@ int main(int argc, char const *argv[]) {
 
     experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
 
-    print_test();
-
     return 0;
 }

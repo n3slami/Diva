@@ -31,11 +31,11 @@ inline Steroids<false> *init(const t_itr begin, const t_itr end, const double bp
     return filter;
 }
 
-inline void insert(Steroids<false> *filter, const uint8_t *key, uint32_t key_length) {
+inline void insert(Steroids<false> *filter, const uint8_t *key, uint16_t key_length) {
     filter->Insert(key, key_length);
 }
 
-inline void del(Steroids<false> *filter, const uint8_t *key, uint32_t key_length) {
+inline void del(Steroids<false> *filter, const uint8_t *key, uint16_t key_length) {
     filter->Delete(key, key_length);
 }
 
@@ -64,8 +64,6 @@ int main(int argc, char const *argv[]) {
     read_workload(parser.get<std::string>("--workload"));
 
     experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
-
-    print_test();
 
     return 0;
 }

@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <argparse/argparse.hpp>
@@ -28,6 +30,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/types.h>
+#include <vector>
 #include "bench_utils.hpp"
 
 #define pass_fun(f) ([](auto... args){ return f(args...); })
@@ -62,7 +65,7 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
         test_out.AddMeasure("size", filter_size);
         test_out.AddMeasure("size", static_cast<long double>(filter_size * 8) / n_keys);
         test_out.AddMeasure("construction_time", timer_results['c']);
-        std::cout << test_out.ToJson() << std::endl;
+        std::cout << test_out.ToJson() << ',' << std::endl;
         timer_results['c'] = 0;
         test_out.Clear();
     }
@@ -115,7 +118,7 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                     }
                 }
 
-                std::cout << test_out.ToJson() << std::endl;
+                std::cout << test_out.ToJson() << ',' << std::endl;
 
                 n_queries = 0;
                 memset(timer_results, 0, sizeof(timer_results));
@@ -133,6 +136,11 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
     uint8_t r_buf[std::numeric_limits<uint16_t>::max()];
     
     uint32_t n_keys = initial_string_keys.size(), n_queries = 0;
+    if (n_keys == 0) {
+        n_keys = initial_int_keys.size();
+        initial_string_keys = std::vector<std::string>(n_keys);
+        std::transform(initial_int_keys.begin(), initial_int_keys.end(), initial_string_keys.begin(), [&](uint64_t k) { return uint64ToString(k); });
+    }
     uint32_t false_positives = 0, false_negatives = 0;
     time_points['c'] = timer::now();
     auto filter = init_f(initial_string_keys.begin(), initial_string_keys.end(), memory_budget, args...);
@@ -144,7 +152,7 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
         test_out.AddMeasure("size", filter_size);
         test_out.AddMeasure("size", static_cast<long double>(filter_size * 8) / n_keys);
         test_out.AddMeasure("construction_time", timer_results['c']);
-        std::cout << test_out.ToJson() << std::endl;
+        std::cout << test_out.ToJson() << ',' << std::endl;
         timer_results['c'] = 0;
         test_out.Clear();
     }
@@ -156,20 +164,42 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                 throw std::runtime_error("Cannot bulk load in the middle of a workload");
             case WorkloadIO::opcode::Insert: {
                 wio.GetStringKey(l_buf_len, l_buf);
-                insert_f(filter, l_buf, l_buf_len);
+                if (wio.StringKeys())
+                    insert_f(filter, l_buf, l_buf_len);
+                else {
+                    uint64_t key = __builtin_bswap64(wio.ReadValue<uint64_t>());
+                    insert_f(filter, reinterpret_cast<const uint8_t *>(&key),
+                                     static_cast<uint16_t>(sizeof(key)));
+                }
                 n_keys++;
                 break;
             }
             case WorkloadIO::opcode::Delete: {
                 wio.GetStringKey(l_buf_len, l_buf);
-                delete_f(filter, l_buf, l_buf_len);
+                if (wio.StringKeys())
+                    delete_f(filter, l_buf, l_buf_len);
+                else {
+                    uint64_t key = __builtin_bswap64(wio.ReadValue<uint64_t>());
+                    delete_f(filter, reinterpret_cast<const uint8_t *>(&key),
+                                     static_cast<uint16_t>(sizeof(key)));
+                }
                 n_keys--;
                 break;
             }
             case WorkloadIO::opcode::Query: {
-                bool actual_res;
-                wio.GetStringQuery(l_buf_len, l_buf, r_buf_len, r_buf, actual_res);
-                bool filter_res = range_f(filter, l_buf, l_buf_len, r_buf, r_buf_len);
+                bool actual_res, filter_res;
+                if (wio.StringKeys()) {
+                    wio.GetStringQuery(l_buf_len, l_buf, r_buf_len, r_buf, actual_res);
+                    filter_res = range_f(filter, l_buf, l_buf_len, r_buf, r_buf_len);
+                }
+                else {
+                    auto [l, r, res] = wio.GetIntQuery();
+                    l = __builtin_bswap64(l);
+                    r = __builtin_bswap64(r);
+                    actual_res = res;
+                    filter_res = range_f(filter, reinterpret_cast<const uint8_t *>(&l), static_cast<uint16_t>(sizeof(l)),
+                                                 reinterpret_cast<const uint8_t *>(&r), static_cast<uint16_t>(sizeof(r)));
+                }
                 false_positives += filter_res & (!actual_res);
                 false_negatives += (!filter_res) & actual_res;
                 n_queries++;
@@ -200,7 +230,7 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                     }
                 }
 
-                std::cout << test_out.ToJson() << std::endl;
+                std::cout << test_out.ToJson() << ',' << std::endl;
 
                 n_queries = 0;
                 memset(timer_results, 0, sizeof(timer_results));
@@ -240,7 +270,7 @@ inline void read_workload(const std::string& workload_file) {
             wio.GetStringKey(buf_len, buf);
             initial_string_keys.push_back({reinterpret_cast<const char *>(buf), buf_len});
         }
-        else 
+        else
             initial_int_keys.push_back(wio.ReadValue<uint64_t>());
     }
 }

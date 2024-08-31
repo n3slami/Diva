@@ -81,7 +81,5 @@ int main(int argc, char const *argv[]) {
     else
         throw std::runtime_error("Unknown range emptiness data structure");
 
-    print_test();
-
     return 0;
 }

@@ -98,12 +98,12 @@ generate_expansion_bench() {
 
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -e $n_expansions --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -e $n_expansions --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $long -o unif_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $short -o norm_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $long -o norm_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $short -o books_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $long -o books_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $short -o osm_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $long -o osm_long
 }
 
 generate_delete_bench() {
@@ -111,16 +111,16 @@ generate_delete_bench() {
     long=$(echo 2 ^ 20 | bc)
     norm_mu=$(echo 2 ^ 63 | bc)
     norm_std=$(echo 2 ^ 50 | bc)
-    n_deletes=100000000
+    n_deletes=10000000
 
     $WORKLOAD_GEN_PATH -t delete -d $n_deletes --max-range-size $short -o unif_short
     $WORKLOAD_GEN_PATH -t delete -d $n_deletes --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o unif_long
+    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $short -o norm_short
+    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $long -o norm_long
+    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o books_short
+    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o books_long
+    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o osm_short
+    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o osm_long
 }
 
 generate_construction_bench() {

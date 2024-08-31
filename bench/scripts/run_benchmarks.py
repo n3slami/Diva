@@ -17,7 +17,7 @@ def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter,
 def corr_bench():
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    memory_footprints = [20]
+    memory_footprints = [16]
     workload_subdir = "corr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
