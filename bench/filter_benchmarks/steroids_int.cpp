@@ -26,25 +26,21 @@ inline Steroids<true> *init(const t_itr begin, const t_itr end, const double bpk
     const double load_factor = 0.95;
     const uint32_t infix_size = std::round(load_factor * (bpk - 1));
     
-    Steroids<true> *filter = new Steroids<true>(infix_size, begin, end, sizeof(uint64_t), rng_seed, load_factor);
+    Steroids<true> *filter = new Steroids<true>(infix_size, begin, end, sizeof(uint64_t),
+                                                rng_seed, load_factor);
     return filter;
 }
 
 inline void insert(Steroids<true> *filter, uint64_t key) {
-    const uint64_t k = __builtin_bswap64(key);
-    filter->Insert(reinterpret_cast<const uint8_t *>(&k), sizeof(k));
+    filter->Insert(key);
 }
 
 inline void del(Steroids<true> *filter, uint64_t key) {
-    const uint64_t k = __builtin_bswap64(key);
-    filter->Delete(reinterpret_cast<const uint8_t *>(&k), sizeof(k));
+    filter->Delete(key);
 }
 
 inline bool query(const Steroids<true> *filter, uint64_t l_key, uint64_t r_key) {
-    const uint64_t l = __builtin_bswap64(l_key);
-    const uint64_t r = __builtin_bswap64(r_key);
-    return filter->RangeQuery(reinterpret_cast<const uint8_t *>(&l), sizeof(l), 
-                              reinterpret_cast<const uint8_t *>(&r), sizeof(r));
+    return filter->RangeQuery(l_key, r_key);
 }
 
 inline size_t size(const Steroids<true> *filter) {

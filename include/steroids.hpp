@@ -56,13 +56,17 @@ public:
     Steroids(const uint32_t infix_size, const t_itr begin, const t_itr end, 
              const uint32_t rng_seed, const float load_factor);
 
+    void Insert(uint64_t key);
     void Insert(std::string_view key);
     void Insert(const uint8_t *key, const uint32_t key_len);
+    void Delete(uint64_t key);
     void Delete(std::string_view input_key);
     void Delete(const uint8_t *input_key, const uint32_t input_key_len);
+    bool RangeQuery(uint64_t l, uint64_t r) const;
     bool RangeQuery(std::string_view input_l, std::string_view input_r) const;
     bool RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
                     const uint8_t *input_r, const uint32_t input_r_len) const;
+    bool PointQuery(uint64_t key) const;
     bool PointQuery(std::string_view key) const;
     bool PointQuery(const uint8_t *key, const uint32_t key_len) const;
     void ShrinkInfixSize(const uint32_t new_infix_size);
@@ -373,6 +377,13 @@ inline void Steroids<int_optimized>::SetupScaleFactors() {
 
 
 template <bool int_optimized>
+inline void Steroids<int_optimized>::Insert(uint64_t key) {
+    key = _bswap64(key);
+    Insert(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
+}
+
+
+template <bool int_optimized>
 inline void Steroids<int_optimized>::Insert(std::string_view key) {
     Insert(reinterpret_cast<const uint8_t *>(key.data()), key.size());
 }
@@ -458,6 +469,15 @@ inline void Steroids<int_optimized>::InsertSimple(const InfiniteByteString key) 
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t insertee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
     InsertRawIntoInfixStore(infix_store, insertee, total_implicit);
+}
+
+
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::RangeQuery(uint64_t l, uint64_t r) const {
+    l = _bswap64(l);
+    r = _bswap64(r);
+    return RangeQuery(reinterpret_cast<const uint8_t *>(&l), sizeof(l),
+                      reinterpret_cast<const uint8_t *>(&r), sizeof(r));
 }
 
 
@@ -564,6 +584,13 @@ inline bool Steroids<int_optimized>::RangeQuery(const uint8_t *input_l, const ui
         const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
         return RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
     }
+}
+
+
+template <bool int_optimized>
+inline bool Steroids<int_optimized>::PointQuery(uint64_t key) const {
+    key = _bswap64(key);
+    return PointQuery(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
 }
 
 
@@ -1041,6 +1068,13 @@ inline uint64_t Steroids<int_optimized>::ExtractPartialKey(const InfiniteByteStr
 
 
 template <bool int_optimized>
+inline void Steroids<int_optimized>::Delete(uint64_t key) {
+    key = _bswap64(key);
+    Delete(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
+}
+
+
+template <bool int_optimized>
 inline void Steroids<int_optimized>::Delete(std::string_view input_key) {
     Delete(reinterpret_cast<const uint8_t *>(input_key.data()), input_key.size());
 }
@@ -1305,19 +1339,25 @@ inline void Steroids<int_optimized>::UpdateInfixListDelete(const uint32_t shared
 template <bool int_optimized>
 template <class t_itr>
 inline void Steroids<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_itr end, const uint32_t key_len) {
-    uint64_t infix_list[infix_store_target_size];
+    uint64_t infix_list[infix_store_target_size], int_opt_buf[3];
     t_itr last_key_it = begin, key_it = begin;
-    InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
-    if constexpr (int_optimized)
-        *key_it = _bswap64(*key_it);
-    InfiniteByteString right_key {};
+    InfiniteByteString left_key {}, right_key {};
+    if constexpr (int_optimized) {
+        int_opt_buf[0] = _bswap64(*key_it);
+        left_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 0), key_len};
+    }
+    else
+        left_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
     AddTreeKey(left_key.str, left_key.length);
     int32_t cnt = 1;
     for (++key_it; key_it != end; ++key_it) {
         if (cnt % infix_store_target_size == 0) {   // New boundary key
-            right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
-            if constexpr (int_optimized)
-                *key_it = _bswap64(*key_it);
+            if constexpr (int_optimized) {
+                int_opt_buf[1] = _bswap64(*key_it);
+                right_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 1), key_len};
+            }
+            else
+                right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
             AddTreeKey(right_key.str, right_key.length);
 
             InfixStore *store;
@@ -1355,13 +1395,22 @@ inline void Steroids<int_optimized>::BulkLoadFixedLength(const t_itr begin, cons
             const uint32_t total_implicit = next_implicit - prev_implicit + 1;
             ++last_key_it;
             for (int32_t i = 0; i < infix_store_target_size - 1; i++) {
-                const InfiniteByteString key {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
+                InfiniteByteString key;
+                if constexpr (int_optimized) {
+                    int_opt_buf[2] = _bswap64(*last_key_it);
+                    key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
+                }
+                else 
+                    key = {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
                 const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
                 infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
                 ++last_key_it;
             }
             LoadListToInfixStore(*store, infix_list, infix_store_target_size - 1, total_implicit);
-            left_key = right_key;
+            if constexpr (int_optimized)
+                int_opt_buf[0] = int_opt_buf[1];
+            else
+                left_key = right_key;
         }
         cnt++;
     }
@@ -1411,7 +1460,13 @@ inline void Steroids<int_optimized>::BulkLoadFixedLength(const t_itr begin, cons
     int32_t i = 0;
     ++last_key_it;
     while (last_key_it != key_it) {
-        const InfiniteByteString key {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
+        InfiniteByteString key;
+        if constexpr (int_optimized) {
+            int_opt_buf[2] = _bswap64(*last_key_it);
+            key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
+        }
+        else 
+            key = {reinterpret_cast<const uint8_t *>(&(*last_key_it)), key_len};
         const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
         infix_list[i++] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
         ++last_key_it;

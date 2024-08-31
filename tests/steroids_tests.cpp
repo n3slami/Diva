@@ -800,8 +800,10 @@ public:
         for (int32_t i = 0; i < init_n; i++)
             init_keys.push_back(rng());
         std::sort(init_keys.begin(), init_keys.end());
-        for (int32_t i = 0; i < init_n; i++)
-            init_keys[i] = to_big_endian_order(init_keys[i]);
+        if constexpr (!O) {
+            for (int32_t i = 0; i < init_n; i++)
+                init_keys[i] = to_big_endian_order(init_keys[i]);
+        }
         Steroids<O> s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
                       seed, load_factor);
 
@@ -2184,8 +2186,10 @@ public:
             for (int32_t i = 0; i < n_keys; i++)
                 keys.push_back(rng());
             std::sort(keys.begin(), keys.end());
-            for (int32_t i = 0; i < n_keys; i++)
-                keys[i] = to_big_endian_order(keys[i]);
+            if constexpr (!O) {
+                for (int32_t i = 0; i < n_keys; i++)
+                    keys[i] = to_big_endian_order(keys[i]);
+            }
 
             Steroids<O> s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
 
