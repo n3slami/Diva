@@ -1635,6 +1635,7 @@ wormleaf_int_remove(struct wormleaf_int * const leaf, const u32 pos)
   leaf->kvs[pos] = leaf->kvs[leaf->nr_keys - 1];
   if (leaf->nr_sorted > pos)
     leaf->nr_sorted = pos;
+  leaf->nr_keys--;
 }
 
 // for delr (delete-range)

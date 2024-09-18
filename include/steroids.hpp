@@ -73,7 +73,7 @@ public:
     uint32_t Size() const;
 
 private:
-    static constexpr uint32_t infix_store_target_size = 512;
+    static constexpr uint32_t infix_store_target_size = 1024;
     static_assert(infix_store_target_size % 64 == 0);
     static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
     static constexpr uint32_t scale_shift = 15;
@@ -161,7 +161,7 @@ private:
         }
 
         static uint32_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size) {
-            return 1 + (Steroids::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
+            return 1 + (Steroids::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64 + 1024;
         }
 
         uint32_t GetElemCount() const {
@@ -1028,7 +1028,7 @@ inline uint32_t Steroids<int_optimized>::Size() const {
         it_int.leaf = nullptr;
         it_int.is = 0;
         for (wh_int_iter_seek(&it_int, nullptr, 0); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int)) {
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key_len), &tree_key_len, 
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                           reinterpret_cast<void **>(&store), &dummy);
             res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
         }
@@ -1042,7 +1042,7 @@ inline uint32_t Steroids<int_optimized>::Size() const {
         it.leaf = nullptr;
         it.is = 0;
         for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key_len), &tree_key_len, 
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                   reinterpret_cast<void **>(&store), &dummy);
             res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
         }
@@ -1184,7 +1184,6 @@ inline void Steroids<int_optimized>::Delete(const uint8_t *input_key, const uint
 
 template <bool int_optimized>
 inline void Steroids<int_optimized>::DeleteMerge(void *const it_inp) {
-
     InfiniteByteString middle_key {};
     InfiniteByteString left_key {};
     InfiniteByteString right_key {};
@@ -1227,8 +1226,10 @@ inline void Steroids<int_optimized>::DeleteMerge(void *const it_inp) {
     GetInfixList(*store_l, infix_list);
     GetInfixList(*store_r, infix_list + store_l->GetElemCount());
 
-    UpdateInfixListDelete(shared, ignore, implicit_size, left_key, middle_key, infix_list, store_l->GetElemCount());
-    UpdateInfixListDelete(shared, ignore, implicit_size, middle_key, right_key, infix_list + store_l->GetElemCount(), store_r->GetElemCount());
+    UpdateInfixListDelete(shared, ignore, implicit_size, left_key, middle_key,
+                          infix_list, store_l->GetElemCount());
+    UpdateInfixListDelete(shared, ignore, implicit_size, middle_key, right_key,
+                          infix_list + store_l->GetElemCount(), store_r->GetElemCount());
     const uint64_t implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
     for (int32_t i = 0; i < total_elem_count; i++)
         infix_list[i] -= implicit << infix_size_;
@@ -1603,7 +1604,7 @@ inline void Steroids<int_optimized>::BulkLoad(const t_itr begin, const t_itr end
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint32_t Steroids<int_optimized>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint64_t *occupieds = store.ptr + 1;
@@ -1617,7 +1618,7 @@ inline uint32_t Steroids<int_optimized>::RankOccupieds(const InfixStore &store, 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint32_t Steroids<int_optimized>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint32_t size_grade = store.GetSizeGrade();
@@ -1648,7 +1649,7 @@ inline int32_t Steroids<int_optimized>::NextOccupied(const InfixStore &store, co
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Steroids<int_optimized>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr + 1;
     int32_t res = pos - 1, hb_pos;
@@ -1663,7 +1664,7 @@ inline int32_t Steroids<int_optimized>::PreviousOccupied(const InfixStore &store
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Steroids<int_optimized>::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     const uint32_t size_grade = store.GetSizeGrade();
@@ -1678,7 +1679,7 @@ inline int32_t Steroids<int_optimized>::NextRunend(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Steroids<int_optimized>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     int32_t res = pos - 1, hb_pos;
@@ -1693,7 +1694,7 @@ inline int32_t Steroids<int_optimized>::PreviousRunend(const InfixStore &store, 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint64_t Steroids<int_optimized>::GetSlot(const InfixStore &store, const uint32_t pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
@@ -1783,7 +1784,7 @@ inline void Steroids<int_optimized>::ShiftRunendsLeft(const InfixStore &store, c
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Steroids<int_optimized>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
@@ -1795,7 +1796,7 @@ inline int32_t Steroids<int_optimized>::FindEmptySlotAfter(const InfixStore &sto
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Steroids<int_optimized>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
@@ -1839,6 +1840,27 @@ inline void Steroids<int_optimized>::InsertRawIntoInfixStore(InfixStore &store, 
     uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
     uint64_t *occupieds = store.ptr + 1;
     uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
+    
+    {
+        uint64_t tmp[50000];
+        uint32_t welp = GetInfixList(store, tmp);
+        assert(welp);
+
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        assert(popcnts[0] == check_popcnts[0]);
+        assert(popcnts[1] == check_popcnts[1]);
+    }
 
     const uint32_t mapped_pos = (implicit_part * size_scalars_[size_grade] * implicit_scalar) 
                                         >> (scale_shift + scale_implicit_shift);
@@ -1912,20 +1934,26 @@ inline void Steroids<int_optimized>::InsertRawIntoInfixStore(InfixStore &store, 
     set_bitmap_bit(occupieds, implicit_part);
     store.UpdateElemCount(1);
 
-    uint32_t occupied_count = 0, runend_count = 0;
-    for (int32_t i = 0; i < infix_store_target_size / 64; i++)
-        occupied_count += __builtin_popcountll(occupieds[i]);
-    for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
-        runend_count += get_bitmap_bit(runends, i);
-    assert(occupied_count == runend_count);
+    {
+        uint64_t tmp[50000];
+        uint32_t welp = GetInfixList(store, tmp);
+        assert(welp);
 
-    uint32_t check_popcnts[2] = {};
-    for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
-        check_popcnts[0] += __builtin_popcountll(occupieds[i]);
-        check_popcnts[1] += __builtin_popcountll(runends[i]);
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        assert(popcnts[0] == check_popcnts[0]);
+        assert(popcnts[1] == check_popcnts[1]);
     }
-    assert(popcnts[0] == check_popcnts[0]);
-    assert(popcnts[1] == check_popcnts[1]);
 }
 
 
@@ -1934,7 +1962,7 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t elem_count = store.GetElemCount();
     if (size_grade > 0 && elem_count <= (size_grade > 1 ? scaled_sizes_[size_grade - 2] : infix_store_target_size)) {
-        ResizeInfixStore(store, true, total_implicit);
+        ResizeInfixStore(store, false, total_implicit);
         size_grade--;
     }
 
@@ -1944,8 +1972,26 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
 
     uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
     uint64_t *occupieds = store.ptr + 1;
+    uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     const bool is_occupied = get_bitmap_bit(occupieds, implicit_part);
     assert(is_occupied);
+
+    {
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        assert(popcnts[0] == check_popcnts[0]);
+        assert(popcnts[1] == check_popcnts[1]);
+    }
 
     const uint32_t key_rank = RankOccupieds(store, implicit_part);
     const int32_t runend_pos = SelectRunends(store, key_rank);
@@ -1980,7 +2026,7 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
                                         // further checking.
     int32_t cur_occupied = implicit_part;
     int32_t cur_runend = runend_pos, prev_runend;
-    int32_t shift_start = -1, shift_end = runend_pos;
+    int32_t shift_start = -1, shift_end = -1;
     while (cur_runend < scaled_sizes_[size_grade]) {
         // Find last run that starts in its canonical slot.
         prev_runend = cur_runend;
@@ -1992,10 +2038,10 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
         cur_occupied = NextOccupied(store, cur_occupied);
         const uint32_t mapped_pos = (cur_occupied * size_scalars_[size_grade] * implicit_scalar) 
                                             >> (scale_shift + scale_implicit_shift);
-        shift_end = (mapped_pos < prev_runend + 1 ? cur_runend : shift_end);
-        if (mapped_pos > prev_runend + 1)
-            break;
+        if (shift_end == -1 && mapped_pos >= prev_runend + 1)
+            shift_end = prev_runend;
     }
+    shift_end = (shift_end == -1 ? prev_runend : shift_end);
     if (!found_empty_right) {
         // Check if should shift to the right.
         int32_t cur_occupied = implicit_part;
@@ -2016,28 +2062,41 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
             cur_occupied = PreviousOccupied(store, cur_occupied);
         }
     }
+    else {
+        const uint32_t mapped_pos = (implicit_part * size_scalars_[size_grade] * implicit_scalar) 
+                                            >> (scale_shift + scale_implicit_shift);
+        assert(mapped_pos <= runstart_pos);
+    }
 
-    uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     if (shift_start == -1) {    // Shift to the left
-        if (match_pos + 1 <= infix_store_target_size / 2 
+        if (match_pos <= infix_store_target_size / 2 
                 && infix_store_target_size / 2 < shift_end + 1)
             popcnts[1] += get_bitmap_bit(runends, infix_store_target_size / 2);
-        ShiftRunendsLeft(store, match_pos + 1, shift_end + 1, 1);
         ShiftSlotsLeft(store, match_pos + 1, shift_end + 1, 1);
+        ShiftRunendsLeft(store, match_pos + 1, shift_end + 1, 1);
+        if (match_pos == shift_end) {
+            SetSlot(store, match_pos, 0);
+            reset_bitmap_bit(runends, match_pos);
+        }
         if (!run_destroyed)
             set_bitmap_bit(runends, runend_pos - 1);
         else
             popcnts[1] -= runend_pos <= infix_store_target_size / 2;
     }
     else {  // Shift to the right
+        ShiftSlotsRight(store, shift_start, match_pos, 1);
         ShiftRunendsRight(store, shift_start, match_pos, 1);
+        if (match_pos == shift_start) {
+            SetSlot(store, match_pos, 0);
+            if (run_destroyed)
+                reset_bitmap_bit(runends, runend_pos);
+        }
         if (shift_start < infix_store_target_size / 2 
                 && infix_store_target_size / 2 <= match_pos)
             popcnts[1] -= get_bitmap_bit(runends, infix_store_target_size / 2);
-        ShiftSlotsRight(store, shift_start, match_pos, 1);
         if (!run_destroyed)
             set_bitmap_bit(runends, runend_pos);
-        else 
+        else
             popcnts[1] -= runend_pos < infix_store_target_size / 2;
     }
     
@@ -2047,13 +2106,26 @@ inline void Steroids<int_optimized>::DeleteRawFromInfixStore(InfixStore &store, 
     }
     store.UpdateElemCount(-1);
 
-    uint32_t check_popcnts[2] = {};
-    for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
-        check_popcnts[0] += __builtin_popcountll(occupieds[i]);
-        check_popcnts[1] += __builtin_popcountll(runends[i]);
+    {
+        uint64_t tmp[50000];
+        uint32_t welp = GetInfixList(store, tmp);
+        assert(welp);
+
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        assert(popcnts[0] == check_popcnts[0]);
+        assert(popcnts[1] == check_popcnts[1]);
     }
-    assert(popcnts[0] == check_popcnts[0]);
-    assert(popcnts[1] == check_popcnts[1]);
 }
 
 
@@ -2249,6 +2321,11 @@ inline void Steroids<int_optimized>::LoadListToInfixStore(InfixStore &store, con
         assert((list[i - 1] >> infix_size_) <= (list[i] >> infix_size_));
     for (int32_t i = 0; i < list_len; i++)
         assert((list[i] >> infix_size_) < total_implicit);
+    for (int32_t i = 1; i < list_len; i++) {
+        const uint64_t prev_l = list[i - 1] - (list[i - 1] & -list[i - 1]);
+        const uint64_t cur_l = list[i] - (list[i] & -list[i]);
+        assert(prev_l <= cur_l);
+    }
 
     uint64_t *occupieds = store.ptr + 1;
     uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
@@ -2261,7 +2338,7 @@ inline void Steroids<int_optimized>::LoadListToInfixStore(InfixStore &store, con
         if (implicit_part != old_implicit_part) {
             ind++;
             l[ind] = std::max<int32_t>(r[ind - 1],
-                                       (implicit_scalar * size_scalars_[size_grade] * implicit_part)
+                                       (implicit_part * size_scalars_[size_grade] * implicit_scalar)
                                             >> (scale_shift + scale_implicit_shift));
             r[ind] = l[ind];
         }
@@ -2289,6 +2366,15 @@ inline void Steroids<int_optimized>::LoadListToInfixStore(InfixStore &store, con
             SetSlot(store, j, explicit_part);
         }
         set_bitmap_bit(runends, r[i] - 1);
+    }
+
+    {
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
     }
 
     uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
@@ -2329,6 +2415,31 @@ inline uint32_t Steroids<int_optimized>::GetInfixList(const InfixStore &store, u
         if (get_bitmap_bit(runends, i))
             implicit_part = NextOccupied(store, implicit_part);
     }
+
+    {
+        for (int32_t i = 1; i < ind; i++) {
+            const uint64_t prev_l = res[i - 1] - (res[i - 1] & -res[i - 1]);
+            const uint64_t cur_l = res[i] - (res[i] & -res[i]);
+            assert(prev_l <= cur_l);
+        }
+
+        uint32_t occupied_count = 0, runend_count = 0;
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++)
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++)
+            runend_count += get_bitmap_bit(runends, i);
+        assert(occupied_count == runend_count);
+
+        uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Steroids<int_optimized>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        assert(popcnts[0] == check_popcnts[0]);
+        assert(popcnts[1] == check_popcnts[1]);
+    }
+
     return ind;
 }
 

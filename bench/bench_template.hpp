@@ -40,6 +40,7 @@ inline auto test_out = TestOutput();
 
 inline std::string json_file = "";
 inline double memory_budget = 10.0;
+inline uint64_t kill_exec_time_threshold = 1ULL * 3600ULL * 1000000ULL;
 
 inline WorkloadIO wio;
 inline InputKeys<uint64_t> initial_int_keys;
@@ -63,13 +64,17 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
         test_out.AddMeasure("n_keys", n_keys);
         const size_t filter_size = size_f(filter);
         test_out.AddMeasure("size", filter_size);
-        test_out.AddMeasure("size", static_cast<long double>(filter_size * 8) / n_keys);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
         test_out.AddMeasure("construction_time", timer_results['c']);
+        if (timer_results['m'] > 0)
+            test_out.AddMeasure("modeling_time", timer_results['m']);
         std::cout << test_out.ToJson() << ',' << std::endl;
         timer_results['c'] = 0;
+        timer_results['m'] = 0;
         test_out.Clear();
     }
 
+    timer::time_point op_start_time = timer::now();
     while (!wio.Done()) {
         WorkloadIO::opcode opcode = wio.GetOpcode();
         switch (opcode) {
@@ -81,7 +86,8 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 break;
             }
             case WorkloadIO::opcode::Delete: {
-                delete_f(filter, wio.ReadValue<uint64_t>());
+                const uint64_t value = wio.ReadValue<uint64_t>();
+                delete_f(filter, value);
                 n_keys--;
                 break;
             }
@@ -95,8 +101,10 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
             }
             case WorkloadIO::opcode::Timer: {
                 char timer_key = wio.ReadValue<char>();
-                if (timer_results[timer_key] == 0)
+                if (timer_results[timer_key] == 0) {
                     time_points[timer_key] = timer::now();
+                    timer_results[timer_key] = -1;
+                }
                 else
                     timer_results[timer_key] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points[timer_key]).count();
                 break;
@@ -109,7 +117,7 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 test_out.AddMeasure("fpr", static_cast<long double>(false_positives) / n_queries);
                 const size_t filter_size = size_f(filter);
                 test_out.AddMeasure("size", filter_size);
-                test_out.AddMeasure("bpk", static_cast<long double>(filter_size) / n_keys);
+                test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
                 for (int32_t i = 0; i < std::numeric_limits<uint8_t>::max(); i++) {
                     if (timer_results[i] > 0) {
                         std::string measure_name = "time_";
@@ -123,6 +131,11 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 n_queries = 0;
                 memset(timer_results, 0, sizeof(timer_results));
                 test_out.Clear();
+
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - op_start_time).count() 
+                            > kill_exec_time_threshold)
+                    return;
+                
                 break;
             }
         }
@@ -150,10 +163,13 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
         test_out.AddMeasure("n_keys", n_keys);
         const size_t filter_size = size_f(filter);
         test_out.AddMeasure("size", filter_size);
-        test_out.AddMeasure("size", static_cast<long double>(filter_size * 8) / n_keys);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
         test_out.AddMeasure("construction_time", timer_results['c']);
+        if (timer_results['m'] > 0)
+            test_out.AddMeasure("modeling_time", timer_results['m']);
         std::cout << test_out.ToJson() << ',' << std::endl;
         timer_results['c'] = 0;
+        timer_results['m'] = 0;
         test_out.Clear();
     }
 
@@ -163,9 +179,10 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
             case WorkloadIO::opcode::Bulk:
                 throw std::runtime_error("Cannot bulk load in the middle of a workload");
             case WorkloadIO::opcode::Insert: {
-                wio.GetStringKey(l_buf_len, l_buf);
-                if (wio.StringKeys())
+                if (wio.StringKeys()) {
+                    wio.GetStringKey(l_buf_len, l_buf);
                     insert_f(filter, l_buf, l_buf_len);
+                }
                 else {
                     uint64_t key = __builtin_bswap64(wio.ReadValue<uint64_t>());
                     insert_f(filter, reinterpret_cast<const uint8_t *>(&key),
@@ -175,9 +192,10 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                 break;
             }
             case WorkloadIO::opcode::Delete: {
-                wio.GetStringKey(l_buf_len, l_buf);
-                if (wio.StringKeys())
+                if (wio.StringKeys()) {
+                    wio.GetStringKey(l_buf_len, l_buf);
                     delete_f(filter, l_buf, l_buf_len);
+                }
                 else {
                     uint64_t key = __builtin_bswap64(wio.ReadValue<uint64_t>());
                     delete_f(filter, reinterpret_cast<const uint8_t *>(&key),
@@ -207,8 +225,10 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
             }
             case WorkloadIO::opcode::Timer: {
                 char timer_key = wio.ReadValue<char>();
-                if (timer_results[timer_key] == 0)
+                if (timer_results[timer_key] == 0) {
                     time_points[timer_key] = timer::now();
+                    timer_results[timer_key] = -1;
+                }
                 else
                     timer_results[timer_key] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points[timer_key]).count();
                 break;
@@ -221,7 +241,7 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                 test_out.AddMeasure("fpr", static_cast<long double>(false_positives) / n_queries);
                 const size_t filter_size = size_f(filter);
                 test_out.AddMeasure("size", filter_size);
-                test_out.AddMeasure("bpk", static_cast<long double>(filter_size) / n_keys);
+                test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
                 for (int32_t i = 0; i < std::numeric_limits<uint8_t>::max(); i++) {
                     if (timer_results[i] > 0) {
                         std::string measure_name = "time_";

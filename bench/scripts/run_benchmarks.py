@@ -9,8 +9,8 @@ global curr_time
 global output_prefix
 
 def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk):
-    command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} | tee {output_base}/{filter}.json"
-    print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} | tee <output_dir>/{workload_subdir}/{filter}.json ]")
+    command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
+    print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
     subprocess.run(command, shell=True)
     print("[ Command finished ]")
 
@@ -30,8 +30,9 @@ def corr_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    #filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["steroids", "steroids_int"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -41,12 +42,13 @@ def fpr_bench():
     for workload in workload_path.iterdir():
         if workload.is_file() and "string" not in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+                if filter == "steroids" or (filter != "steroids" and bpk > 10):
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_string_bench():
     filters = ["steroids", "surf"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
-    workload_subdir = "fpr_bench"
+    workload_subdir = "fpr_string_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
 
@@ -74,7 +76,7 @@ def expansion_bench():
     filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
                "rencoder", "snarf"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
-    workload_subdir = "true_bench"
+    workload_subdir = "expansion_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
     output_prefix = Path(f"results/{datetime.now().strftime('%Y-%m-%d.%H:%M:%S')}")
 
     try:
-        corr_bench()
+        #corr_bench()
         fpr_bench()
         fpr_string_bench()
         true_bench()

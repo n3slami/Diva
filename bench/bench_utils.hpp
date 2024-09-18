@@ -65,7 +65,7 @@ using timer = std::chrono::high_resolution_clock;
 
 struct ByteString {
     uint8_t *str;
-    uint32_t length;
+    uint16_t length;
 
     ByteString(const uint8_t *buf, uint32_t buf_len)
         : length(buf_len) {

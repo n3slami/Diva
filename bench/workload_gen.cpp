@@ -336,7 +336,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
 
 
 void standard_string_bench(argparse::ArgumentParser& parser) {
-    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
+    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, true);
     uint32_t kdist_ind = 0, qdist_ind = 0;
     auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
     uint32_t key_norm_byte = 0;
