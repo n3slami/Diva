@@ -30,9 +30,8 @@ def corr_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_bench():
-    #filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-    #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    filters = ["steroids", "steroids_int"]
+    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -48,7 +47,7 @@ def fpr_bench():
 def fpr_string_bench():
     filters = ["steroids", "surf"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
-    workload_subdir = "fpr_string_bench"
+    workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +81,7 @@ def expansion_bench():
 
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
-        if workload.is_file():
+        if workload.is_file() and "unif" in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
@@ -132,13 +131,13 @@ if __name__ == "__main__":
     output_prefix = Path(f"results/{datetime.now().strftime('%Y-%m-%d.%H:%M:%S')}")
 
     try:
-        #corr_bench()
+        corr_bench()
         fpr_bench()
         fpr_string_bench()
         true_bench()
+        construction_bench()
         expansion_bench()
         delete_bench()
-        construction_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
         shutil.rmtree(output_prefix)

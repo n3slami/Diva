@@ -129,6 +129,8 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 std::cout << test_out.ToJson() << ',' << std::endl;
 
                 n_queries = 0;
+                false_positives = 0;
+                false_negatives = 0;
                 memset(timer_results, 0, sizeof(timer_results));
                 test_out.Clear();
 
@@ -253,6 +255,8 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                 std::cout << test_out.ToJson() << ',' << std::endl;
 
                 n_queries = 0;
+                false_positives = 0;
+                false_negatives = 0;
                 memset(timer_results, 0, sizeof(timer_results));
                 test_out.Clear();
                 break;
