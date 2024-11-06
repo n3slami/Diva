@@ -67,10 +67,10 @@ generate_fpr_bench() {
         #$WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
         #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
         #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
-        $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size $range_size -o unif_string_${i}
-        $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size $range_size -o norm_string_${i}
         i=$(($i + 4))
     done
+    $WORKLOAD_GEN_PATH -t standard-string --kdist unif -o unif_string
+    $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte -o norm_string
 }
 
 generate_true_bench() {

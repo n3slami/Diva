@@ -32,7 +32,7 @@ def corr_bench():
 def fpr_bench():
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
+    memory_footprints = [14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -46,7 +46,7 @@ def fpr_bench():
 
 def fpr_string_bench():
     filters = ["steroids", "surf"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
+    memory_footprints = [14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -74,7 +74,7 @@ def true_bench():
 def expansion_bench():
     filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
                "rencoder", "snarf"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
+    memory_footprints = [20]
     workload_subdir = "expansion_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -83,7 +83,8 @@ def expansion_bench():
     for workload in workload_path.iterdir():
         if workload.is_file() and "unif" in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+                execute_benchmark(build_dir, output_base, workload_subdir, workload,
+                                  filter, bpk - (1 if "steroids" in filter else 0))
 
 def delete_bench():
     filters = ["steroids", "steroids_int", "memento", "snarf"]
