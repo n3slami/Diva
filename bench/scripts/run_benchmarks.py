@@ -53,7 +53,7 @@ def fpr_string_bench():
 
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
-        if workload.is_file() and "string" in workload.name:
+        if workload.is_file() and workload.name.endswith("string"):
             for filter, bpk in itertools.product(filters, memory_footprints):
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 

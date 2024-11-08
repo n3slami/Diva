@@ -372,8 +372,8 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
                                            keys_vec[picked + 1].str, keys_vec[picked + 1].length);
         const uint8_t left_diff = lcp < keys_vec[picked].length ? keys_vec[picked].str[lcp] : 0x00;
         const uint8_t right_diff = lcp < keys_vec[picked + 1].length ? keys_vec[picked + 1].str[lcp] : 0xFF;
-        const uint32_t left_len = std::max<uint32_t>(lcp + 2, key_lens[length_picker(rng)]);
-        const uint32_t right_len = std::max<uint32_t>(lcp + 2, key_lens[length_picker(rng)]);
+        const uint32_t left_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
+        const uint32_t right_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
         uint8_t l_key[left_len], r_key[right_len];
         memcpy(l_key, keys_vec[picked].str, lcp);
         memcpy(r_key, keys_vec[picked + 1].str, lcp);
