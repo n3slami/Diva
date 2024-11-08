@@ -28,7 +28,7 @@ inline surf::SuRF init(const t_itr begin, const t_itr end, const int bpk, Args..
     time_points['c'] = timer::now();
     surf::SuRF s = surf::SuRF(string_keys, surf::kReal, 0, 0);
     const uint64_t n_keys = std::distance(begin, end);
-    const int suffix_bits = std::round(bpk - (s.serializedSize() * 8.0 / n_keys));
+    const int suffix_bits = std::max<int>(std::round(bpk - (s.serializedSize() * 8.0 / n_keys)), 0);
     s = surf::SuRF(string_keys, surf::kReal, 0, suffix_bits);
     return s;
 }
@@ -39,7 +39,7 @@ inline surf::SuRF init_hash(const t_itr begin, const t_itr end, const int bpk, A
     time_points['c'] = timer::now();
     surf::SuRF s = surf::SuRF(string_keys, surf::kHash, 0, 0);
     const uint64_t n_keys = std::distance(begin, end);
-    const int suffix_bits = std::round(bpk - (s.serializedSize() * 8.0 / n_keys));
+    const int suffix_bits = std::max<int>(std::round(bpk - (s.serializedSize() * 8.0 / n_keys)), 0);
     s = surf::SuRF(string_keys, surf::kHash, suffix_bits, 0);
     return s;
 }
