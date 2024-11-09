@@ -393,10 +393,12 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
         if (key_dist == "unif") {
             ByteString sample = generate_single_string_key_uniform(rng, key_lens, length_picker, unif_dist);
             picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+            picked = std::min(picked, n_keys - 2);
         }
         else if (key_dist == "norm") {
             ByteString sample = generate_single_string_key_normal(rng, key_lens, key_norm_byte, length_picker, norm_dist);
             picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+            picked = std::min(picked, n_keys - 2);
         }
         else 
             picked = picker(rng);
@@ -461,7 +463,7 @@ void true_bench(argparse::ArgumentParser& parser) {
         if (offset > keys_vec[picked])
             continue;
         const uint64_t l_key = keys_vec[picked] - offset;
-        if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+        if (std::numeric_limits<uint64_t>::max() - l_key + 1 < query_size)
             continue;
         const uint64_t r_key = l_key + query_size - 1;
         wio.Query(l_key, r_key, true);

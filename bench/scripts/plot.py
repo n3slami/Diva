@@ -374,7 +374,7 @@ def plot_expansion(result_dir, output_dir):
                 result = json.loads(json_string)
                 for j, entry in enumerate(result[1:]):
                     plot_data[i][filter].append([j / FRAC_EXPANSION_COUNT, entry["fpr"]])
-                    plot_data[2][filter].append([j / FRAC_EXPANSION_COUNT, entry["bpk"] - (1 if "steroids" in filter else 0)])
+                    plot_data[2][filter].append([j / FRAC_EXPANSION_COUNT, entry["bpk"]])
                     if "time_i" in entry:
                         n_inserts = entry["n_keys"] - result[j]["n_keys"]
                         plot_data[3][filter].append([j / FRAC_EXPANSION_COUNT, entry["time_i"] * 1e6 / n_inserts])

@@ -49,23 +49,6 @@ inline InputKeys<std::string> initial_string_keys;
 inline timer::time_point time_points[std::numeric_limits<uint8_t>::max()];
 inline uint64_t timer_results[std::numeric_limits<uint8_t>::max()];
 
-inline void flush_entire_cpu_cache() {
-    constexpr uint32_t word_count = 2e7;
-    uint64_t *words = new uint64_t[word_count];
-    std::mt19937_64 rng(std::chrono::steady_clock::now().time_since_epoch().count());
-    for (uint32_t i = 0; i < word_count; i++)
-        words[i] = rng();
-    for (uint32_t i = 0; i < word_count; i++) {
-        const uint32_t pos = rng() % word_count;
-        words[pos] += (0 < pos ? words[pos - 1] : 0ULL) + (pos < word_count ? words[pos + 1] : 0ULL);
-    }
-    uint64_t res = 0;
-    for (uint32_t i = 0; i < word_count; i++)
-        res ^= words[i];
-    delete[] words;
-    std::cerr << "[+] Flushed the cache (res=" << res << ")" << std::endl;
-}
-
 template <typename InitFun, typename InsertFun, typename DeleteFun, typename RangeFun, typename SizeFun, typename... Args>
 void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun range_f, SizeFun size_f, Args... args) {
     uint16_t l_buf_len, r_buf_len;
@@ -160,7 +143,6 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
             }
         }
     }
-    flush_entire_cpu_cache();
 }
 
 template <typename InitFun, typename InsertFun, typename DeleteFun, typename RangeFun, typename SizeFun, typename... Args>
@@ -282,7 +264,6 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
             }
         }
     }
-    flush_entire_cpu_cache();
 }
 
 

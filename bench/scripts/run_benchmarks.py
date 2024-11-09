@@ -5,7 +5,6 @@ from datetime import datetime
 global build_dir
 global workload_dir
 global benchmarks_dir
-global curr_time
 global output_prefix
 
 def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk):
@@ -41,8 +40,7 @@ def fpr_bench():
     for workload in workload_path.iterdir():
         if workload.is_file() and "string" not in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
-                if filter == "steroids" or (filter != "steroids" and bpk > 10):
-                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_string_bench():
     filters = ["steroids", "surf"]
@@ -132,13 +130,13 @@ if __name__ == "__main__":
     output_prefix = Path(f"results/{datetime.now().strftime('%Y-%m-%d.%H:%M:%S')}")
 
     try:
-        corr_bench()
-        fpr_bench()
+        #corr_bench()
         fpr_string_bench()
+        fpr_bench()
         true_bench()
         construction_bench()
-        expansion_bench()
-        delete_bench()
+        #expansion_bench()
+        #delete_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
         shutil.rmtree(output_prefix)

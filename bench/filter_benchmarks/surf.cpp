@@ -29,8 +29,10 @@ inline surf::SuRF init(const t_itr begin, const t_itr end, const int bpk, Args..
     surf::SuRF s = surf::SuRF(string_keys);
     const uint64_t n_keys = std::distance(begin, end);
     const int suffix_bits = std::max<int>(std::round(bpk - (s.serializedSize() * 8.0 / n_keys)), 0);
-    if (suffix_bits > 0)
+    if (suffix_bits > 0) {
+        s.destroy();
         s = surf::SuRF(string_keys, surf::kReal, 0, suffix_bits);
+    }
     return s;
 }
 
@@ -41,8 +43,10 @@ inline surf::SuRF init_hash(const t_itr begin, const t_itr end, const int bpk, A
     surf::SuRF s = surf::SuRF(string_keys);
     const uint64_t n_keys = std::distance(begin, end);
     const int suffix_bits = std::max<int>(std::round(bpk - (s.serializedSize() * 8.0 / n_keys)), 0);
-    if (suffix_bits > 0)
+    if (suffix_bits > 0) {
+        s.destroy();
         s = surf::SuRF(string_keys, surf::kHash, suffix_bits, 0);
+    }
     return s;
 }
 
@@ -61,12 +65,6 @@ inline bool query(surf::SuRF& f, const uint8_t *left, uint16_t left_length,
     if (left_str == right_str)
         return f.lookupKey(left_str);
     return f.lookupRange(left_str, true, right_str, true);
-}
-
-inline bool query(surf::SuRF& f, std::string& left, std::string& right) {
-    if (left == right)
-        return f.lookupKey(left);
-    return f.lookupRange(left, true, right, true);
 }
 
 inline size_t size(surf::SuRF& f) {
