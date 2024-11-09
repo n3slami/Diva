@@ -52,7 +52,7 @@ inline uint64_t timer_results[std::numeric_limits<uint8_t>::max()];
 inline void flush_entire_cpu_cache() {
     constexpr uint32_t word_count = 2e7;
     uint64_t *words = new uint64_t[word_count];
-    std::mt19937_64 rng(1023);
+    std::mt19937_64 rng(std::chrono::steady_clock::now().time_since_epoch().count());
     for (uint32_t i = 0; i < word_count; i++)
         words[i] = rng();
     for (uint32_t i = 0; i < word_count; i++) {
