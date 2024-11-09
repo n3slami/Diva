@@ -176,6 +176,7 @@ def plot_fpr_string(result_dir, output_dir):
     WIDTH = 3
     HEIGHT = 3
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 0]
+    YTICKS_QUERY = [1000, 100, 10, 1, 0]
 
     workloads = ["unif", "norm"]
     filters = ["steroids", "surf"]
@@ -224,7 +225,10 @@ def plot_fpr_string(result_dir, output_dir):
         axes[i][0].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
         axes[i][0].set_yticks(YTICKS)
         axes[i][0].set_ylim(bottom=-0.0000003, top=1.9)
-        axes[i][1].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(50))
+        axes[i][1].set_yscale("symlog", linthresh=1)
+        axes[i][1].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
+        axes[i][1].set_yticks(YTICKS_QUERY)
+        axes[i][1].set_ylim(bottom=-0.0000003, top=1000)
     fig.subplots_adjust(wspace=0.1)
 
     legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
@@ -270,7 +274,7 @@ def plot_true(result_dir, output_dir):
                 axes[i][j].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
 
     for i, workload in enumerate(workloads):
-        title = DATASET_NAMES[workload if workload != "real" else "osm"] \
+        title = DATASET_NAMES[workload if workload != "real" else "books"] \
                 + "\nTime [ns/query]" if len(workloads) > 1 else "Time [ns/query]" 
         axes[i][0].set_ylabel(title, fontsize=YLABEL_FONT_SIZE)
     for i, range_size in enumerate(range_sizes):
