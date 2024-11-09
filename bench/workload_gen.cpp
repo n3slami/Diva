@@ -107,22 +107,47 @@ std::set<uint64_t> generate_int_keys_normal(uint64_t n_keys, long double mu, lon
     return keys;
 }
 
+ByteString generate_single_string_key_uniform(std::mt19937_64& rng,
+                                              std::vector<uint64_t>& key_lens,
+                                              std::uniform_int_distribution<uint64_t>& len_dist,
+                                              std::uniform_int_distribution<uint64_t>& dist) {
+    const uint32_t len = key_lens[len_dist(rng)];
+    const uint32_t word_len = ((len + 7) / 8) * 8;
+    uint64_t buf[word_len];
+    for (int32_t i = 0; i < word_len; i++)
+        buf[i] = dist(rng);
+    return {reinterpret_cast<const uint8_t *>(buf), len};
+}
+
 std::set<ByteString> generate_string_keys_uniform(uint64_t n_keys, std::vector<uint64_t> key_lens, std::mt19937_64& rng) {
     std::set<ByteString> keys;
     std::uniform_int_distribution<uint64_t> len_dist(0, key_lens.size() - 1);
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     std::cout << "Generating keys..." << std::endl;
     while (keys.size() < n_keys) {
-        const uint32_t len = key_lens[len_dist(rng)];
-        const uint32_t word_len = ((len + 7) / 8) * 8;
-        uint64_t buf[word_len];
-        for (int32_t i = 0; i < word_len; i++)
-            buf[i] = dist(rng);
-        keys.insert(ByteString(reinterpret_cast<const uint8_t *>(buf), len));
+        keys.insert(generate_single_string_key_uniform(rng, key_lens, len_dist, dist));
         print_progress(1.0 * keys.size() / n_keys);
     }
     std::cout << std::endl;
     return keys;
+}
+
+ByteString global_norm_base_key {nullptr, 0};
+
+ByteString generate_single_string_key_normal(std::mt19937_64& rng,
+                                             std::vector<uint64_t>& key_lens,
+                                             uint32_t norm_byte,
+                                             std::uniform_int_distribution<uint64_t>& len_dist,
+                                             std::normal_distribution<long double>& dist) {
+    const uint32_t len = key_lens[len_dist(rng)];
+    uint8_t buf[len + 8];
+    memcpy(buf, global_norm_base_key.str, len);
+    const uint64_t pert = __builtin_bswap64(static_cast<uint64_t>(dist(rng)));
+    uint64_t payload;
+    memcpy(&payload, buf + norm_byte, sizeof(payload));
+    payload += pert;
+    memcpy(buf + norm_byte, &payload, sizeof(payload));
+    return {reinterpret_cast<const uint8_t *>(buf), len};
 }
 
 std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<uint64_t> key_lens, 
@@ -133,24 +158,20 @@ std::set<ByteString> generate_string_keys_normal(uint64_t n_keys, std::vector<ui
     uint64_t base_key[max_word_len];
     for (int32_t i = 0; i < max_word_len; i++)
         base_key[i] = rng();
+    global_norm_base_key = ByteString(reinterpret_cast<const uint8_t *>(base_key),
+                                      max_word_len * sizeof(uint64_t));
 
     std::set<ByteString> keys;
     std::uniform_int_distribution<uint64_t> len_dist(0, key_lens.size() - 1);
     std::normal_distribution<long double> dist(mu, std);
     std::cout << "Generating keys..." << std::endl;
     while (keys.size() < n_keys) {
-        const uint32_t len = key_lens[len_dist(rng)];
-        uint8_t buf[len + 8];
-        memcpy(buf, base_key, len);
-        const uint64_t pert = __builtin_bswap64(static_cast<uint64_t>(dist(rng)));
-        *reinterpret_cast<uint64_t *>(buf + norm_byte) += pert;
-        keys.insert({reinterpret_cast<const uint8_t *>(buf), len});
+        keys.insert(generate_single_string_key_normal(rng, key_lens, norm_byte, len_dist, dist));
         print_progress(1.0 * keys.size() / n_keys);
     }
     std::cout << std::endl;
     return keys;
 }
-
 
 
 std::tuple<std::string, long double, long double, std::string> get_kdist(argparse::ArgumentParser& parser, uint32_t& pos) {
@@ -363,11 +384,22 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
     wio.Timer('q');
     std::cout << "Generating queries..." << std::endl;
     std::uniform_int_distribution<uint32_t> picker(0, n_keys - 2);
-    std::uniform_int_distribution<uint32_t> length_picker(0, key_lens.size() - 1);
-    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    std::uniform_int_distribution<uint64_t> length_picker(0, key_lens.size() - 1);
     std::uniform_int_distribution<uint8_t> byte_dist(0, std::numeric_limits<uint8_t>::max());
+    std::uniform_int_distribution<uint64_t> unif_dist(0, std::numeric_limits<uint64_t>::max());
+    std::normal_distribution<long double> norm_dist(key_dist_mu, key_dist_std);
     for (uint32_t i = 0; i < n_queries;) {
-        const uint32_t picked = picker(rng);
+        uint32_t picked;
+        if (key_dist == "unif") {
+            ByteString sample = generate_single_string_key_uniform(rng, key_lens, length_picker, unif_dist);
+            picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+        }
+        else if (key_dist == "norm") {
+            ByteString sample = generate_single_string_key_normal(rng, key_lens, key_norm_byte, length_picker, norm_dist);
+            picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+        }
+        else 
+            picked = picker(rng);
         const uint32_t lcp = calculate_lcp(keys_vec[picked].str, keys_vec[picked].length,
                                            keys_vec[picked + 1].str, keys_vec[picked + 1].length);
         const uint8_t left_diff = lcp < keys_vec[picked].length ? keys_vec[picked].str[lcp] : 0x00;
@@ -429,6 +461,8 @@ void true_bench(argparse::ArgumentParser& parser) {
         if (offset > keys_vec[picked])
             continue;
         const uint64_t l_key = keys_vec[picked] - offset;
+        if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+            continue;
         const uint64_t r_key = l_key + query_size - 1;
         wio.Query(l_key, r_key, true);
         i++;
