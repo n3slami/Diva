@@ -386,11 +386,12 @@ def plot_expansion(result_dir, output_dir):
     for filter in filters:
         plot_data[0][filter] = plot_data[0][filter][:-1]
         plot_data[1][filter] = plot_data[1][filter][:-1]
-        for i in range(2, 4):
-            for j in range(len(plot_data[i][filter]) // 2):
-                plot_data[i][filter][j][1] += plot_data[i][filter][j + len(plot_data[i][filter]) // 2][1]
-                plot_data[i][filter][j][1] /= 2
-            plot_data[i][filter] = plot_data[i][filter][:len(plot_data[i][filter]) // 2]
+        if filter != "memento_expandable":
+            for i in range(2, 4):
+                for j in range(len(plot_data[i][filter]) // 2):
+                    plot_data[i][filter][j][1] += plot_data[i][filter][j + len(plot_data[i][filter]) // 2][1]
+                    plot_data[i][filter][j][1] /= 2
+                plot_data[i][filter] = plot_data[i][filter][:len(plot_data[i][filter]) // 2]
     for i in range(len(range_sizes) + 2):
         for filter in filters:
             if i >= len(range_sizes):
