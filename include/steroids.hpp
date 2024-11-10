@@ -1438,12 +1438,8 @@ inline void Steroids<int_optimized>::BulkLoadFixedLength(const t_itr begin, cons
     }
 
     // Add what was left from the loop
-    uint8_t min_str[key_len], max_str[key_len];
-    memset(min_str, 0, key_len);
+    uint8_t max_str[key_len];
     memset(max_str, 0xFF, key_len);
-    AddTreeKey(min_str, key_len);
-    AddTreeKey(max_str, key_len);
-
     right_key = {max_str, key_len};
 
     InfixStore *store;
@@ -1568,12 +1564,8 @@ inline void Steroids<int_optimized>::BulkLoad(const t_itr begin, const t_itr end
     }
 
     // Add what was left from the loop
-    uint8_t min_str[max_len], max_str[max_len];
-    memset(min_str, 0, max_len);
+    uint8_t max_str[max_len];
     memset(max_str, 0xFF, max_len);
-    AddTreeKey(min_str, max_len);
-    AddTreeKey(max_str, max_len);
-
     right_key = {max_str, max_len};
 
     InfixStore *store;
