@@ -313,6 +313,7 @@ def plot_construction(result_dir, output_dir):
     workload_subdir = Path("construction_bench")
 
     fig, ax = plt.subplots(figsize=(WIDTH, HEIGHT))
+    ax.set_ylim(bottom=0, top=1500)
     for i, logn in enumerate(log_number_of_keys):
         for j, filter in enumerate(filters):
             file_path = result_dir / workload_subdir / Path(f"{filter}_16_unif_{logn}.json")
