@@ -359,6 +359,11 @@ Steroids<int_optimized>::Steroids(const uint32_t infix_size, const t_itr begin, 
 
     rng_.seed(rng_seed);
     SetupScaleFactors();
+
+    uint8_t key[8];
+    memset(key, 0x00, 8);
+    AddTreeKey(key, 8);
+
     BulkLoad(begin, end);
 }
 
@@ -1566,6 +1571,8 @@ inline void Steroids<int_optimized>::BulkLoad(const t_itr begin, const t_itr end
     // Add what was left from the loop
     uint8_t max_str[max_len];
     memset(max_str, 0xFF, max_len);
+    AddTreeKey(max_str, max_len);
+
     right_key = {max_str, max_len};
 
     InfixStore *store;
