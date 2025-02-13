@@ -74,6 +74,8 @@ static inline uint32_t fast_reduce(uint32_t hash, uint32_t n) {
     return (uint32_t) (((uint64_t) hash * n) >> 32);
 }
 
+int predef_memento_size = -1;
+
 template <typename t_itr, typename... Args>
 inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... args) {
     auto&& t = std::forward_as_tuple(args...);
@@ -88,7 +90,6 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     const uint64_t max_range_size = *std::max_element(query_lengths.begin(), query_lengths.end());
     const double load_factor = 0.95;
     const uint64_t n_slots = n_items / load_factor + std::sqrt(n_items);
-    int predef_memento_size = std::get<1>(t);
     uint32_t memento_bits = 1;
     if (predef_memento_size == -1) {
         while ((1ULL << memento_bits) < max_range_size)
@@ -174,6 +175,10 @@ int main(int argc, char const *argv[]) {
     }
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
+
+    if (auto max_range_size = parser.present<int>("--range_size")) {
+        for (predef_memento_size = 0; (1 << predef_memento_size) < *max_range_size; predef_memento_size++);
+    }
 
     experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_ref(query), pass_ref(size),
                wio.GetIntQueries(), -1);

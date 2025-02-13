@@ -7,9 +7,13 @@ global workload_dir
 global benchmarks_dir
 global output_prefix
 
-def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk):
-    command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
-    print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
+def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None):
+    if force_range_size:
+        command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} --range_size {force_range_size} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
+        print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} --range_size {force_range_size} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
+    else:
+        command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
+        print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
     subprocess.run(command, shell=True)
     print("[ Command finished ]")
 
@@ -31,7 +35,9 @@ def corr_bench():
 def fpr_bench():
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    memory_footprints = [14, 16, 18, 20]
+    # filters = ["memento", "rosetta"]
+    memory_footprints = [8, 10, 12]
+    MEDIAN_RANGE_SIZE = 2 ** 7
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -40,7 +46,12 @@ def fpr_bench():
     for workload in workload_path.iterdir():
         if workload.is_file() and "string" not in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+                if filter == "oasis" and "osm" in workload.name:
+                    continue
+                if filter in ["memento", "rosetta", "proteus"]:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, MEDIAN_RANGE_SIZE)
+                else:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_string_bench():
     filters = ["steroids", "surf"]
@@ -72,7 +83,7 @@ def true_bench():
 def expansion_bench():
     filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
                "rencoder", "snarf"]
-    memory_footprints = [20]
+    memory_footprints = [16]
     workload_subdir = "expansion_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -85,7 +96,8 @@ def expansion_bench():
                                   filter, bpk - (1 if "steroids" in filter else 0))
 
 def delete_bench():
-    filters = ["steroids", "steroids_int", "memento", "snarf"]
+    #filters = ["steroids", "steroids_int", "memento", "snarf"]
+    filters = ["memento"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = "delete_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -98,8 +110,8 @@ def delete_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def construction_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
+               "memento", "steroids", "steroids_int", "grafite"]
     memory_footprints = [16]
     workload_subdir = "construction_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -131,11 +143,11 @@ if __name__ == "__main__":
 
     try:
         #corr_bench()
-        fpr_string_bench()
-        fpr_bench()
-        true_bench()
-        construction_bench()
-        #expansion_bench()
+        #fpr_string_bench()
+        #fpr_bench()
+        #true_bench()
+        #construction_bench()
+        expansion_bench()
         #delete_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")

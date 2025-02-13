@@ -69,8 +69,8 @@ generate_fpr_bench() {
         #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
         i=$(($i + 4))
     done
-    $WORKLOAD_GEN_PATH -t standard-string --kdist unif -o unif_string
-    $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte -o norm_string
+    $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size 1024 -o unif_string
+    $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size 1024 -o norm_string
 }
 
 generate_true_bench() {
@@ -126,7 +126,7 @@ generate_delete_bench() {
 generate_construction_bench() {
     i=5
     x=100000
-    while [ $i -le 8 ]
+    while [ $i -le 7 ]
     do
         $WORKLOAD_GEN_PATH -t construction --max-range-size 1024 -n ${x} -q $(echo "($x * 0.1)/1" | bc) -o unif_${i}
         x=$(echo "$x * 10" | bc)
@@ -142,7 +142,6 @@ if ! generate_corr_bench ; then
     exit 1
 fi
 echo "[!!] corr_bench generated"
-'
 
 mkdir -p $OUT_PATH/fpr_bench && cd $OUT_PATH/fpr_bench || exit 1
 if ! generate_fpr_bench ; then
@@ -151,7 +150,6 @@ if ! generate_fpr_bench ; then
 fi
 echo "[!!] fpr_bench generated"
 
-: '
 mkdir -p $OUT_PATH/true_bench && cd $OUT_PATH/true_bench || exit 1
 if ! generate_true_bench ; then
     echo "[!!] true_bench generation failed"
@@ -172,6 +170,7 @@ if ! generate_delete_bench ; then
     exit 1
 fi
 echo "[!!] delete_bench generated"
+'
 
 mkdir -p $OUT_PATH/construction_bench && cd $OUT_PATH/construction_bench || exit 1
 if ! generate_construction_bench ; then
@@ -179,6 +178,5 @@ if ! generate_construction_bench ; then
     exit 1
 fi
 echo "[!!] construction_bench generated"
-'
 
 echo "[!!] success, all workloads generated"

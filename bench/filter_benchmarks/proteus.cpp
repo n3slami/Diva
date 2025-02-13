@@ -20,11 +20,15 @@
 #include "../include/proteus/include/proteus.hpp"
 #include "../include/proteus/include/util.hpp"
 #include "../include/proteus/include/modeling.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <tmmintrin.h>
 
 #define SUPPRESS_STDOUT
 const double default_sample_rate = 0.2;
+
+int range_size = -1;
 
 template <typename t_itr, typename... Args>
 inline proteus::Proteus init(const t_itr begin, const t_itr end, const double bpk, Args... args) {
@@ -34,10 +38,24 @@ inline proteus::Proteus init(const t_itr begin, const t_itr end, const double bp
     auto sample_rate = std::get<1>(t);
     auto klen = 64;
     auto queries = std::vector<std::pair<uint64_t, uint64_t>>(queries_temp.size());
-    std::transform(queries_temp.begin(), queries_temp.end(), queries.begin(), [](auto x) {
-        auto [left, right, result] = x;
-        return std::make_pair(left, right);
-    });
+    if (range_size != -1) {
+        const uint64_t seed = 10;
+        std::mt19937_64 rng(seed);
+        std::transform(queries_temp.begin(), queries_temp.end(), queries.begin(), [&](auto x) {
+                const uint64_t left = rng();
+                const uint64_t next_key_ind = std::upper_bound(keys.begin(), keys.end(), left) - keys.begin();
+                const uint64_t length = std::min<uint64_t>(range_size, (next_key_ind < keys.size() ? keys[next_key_ind] 
+                                                                                 : std::numeric_limits<uint64_t>::max())
+                                                                        - left + 1);
+                return std::make_pair(left, left + rng() % length);
+            });
+    }
+    else {
+        std::transform(queries_temp.begin(), queries_temp.end(), queries.begin(), [](auto x) {
+                auto [left, right, result] = x;
+                return std::make_pair(left, right);
+            });
+    }
 
     auto sample_queries = proteus::sampleQueries(queries, sample_rate);
     std::sort(sample_queries.begin(), sample_queries.end());
@@ -86,6 +104,10 @@ int main(int argc, char const *argv[]) {
     }
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
+
+    if (auto max_range_size = parser.present<int>("--range_size")) {
+        range_size = *max_range_size;
+    }
 
     auto queries = wio.GetIntQueries();
     experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size),

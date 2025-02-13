@@ -16,12 +16,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <boost/range/range_fwd.hpp>
 #include <cmath>
 #include <cstdint>
 #include <utility>
 
 #include "../bench_template.hpp"
 #include "../include/rosetta/dst.h"
+
+int range_size = -1;
 
 template <typename t_itr, typename... Args>
 inline DstFilter<BloomFilter<>> init(const t_itr begin, const t_itr end, const double bpk, Args... args) {
@@ -30,6 +33,12 @@ inline DstFilter<BloomFilter<>> init(const t_itr begin, const t_itr end, const d
 
     auto&& t = std::forward_as_tuple(args...);
     auto queries = std::get<0>(t);
+    if (range_size != -1) {
+        std::transform(queries.begin(), queries.end(), queries.begin(), [](auto x) {
+                auto [left, right, result] = x;
+                return std::tuple(left, left + range_size, result);
+            });
+    }
     auto model_queries = std::round(queries.size() * sample_rate);
     time_points['m'] = timer::now();
     DstFilter<BloomFilter<true>, true> dst_stat(dfs_diff, bfs_diff,
@@ -92,6 +101,10 @@ int main(int argc, char const *argv[]) {
     }
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
+
+    if (auto max_range_size = parser.present<int>("--range_size")) {
+        range_size = *max_range_size;
+    }
 
     experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size),
                wio.GetIntQueries());
