@@ -896,7 +896,6 @@ void wiredtiger_bench(argparse::ArgumentParser& parser) {
 
         cur_n_keys *= 2;
     }
-    wio.Flush();
 }
 
 
