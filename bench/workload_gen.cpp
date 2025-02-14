@@ -717,6 +717,190 @@ void construction_bench(argparse::ArgumentParser& parser) {
 }
 
 
+template <typename T>
+static uint64_t turn_zero_bytes_to_ones(T val) {
+    for (uint32_t j = 0; j < sizeof(val); j++) {
+        if ((val >> (8 * j)) % 256 == 0)
+            val |= 1ULL << (8 * j);
+    }
+    return val;
+}
+
+
+void wiredtiger_bench(argparse::ArgumentParser& parser) {
+    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
+    uint32_t kdist_ind = 0, qdist_ind = 0;
+    auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
+    auto [query_dist, query_dist_mu, query_dist_std] = get_qdist(parser, qdist_ind);
+
+    const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
+    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
+    const uint64_t seed = parser.get<uint64_t>("--seed");
+    std::mt19937_64 rng(seed);
+
+    std::set<uint64_t> keys;
+    if (key_dist == "unif")
+        keys = generate_int_keys_uniform(n_keys, rng);
+    else if (key_dist == "norm")
+        keys = generate_int_keys_normal(n_keys, key_dist_mu, key_dist_std, rng);
+    else
+        keys = read_data_binary<uint64_t>(key_file);
+    std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+
+    for (uint32_t i = 0; i < keys_vec.size(); i++)
+        keys_vec[i] = turn_zero_bytes_to_ones(keys_vec[i]);
+    std::sort(keys_vec.begin(), keys_vec.end());
+
+    const uint32_t n_expansions = parser.get<uint64_t>("--n-expansions");
+    std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+    uint32_t cur_n_keys = n_keys >> n_expansions;
+    std::sort(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
+    keys = std::set<uint64_t>(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
+
+    {
+        std::vector<uint64_t> init_keys_vec = {keys_vec.begin(), keys_vec.begin() + cur_n_keys};
+
+        wio.Bulk(init_keys_vec);
+        wio.ResetDB();
+
+        wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
+        if (query_dist == "unif") {
+            std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = turn_zero_bytes_to_ones(dist(rng));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "norm") {
+            std::normal_distribution<long double> dist(query_dist_mu, query_dist_std);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = turn_zero_bytes_to_ones(static_cast<uint64_t>(dist(rng)));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "corr") {
+            const double corr_deg = parser.get<double>("--corr-degree");
+            const uint64_t corr_distance = static_cast<uint64_t>(std::min(std::pow(2.0, 64 * (1 - corr_deg)),
+                                                                 std::pow(2.0, 64)));
+            std::uniform_int_distribution<uint64_t> picker(0, n_keys);
+            std::uniform_int_distribution<uint64_t> corr_distance_dist(1, corr_distance);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint32_t picked = picker(rng);
+                const uint64_t query_size = query_size_dist(rng);
+                const uint64_t distance = corr_distance_dist(rng);
+                if (keys_vec[picked] < distance + query_size - 1)
+                    continue;
+                uint64_t r_key = keys_vec[picked] - distance;
+                uint64_t l_key = r_key - query_size + 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else 
+            throw std::runtime_error("Invalid query distribution type for this benchmark");
+        wio.Timer('q');
+        wio.Flush();
+    }
+
+    for (int32_t expansion = 0; expansion < n_expansions; expansion++) {
+        const uint32_t n_inserts = cur_n_keys;
+        const uint32_t pos = cur_n_keys;
+        std::sort(keys_vec.begin() + pos, keys_vec.begin() + pos + n_inserts);
+
+        wio.ResetDB();
+        wio.Timer('i');
+        for (uint32_t i = pos; i < pos + n_inserts; i++) {
+            wio.Insert(keys_vec[i]);
+            keys.insert(keys_vec[i]);
+        }
+        wio.Timer('i');
+
+        wio.ResetDB();
+        wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
+        if (query_dist == "unif") {
+            std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = turn_zero_bytes_to_ones(dist(rng));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "norm") {
+            std::normal_distribution<long double> dist(query_dist_mu, query_dist_std);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = turn_zero_bytes_to_ones(static_cast<uint64_t>(dist(rng)));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "corr") {
+            const double corr_deg = parser.get<double>("--corr-degree");
+            const uint64_t corr_distance = static_cast<uint64_t>(std::min(std::pow(2.0, 64 * (1 - corr_deg)),
+                                                                 std::pow(2.0, 64)));
+            std::uniform_int_distribution<uint64_t> picker(0, pos + n_inserts - 1);
+            std::uniform_int_distribution<uint64_t> corr_distance_dist(1, corr_distance);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint32_t picked = picker(rng);
+                const uint64_t query_size = query_size_dist(rng);
+                const uint64_t distance = corr_distance_dist(rng);
+                if (keys_vec[picked] < distance + query_size - 1)
+                    continue;
+                uint64_t r_key = keys_vec[picked] - distance;
+                uint64_t l_key = r_key - query_size + 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else 
+            throw std::runtime_error("Invalid query distribution type for this benchmark");
+        wio.Timer('q');
+        wio.Flush();
+        std::cout << std::endl;
+
+        cur_n_keys *= 2;
+    }
+    wio.Flush();
+}
+
+
 std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> benches = {
     {"correlated", correlated_bench},
     {"standard-int", standard_int_bench},
@@ -725,6 +909,7 @@ std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> 
     {"expansion", expansion_bench},
     {"delete", delete_bench},
     {"construction", construction_bench},
+    {"wiredtiger", wiredtiger_bench},
 };
 
 int main(int argc, char const *argv[]) {

@@ -7,13 +7,13 @@ global workload_dir
 global benchmarks_dir
 global output_prefix
 
-def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None):
-    if force_range_size:
-        command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} --range_size {force_range_size} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
-        print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} --range_size {force_range_size} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
-    else:
-        command = f"{build_dir}/bench/bench_{filter} {bpk} -w {workload} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
-        print(f"[ Executing: <build_dir>/bench/bench_{filter} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json ]")
+def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False):
+    file_to_execute = f"bench/bench_{filter}_wiredtiger" if wiredtiger else f"bench/bench_{filter}"
+    range_size_option = f"--range_size {force_range_size}" if force_range_size else ""
+    command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
+    cli_message_command = f"<build_dir>/{file_to_execute} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} {range_size_option} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json"
+
+    print(f"[ Executing: {cli_message_command} ]")
     subprocess.run(command, shell=True)
     print("[ Command finished ]")
 
@@ -93,7 +93,7 @@ def expansion_bench():
         if workload.is_file() and "unif" in workload.name:
             for filter, bpk in itertools.product(filters, memory_footprints):
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
-                                  filter, bpk - (1 if "steroids" in filter else 0))
+                                  filter, bpk - (2 if "steroids" in filter else 0))
 
 def delete_bench():
     #filters = ["steroids", "steroids_int", "memento", "snarf"]
@@ -123,6 +123,20 @@ def construction_bench():
             for filter, bpk in itertools.product(filters, memory_footprints):
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
+def wiredtiger_bench():
+    filters = ["steroids"]
+    memory_footprints = [16]
+    workload_subdir = "wiredtiger_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if workload.is_file():
+            for filter, bpk in itertools.product(filters, memory_footprints):
+                execute_benchmark(build_dir, output_base, workload_subdir, workload,
+                                  filter, bpk - (2 if "steroids" in filter else 0),
+                                  wiredtiger=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="run_benchmarks")
@@ -147,8 +161,9 @@ if __name__ == "__main__":
         #fpr_bench()
         #true_bench()
         #construction_bench()
-        expansion_bench()
+        #expansion_bench()
         #delete_bench()
+        wiredtiger_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
         shutil.rmtree(output_prefix)

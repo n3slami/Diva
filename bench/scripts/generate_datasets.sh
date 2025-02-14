@@ -134,6 +134,11 @@ generate_construction_bench() {
     done
 }
 
+generate_wiredtiger_bench() {
+    short=$(echo 2 ^ 10 | bc)
+    n_expansions=6
+    $WORKLOAD_GEN_PATH -t wiredtiger -n 2000000 -q 100000 -e $n_expansions --max-range-size $short -o unif_short
+}
 
 : '
 mkdir -p $OUT_PATH/corr_bench && cd $OUT_PATH/corr_bench || exit 1
@@ -170,7 +175,6 @@ if ! generate_delete_bench ; then
     exit 1
 fi
 echo "[!!] delete_bench generated"
-'
 
 mkdir -p $OUT_PATH/construction_bench && cd $OUT_PATH/construction_bench || exit 1
 if ! generate_construction_bench ; then
@@ -178,5 +182,13 @@ if ! generate_construction_bench ; then
     exit 1
 fi
 echo "[!!] construction_bench generated"
+'
+
+mkdir -p $OUT_PATH/wiredtiger_bench && cd $OUT_PATH/wiredtiger_bench || exit 1
+if ! generate_wiredtiger_bench ; then
+    echo "[!!] wiredtiger_bench generation failed"
+    exit 1
+fi
+echo "[!!] wiredtiger_bench generated"
 
 echo "[!!] success, all workloads generated"

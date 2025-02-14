@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <limits>
 #include <ostream>
+#include <random>
 #include <set>
 #include <vector>
 #include <iostream>
@@ -58,6 +59,18 @@ inline uint64_t stringToUint64(const std::string_view str_key) {
 inline bool has_suffix(const std::string_view str, const std::string_view suffix) {
     return str.size() >= suffix.size() &&
            str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+const uint64_t string_rng_seed = 1000;
+static std::mt19937_64 string_rng(string_rng_seed);
+static inline void generate_random_string(uint8_t *str, uint32_t len) {
+    uint32_t i;
+    uint64_t *word_str = reinterpret_cast<uint64_t *>(str);
+    for (i = 0; i + 8 <= len; i += 8)
+        word_str[i / 8] = std::max<uint64_t>(string_rng(), 1ULL);
+    for (; i < len; i++)
+        str[i] = std::max<uint8_t>(string_rng() % 256, 1U);
+    str[len] = '\0';
 }
 
 using timer = std::chrono::high_resolution_clock;
@@ -210,6 +223,7 @@ public:
         Delete,
         Query,
         Timer,
+        ResetDB,
         Flush
     };
 
@@ -348,6 +362,11 @@ public:
 
     void Flush() {
         WriteOpcode(opcode::Flush);
+    }
+
+
+    void ResetDB() {
+        WriteOpcode(opcode::ResetDB);
     }
 
 

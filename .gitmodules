@@ -22,3 +22,6 @@
 [submodule "bench/include/oasis"]
 	path = bench/include/oasis
 	url = git@github.com:Woooooow-Pro/Oasis-RangeFilter.git
+[submodule "bench/wiredtiger"]
+	path = bench/wiredtiger
+	url = https://github.com/wiredtiger/wiredtiger.git
