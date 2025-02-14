@@ -53,7 +53,7 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
     memory_budget = parser.get<double>("arg");
-    memory_to_disk_ratio = parser.get<double>("--memory_to_disk_ratio ");
+    memory_to_disk_ratio = parser.get<double>("--memory_to_disk_ratio");
     val_len = parser.get<int>("--val_len");
     read_workload(parser.get<std::string>("--workload"));
 

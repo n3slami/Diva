@@ -43,7 +43,7 @@
 static const std::vector<std::string> kdist_names = {"unif", "norm", "real"};
 static const std::vector<std::string> kdist_default = {"unif"};
 static const std::vector<std::string> qdist_names = {"unif", "norm", "real", "corr", "true"};
-static const std::vector<std::string> qdist_default = {"unif", "corr"};
+static const std::vector<std::string> qdist_default = {"unif"};
 
 uint64_t default_n_keys = 200'000'000;
 uint64_t default_n_deletes = 10'000'000;
@@ -720,7 +720,7 @@ void construction_bench(argparse::ArgumentParser& parser) {
 template <typename T>
 static uint64_t turn_zero_bytes_to_ones(T val) {
     for (uint32_t j = 0; j < sizeof(val); j++) {
-        if ((val >> (8 * j)) % 256 == 0)
+        if (((val >> (8 * j)) & 0xFF) == 0)
             val |= 1ULL << (8 * j);
     }
     return val;
@@ -761,7 +761,6 @@ void wiredtiger_bench(argparse::ArgumentParser& parser) {
         std::vector<uint64_t> init_keys_vec = {keys_vec.begin(), keys_vec.begin() + cur_n_keys};
 
         wio.Bulk(init_keys_vec);
-        wio.ResetDB();
 
         wio.Timer('q');
         std::cout << "Generating queries..." << std::endl;

@@ -137,7 +137,7 @@ generate_construction_bench() {
 generate_wiredtiger_bench() {
     short=$(echo 2 ^ 10 | bc)
     n_expansions=6
-    $WORKLOAD_GEN_PATH -t wiredtiger -n 2000000 -q 100000 -e $n_expansions --max-range-size $short -o unif_short
+    $WORKLOAD_GEN_PATH -t wiredtiger --qdist unif -e $n_expansions --max-range-size $short -o unif_short
 }
 
 : '

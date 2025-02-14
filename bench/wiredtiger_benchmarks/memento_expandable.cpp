@@ -83,6 +83,10 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     auto query_lengths = std::vector<uint64_t>(queries_temp.size());
     std::transform(queries_temp.begin(), queries_temp.end(), query_lengths.begin(), [](auto x) {
         auto [left, right, result] = x;
+        if (left > right) {
+            std::cerr << "fock left=" << left << " right=" << right << std::endl;
+            exit(1);
+        }
         return right - left + 1;
     });
     const uint64_t n_items = std::distance(begin, end);
@@ -174,7 +178,7 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
     memory_budget = parser.get<double>("arg");
-    memory_to_disk_ratio = parser.get<double>("--memory_to_disk_ratio ");
+    memory_to_disk_ratio = parser.get<double>("--memory_to_disk_ratio");
     val_len = parser.get<int>("--val_len");
     read_workload(parser.get<std::string>("--workload"));
 

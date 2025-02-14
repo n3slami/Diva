@@ -126,15 +126,17 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
     error_check(session->open_cursor(session, "table:access", NULL, NULL, &cursor));
     std::cerr << "[+] WiredTiger initialized" << std::endl;
 
-    uint64_t key_buf;
-    uint8_t val_buf[val_len];
+    uint8_t key_buf[sizeof(uint64_t) + 1], val_buf[val_len + 1];
+    memset(key_buf, 0, sizeof(uint64_t) + 1);
+    memset(val_buf, 0, val_len + 1);
 
     for (uint64_t key : initial_int_keys) {
-        key_buf = __builtin_bswap64(key);
+        const uint64_t key_swapped = __builtin_bswap64(key);
+        memcpy(key_buf, &key_swapped, sizeof(key_swapped));
         generate_random_string(val_buf, val_len);
-        insert_kv(cursor, reinterpret_cast<const uint8_t *>(&key_buf), val_buf);
+        insert_kv(cursor, reinterpret_cast<const uint8_t *>(key_buf), val_buf);
     }
-    
+
     uint32_t false_positives = 0, false_negatives = 0;
     time_points['c'] = timer::now();
     auto filter = init_f(initial_int_keys.begin(), initial_int_keys.end(), memory_budget, args...);
@@ -154,6 +156,18 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
         test_out.Clear();
     }
 
+    {
+        error_check(conn->close(conn, NULL)); /* Close all handles. */
+        current_buffer_pool_size_mb = compute_buffer_pool_size_mb(n_keys, size_f(filter));
+        sprintf(connection_config, "statistics=(all),direct_io=[data],cache_size=%ldMB", current_buffer_pool_size_mb);
+        error_check(wiredtiger_open(wt_home, NULL, connection_config, &conn));
+        error_check(conn->open_session(conn, NULL, NULL, &session));
+        error_check(session->open_cursor(session, "table:access", NULL, NULL, &cursor));
+        error_check(cursor->reset(cursor));
+        std::cerr << "[+] Set WiredTiger's initial buffer pool size to " << current_buffer_pool_size_mb << "MB" << std::endl;
+    }
+
+
     timer::time_point op_start_time = timer::now();
     while (!wio.Done()) {
         WorkloadIO::opcode opcode = wio.GetOpcode();
@@ -163,17 +177,19 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
             case WorkloadIO::opcode::Insert: {
                 const uint64_t new_key = wio.ReadValue<uint64_t>();
                 insert_f(filter, new_key);
-                key_buf = __builtin_bswap64(new_key);
+                const uint64_t key_swapped = __builtin_bswap64(new_key);
+                memcpy(key_buf, &key_swapped, sizeof(key_swapped));
                 generate_random_string(val_buf, val_len);
-                insert_kv(cursor, reinterpret_cast<const uint8_t *>(&key_buf), val_buf);
+                insert_kv(cursor, reinterpret_cast<const uint8_t *>(key_buf), val_buf);
                 n_keys++;
                 break;
             }
             case WorkloadIO::opcode::Delete: {
                 const uint64_t new_key = wio.ReadValue<uint64_t>();
                 delete_f(filter, new_key);
-                key_buf = __builtin_bswap64(new_key);
-                delete_kv(cursor, reinterpret_cast<const uint8_t *>(&key_buf));
+                const uint64_t key_swapped = __builtin_bswap64(new_key);
+                memcpy(key_buf, &key_swapped, sizeof(key_swapped));
+                delete_kv(cursor, reinterpret_cast<const uint8_t *>(key_buf));
                 n_keys--;
                 break;
             }
@@ -183,8 +199,8 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 if (filter_res) {
                     const uint64_t l_swapped = __builtin_bswap64(l);
                     const uint64_t r_swapped = __builtin_bswap64(r);
-                    fetch_range_from_db(cursor, reinterpret_cast<const uint8_t *>(l_swapped),
-                                                reinterpret_cast<const uint8_t *>(r_swapped));
+                    fetch_range_from_db(cursor, reinterpret_cast<const uint8_t *>(&l_swapped),
+                                                reinterpret_cast<const uint8_t *>(&r_swapped));
                 }
                 false_positives += filter_res & (!actual_res);
                 false_negatives += (!filter_res) & actual_res;

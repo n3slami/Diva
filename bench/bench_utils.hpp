@@ -340,6 +340,7 @@ public:
 
 
     void Query(ByteString& l_key, ByteString& r_key, bool res) {
+        assert(l_key <= r_key);
         WriteOpcode(opcode::Query);
         WriteByteString(l_key);
         WriteByteString(r_key);
@@ -347,6 +348,7 @@ public:
     }
 
     void Query(uint64_t l_key, uint64_t r_key, bool res) {
+        assert(l_key <= r_key);
         WriteOpcode(opcode::Query);
         WriteValue(l_key);
         WriteValue(r_key);
@@ -393,6 +395,8 @@ public:
                     dup_head++;
                     break;
                 case opcode::Flush:
+                    break;
+                case opcode::ResetDB:
                     break;
                 default:
                     dup_head += sizeof(uint64_t);
