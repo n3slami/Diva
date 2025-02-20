@@ -37,7 +37,7 @@ RANGE_FILTERS_STYLE_KWARGS = {"steroids_int": {"marker": 'v', "color": "fuchsia"
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "memento_expandable": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "grafite": {"marker": 'o', "color": "teal", "label": "Grafite"},
-                              "none": {"marker": 'x', "color": "dimgray", "zorder": 10, "label": "Baseline"},
+                              "base": {"marker": 'x', "color": "dimgray", "zorder": 10, "label": "Baseline"},
                               "snarf": {"marker": '^', "color": "black", "label": "SNARF"},
                               "oasis": {"marker": '+', "color": "darkkhaki", "label": "Oasis+"},
                               "surf": {"marker": 's', "color": "C2", "label": "SuRF"},
@@ -46,14 +46,14 @@ RANGE_FILTERS_STYLE_KWARGS = {"steroids_int": {"marker": 'v', "color": "fuchsia"
                               "rosetta": {"marker": 'd', "color": "C4", "label": "Rosetta"},
                               "rencoder": {"marker": '>', "color": "C5", "label": "REncoder"}}
 RANGE_FILTERS_HATCHES = {"steroids_int": '',
-                         "steroids": '.',
-                         "memento": '/',
-                         "memento_expandable": '/',
-                         "grafite": '\\',
+                         "steroids": '...',
+                         "memento": '///',
+                         "memento_expandable": '///',
+                         "grafite": '\\\\\\',
                          "none": '|',
-                         "snarf": '-',
-                         "oasis": '+',
-                         "surf": 'x',
+                         "snarf": '---',
+                         "oasis": '++++',
+                         "surf": 'xxx',
                          "proteus": 'o',
                          "rosetta": 'O',
                          "rencoder": '*'}
@@ -66,8 +66,10 @@ DATASET_NAMES = {"unif": r"$\textsc{Uniform}$",
                  "osm": r"$\textsc{OSM}$",
                  "fb": r"$\textsc{FB}$"}
 RANGE_LENGTH_NAMES = {"point": "Point",
-                      "short": "Range ($R \\leq 2^{10}$)",
-                      "long": "Range ($R \\leq 2^{20}$)"}
+                      "short": "Range ($R=2^{10}$)",
+                      "long": "Range ($R=2^{20}$)"}
+RANGE_LENGTH_TAGS = {"short": "$R=2^{10}$",
+                     "long": "$R=2^{20}$"}
 
 
 def fix_file_contents(contents):
@@ -135,7 +137,7 @@ def plot_fpr(result_dir, output_dir):
         axes[i][0].set_ylabel(f"FPR", fontsize=YLABEL_FONT_SIZE)
         axes[i][-1].set_ylabel(f"{memory_footprint} BPK", fontsize=YLABEL_FONT_SIZE)
         axes[i][-1].yaxis.set_label_position("right")
-    axes[-1][0].set_ylabel(f"Time [ns/query]", fontsize=YLABEL_FONT_SIZE)
+    axes[-1][0].set_ylabel(f"$\\;\\;$Query\\\\Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
     axes[-1][-1].set_ylabel(f"{memory_footprints[-1]} BPK", fontsize=YLABEL_FONT_SIZE)
     axes[-1][-1].yaxis.set_label_position("right")
     for j in range(len(workloads)):
@@ -207,7 +209,7 @@ def plot_fpr_string(result_dir, output_dir):
         axes[i][0].set_ylabel(DATASET_NAMES[workload] + "\nFPR", fontsize=YLABEL_FONT_SIZE)
         axes[i][1].yaxis.set_label_position("right")
         axes[i][1].yaxis.tick_right()
-        axes[i][1].set_ylabel("Time [ns/query]", fontsize=YLABEL_FONT_SIZE)
+        axes[i][1].set_ylabel("$\\;\\;$Query\\\\Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
     for i in range(2):
         axes[-1][i].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
     for ax in list(axes.flatten()):
@@ -215,8 +217,6 @@ def plot_fpr_string(result_dir, output_dir):
         ax.autoscale_view()
         ax.margins(0.04)
         ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
-    axes[0][0].set_title("FPR", fontsize=TITLE_FONT_SIZE)
-    axes[0][1].set_title("Query Time", fontsize=TITLE_FONT_SIZE)
     for i in range(len(workloads)):
         axes[i][0].set_yscale("log")
         axes[i][0].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
@@ -229,7 +229,7 @@ def plot_fpr_string(result_dir, output_dir):
     fig.subplots_adjust(wspace=0.1)
 
     legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
-    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.75, 1.425),
+    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.75, 1.275),
                       fancybox=True, shadow=False, ncol=5, fontsize=LEGEND_FONT_SIZE)
     fig.savefig(output_dir / "fpr_string.pdf", bbox_inches='tight', pad_inches=0.01)
 
@@ -299,9 +299,9 @@ def plot_true(result_dir, output_dir):
     LEGEND_FONT_SIZE = 8
     YLABEL_FONT_SIZE = 11.5
     XLABEL_FONT_SIZE = 11.5
-    WIDTH = 5
-    HEIGHT = 2
-    YTICKS = [1e5, 1e4, 1e3, 1e2]
+    WIDTH = 3.5
+    HEIGHT = 1.5
+    YTICKS = [1e6, 1e5, 1e4, 1e3, 1e2]
 
     WORKLOAD = "unif"
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
@@ -329,11 +329,11 @@ def plot_true(result_dir, output_dir):
         for filter in filters:
             axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
 
-    title = DATASET_NAMES[WORKLOAD if WORKLOAD != "real" else "books"] + "\nTime [ns/query]" 
+    title = DATASET_NAMES[WORKLOAD if WORKLOAD != "real" else "books"] + "\nQuery Latency [ns/op]" 
     axes[0].set_ylabel(title, fontsize=YLABEL_FONT_SIZE)
     for i, range_size in enumerate(range_sizes):
         axes[i].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
-        axes[i].set_title(RANGE_LENGTH_NAMES[range_size], fontsize=TITLE_FONT_SIZE)
+        axes[i].text(9.5, 4e5, RANGE_LENGTH_TAGS[range_size], fontsize=XLABEL_FONT_SIZE)
     for ax in axes.flatten():
         ax.set_xlim(left=min(memory_footprints) - 1, right=max(memory_footprints) + 1)
         ax.set_yscale('log')
@@ -343,9 +343,9 @@ def plot_true(result_dir, output_dir):
         ax.set_yticks(YTICKS)
     fig.subplots_adjust(wspace=0.1)
 
-    legend_lines, legend_labels = axes[1].get_legend_handles_labels()
-    axes[1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-1.495, 1.45),
-                   fancybox=True, shadow=False, ncol=5, fontsize=LEGEND_FONT_SIZE)
+    legend_lines, legend_labels = axes[0].get_legend_handles_labels()
+    axes[1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(1.025, 1.25),
+                   fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
     fig.savefig(output_dir / "true.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
@@ -359,8 +359,8 @@ def plot_construction(result_dir, output_dir):
     BARW = 0.1
     ALPHA = 0.7
     ALPHA_MODELING = 0.25
-    PATTERN_DENSITY = 4
-    matplotlib.rcParams["hatch.linewidth"] = 0.2
+    PATTERN_DENSITY = 2
+    matplotlib.rcParams["hatch.linewidth"] = 0.3
 
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
@@ -415,9 +415,13 @@ def plot_expansion(result_dir, output_dir):
     WIDTH = 3.5
     HEIGHT = 3.5
     FRAC_EXPANSION_COUNT = 4
-    MEMORY_FOOTPRINT = 20
-    XTICKS = list(range(7))
+    MEMORY_FOOTPRINT = 16
+    N_EXPANSIONS = 6
+    XTICK_FONT_SIZE = 9
+    XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
+    XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
+    YTICKS_MEMORY = [15, 20, 25, 30, 35]
 
     filters = ["steroids", "steroids_int", "memento_expandable", "rosetta", "rencoder", "snarf"]
     range_sizes = ["short", "long"]
@@ -427,7 +431,7 @@ def plot_expansion(result_dir, output_dir):
     plot_data = [{filter: [] for filter in filters} for _ in range(len(range_sizes) + 2)]
     for i, range_size in enumerate(range_sizes):
         for filter in filters:
-            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT}_unif_{range_size}.json")
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if 'steroids' in filter else 0)}_unif_{range_size}.json")
             if not file_path.is_file():
                 continue
             with open(file_path, 'r') as result_file:
@@ -437,11 +441,12 @@ def plot_expansion(result_dir, output_dir):
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
                 for j, entry in enumerate(result[1:]):
-                    plot_data[i][filter].append([j / FRAC_EXPANSION_COUNT, entry["fpr"]])
-                    plot_data[2][filter].append([j / FRAC_EXPANSION_COUNT, entry["bpk"]])
+                    current_dataset_fraction = 2 ** (j // FRAC_EXPANSION_COUNT - N_EXPANSIONS) * (j % FRAC_EXPANSION_COUNT + 1)
+                    plot_data[i][filter].append([current_dataset_fraction, entry["fpr"]])
+                    plot_data[2][filter].append([current_dataset_fraction, entry["bpk"]])
                     if "time_i" in entry:
                         n_inserts = entry["n_keys"] - result[j]["n_keys"]
-                        plot_data[3][filter].append([j / FRAC_EXPANSION_COUNT, entry["time_i"] * 1e6 / n_inserts])
+                        plot_data[3][filter].append([2 ** (j / FRAC_EXPANSION_COUNT - N_EXPANSIONS), entry["time_i"] * 1e6 / n_inserts])
     for filter in filters:
         plot_data[0][filter] = plot_data[0][filter][:-1]
         plot_data[1][filter] = plot_data[1][filter][:-1]
@@ -453,8 +458,6 @@ def plot_expansion(result_dir, output_dir):
                 plot_data[i][filter] = plot_data[i][filter][:len(plot_data[i][filter]) // 2]
     for i in range(len(range_sizes) + 2):
         for filter in filters:
-            tmp_kwargs = deepcopy(RANGE_FILTERS_STYLE_KWARGS[filter])
-            tmp_kwargs["marker"] = ""
             tmp_plot_data = list(zip(*plot_data[i][filter]))
             if i >= len(range_sizes):
                 if filter == "memento_expandable" or (filter in ["rosetta", "rencoder"] and i == 2):
@@ -464,10 +467,12 @@ def plot_expansion(result_dir, output_dir):
             elif len(tmp_plot_data) > 0:
                 axes[0][i].plot(tmp_plot_data[0][::2], tmp_plot_data[1][::2], **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
 
+    for ax in axes.flatten():
+        ax.set_xscale("log")
+        ax.minorticks_off()
+        ax.set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
     for i in range(2):
-        axes[1][i].set_xlabel("\\# of Expansions", fontsize=XLABEL_FONT_SIZE)
-        axes[0][i].set_xticks(XTICKS)
-        axes[1][i].set_xticks(XTICKS)
+        axes[1][i].set_xlabel("Dataset Fraction", fontsize=XLABEL_FONT_SIZE)
     for i, j in ((0, 0), (0, 1), (1, 1)):
         if i == 0:
             axes[i][j].set_yscale("log")
@@ -477,26 +482,24 @@ def plot_expansion(result_dir, output_dir):
             axes[i][j].set_yscale("log")
         axes[i][j].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs="auto"))
     axes[1][0].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
-    axes[1][0].set_ylim(bottom=15, top=35)
+    axes[1][0].set_ylim(bottom=13, top=35)
+    axes[1][0].set_yticks(YTICKS_MEMORY)
 
-    axes[0][0].set_title(RANGE_LENGTH_NAMES[range_sizes[0]], fontsize=TITLE_FONT_SIZE)
+    axes[0][0].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[0]], fontsize=XLABEL_FONT_SIZE)
     axes[0][0].set_ylabel("FPR", fontsize=YLABEL_FONT_SIZE)
 
-    axes[0][1].set_title(RANGE_LENGTH_NAMES[range_sizes[1]], fontsize=TITLE_FONT_SIZE)
+    axes[0][1].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[1]], fontsize=XLABEL_FONT_SIZE)
     axes[0][1].set_yticklabels([])
 
-    axes[1][0].set_title("Space", fontsize=TITLE_FONT_SIZE)
-    axes[1][0].set_ylabel("BPK", fontsize=TITLE_FONT_SIZE)
-
-    axes[1][1].set_title("Inserts", fontsize=TITLE_FONT_SIZE)
+    axes[1][0].set_ylabel("Space [BPK]", fontsize=YLABEL_FONT_SIZE)
     axes[1][1].yaxis.set_label_position("right")
     axes[1][1].yaxis.tick_right()
-    axes[1][1].set_ylabel("Time [ns/insert]", fontsize=YLABEL_FONT_SIZE)
+    axes[1][1].set_ylabel("Insert Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
 
     legend_lines, legend_labels = axes[1][1].get_legend_handles_labels()
-    axes[0][1].legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(1.0,0.975),
-                  fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
-    fig.subplots_adjust(hspace=0.25, wspace=0.1)
+    axes[0][1].legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(-1.075,1.35),
+                      fancybox=True, shadow=False, ncol=(len(filters) + 1) // 2, fontsize=LEGEND_FONT_SIZE)
+    fig.subplots_adjust(hspace=0.15, wspace=0.1)
     fig.savefig(output_dir / "expansion.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
@@ -504,8 +507,8 @@ def plot_delete(result_dir, output_dir):
     LEGEND_FONT_SIZE = 7
     YLABEL_FONT_SIZE = 9.5
     XLABEL_FONT_SIZE = 9.5
-    WIDTH = 1.6
-    HEIGHT = 1.5
+    WIDTH = 1.8
+    HEIGHT = 1.7
 
     filters = ["steroids", "steroids_int", "memento", "snarf"]
     range_sizes = ["short", "long"]
@@ -537,7 +540,7 @@ def plot_delete(result_dir, output_dir):
 
     ax.set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
     ax.set_xticks(memory_footprints)
-    ax.set_ylabel("Time [ns/delete]", fontsize=YLABEL_FONT_SIZE)
+    ax.set_ylabel("Delete Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
     ax.set_ylim(bottom=-0.0000003)
     ax.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1000))
 
@@ -547,13 +550,62 @@ def plot_delete(result_dir, output_dir):
     fig.savefig(output_dir / "delete.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
+def plot_wiredtiger(result_dir, output_dir):
+    LEGEND_FONT_SIZE = 7
+    TITLE_FONT_SIZE = 9.5
+    YLABEL_FONT_SIZE = 9.5
+    XLABEL_FONT_SIZE = 9.5
+    WIDTH = 1.8
+    HEIGHT = 1.7
+    N_EXPANSIONS = 6
+    XTICK_FONT_SIZE = 9
+    XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
+    XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
+
+    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    RANGE_SIZE = "short"
+    MEMORY_FOOTPRINT = 16
+    workload_subdir = Path("wiredtiger_bench")
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, HEIGHT))
+    plot_data = {filter: [] for filter in filters}
+    for filter in filters:
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if 'steroids' in filter else 0)}_unif_{RANGE_SIZE}.json")
+        if not file_path.is_file():
+            continue
+        with open(file_path, 'r') as result_file:
+            contents = result_file.read()
+            if len(contents) == 0:
+                continue
+            json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+            result = json.loads(json_string)
+            for i, entry in enumerate(result[1:]):
+                plot_data[filter].append([2 ** (i - N_EXPANSIONS), entry["time_q"] * 1e6 / entry["n_queries"]])
+    for filter in filters:
+        ax.plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    ax.set_xlabel("Dataset Fraction", fontsize=XLABEL_FONT_SIZE)
+    ax.set_xscale("log")
+    ax.minorticks_off()
+    ax.set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
+    ax.set_ylabel("$\\;\\;\\;$End-to-End\\\\Query Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
+    ax.set_yscale("log")
+    ax.text(0.25, 200, RANGE_LENGTH_TAGS[RANGE_SIZE], fontsize=XLABEL_FONT_SIZE)
+
+    legend_lines, legend_labels = ax.get_legend_handles_labels()
+    ax.legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(1.0,0.8),
+              fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
+    fig.savefig(output_dir / "wiredtiger.pdf", bbox_inches='tight', pad_inches=0.01)
+
+
 PLOTTERS = {"fpr": plot_fpr,
             "fpr_string": plot_fpr_string,
             "fpr_memory": plot_fpr_memory,
             "true": plot_true,
             "construction": plot_construction,
             "expansion": plot_expansion,
-            "delete": plot_delete}
+            "delete": plot_delete,
+            "wiredtiger": plot_wiredtiger}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='BenchResultPlotter')
