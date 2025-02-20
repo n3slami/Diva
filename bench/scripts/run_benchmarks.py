@@ -36,7 +36,7 @@ def fpr_bench():
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     # filters = ["memento", "rosetta"]
-    memory_footprints = [8, 10, 12]
+    memory_footprints = [10, 16]
     MEDIAN_RANGE_SIZE = 2 ** 7
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -53,9 +53,20 @@ def fpr_bench():
                 else:
                     execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
+    memory_footprints = [8, 10, 12, 14, 16, 18]
+    for workload in workload_path.iterdir():
+        if (workload.is_file() and "string" not in workload.name) and ("unif" in workload.name or "osm" in workload.name):
+            for filter, bpk in itertools.product(filters, memory_footprints):
+                if filter == "oasis" and "osm" in workload.name:
+                    continue
+                if filter in ["memento", "rosetta", "proteus"]:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, MEDIAN_RANGE_SIZE)
+                else:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+
 def fpr_string_bench():
     filters = ["steroids", "surf"]
-    memory_footprints = [14, 16, 18, 20]
+    memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -96,18 +107,21 @@ def expansion_bench():
                                   filter, bpk - (2 if "steroids" in filter else 0))
 
 def delete_bench():
-    #filters = ["steroids", "steroids_int", "memento", "snarf"]
-    filters = ["memento"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
+    filters = ["steroids", "steroids_int", "memento_expandable", "snarf"]
+    memory_footprints = [16]
     workload_subdir = "delete_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
+    MEMENTO_RANGE_SIZE = 2 ** 10
 
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
         if workload.is_file():
             for filter, bpk in itertools.product(filters, memory_footprints):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+                if filter == "memento_expandable":
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, MEMENTO_RANGE_SIZE)
+                else:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def construction_bench():
     filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
@@ -124,7 +138,7 @@ def construction_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def wiredtiger_bench():
-    filters = ["steroids"]
+    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
     memory_footprints = [16]
     workload_subdir = "wiredtiger_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -156,13 +170,13 @@ if __name__ == "__main__":
     output_prefix = Path(f"results/{datetime.now().strftime('%Y-%m-%d.%H:%M:%S')}")
 
     try:
-        #corr_bench()
-        #fpr_string_bench()
-        #fpr_bench()
-        #true_bench()
-        #construction_bench()
-        #expansion_bench()
-        #delete_bench()
+        corr_bench()
+        fpr_string_bench()
+        fpr_bench()
+        true_bench()
+        construction_bench()
+        expansion_bench()
+        delete_bench()
         wiredtiger_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
