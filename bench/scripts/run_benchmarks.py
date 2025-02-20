@@ -78,8 +78,9 @@ def fpr_string_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def true_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    #filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["steroids", "steroids_int"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = "true_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -92,8 +93,9 @@ def true_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def expansion_bench():
-    filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
-               "rencoder", "snarf"]
+    #filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
+    #           "rencoder", "snarf"]
+    filters = ["memento_expandable"]
     memory_footprints = [16]
     workload_subdir = "expansion_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -124,8 +126,9 @@ def delete_bench():
                     execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def construction_bench():
-    filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
-               "memento", "steroids", "steroids_int", "grafite"]
+    #filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
+    #           "memento", "steroids", "steroids_int", "grafite"]
+    filters = ["steroids", "steroids_int"]
     memory_footprints = [16]
     workload_subdir = "construction_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -148,9 +151,9 @@ def wiredtiger_bench():
     for workload in workload_path.iterdir():
         if workload.is_file():
             for filter, bpk in itertools.product(filters, memory_footprints):
+                remove_amount = 1 if "steroids" in filter else 0
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
-                                  filter, bpk - (2 if "steroids" in filter else 0),
-                                  wiredtiger=True)
+                                  filter, bpk - remove_amount, wiredtiger=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="run_benchmarks")
