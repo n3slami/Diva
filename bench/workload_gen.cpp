@@ -644,10 +644,12 @@ void expansion_bench(argparse::ArgumentParser& parser) {
 
 void delete_bench(argparse::ArgumentParser& parser) {
     WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
-    uint32_t kdist_ind = 0;
+    uint32_t kdist_ind = 0, qdist_ind = 0;
     auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
+    auto [query_dist, query_dist_mu, query_dist_std] = get_qdist(parser, qdist_ind);
 
     const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
+    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     const uint64_t seed = parser.get<uint64_t>("--seed");
     std::mt19937_64 rng(seed);
 
@@ -659,38 +661,70 @@ void delete_bench(argparse::ArgumentParser& parser) {
     else
         keys = read_data_binary<uint64_t>(key_file);
     std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
-    wio.Bulk(keys_vec);
-    std::vector<bool> is_deleted(keys.size(), false);
+    uint32_t perm[keys_vec.size()];
+    for (uint32_t i = 0; i < keys_vec.size(); i++)
+        perm[i] = i;
 
-    std::vector<uint64_t> deleted_keys;
     const uint32_t n_deletes = parser.get<uint64_t>("--n-deletes");
-    wio.Timer('d');
-    std::uniform_int_distribution<uint32_t> op_dist(0, 2);
-    std::cout << "Generating deletes..." << std::endl;
-    for (uint32_t i = 0; i < n_deletes;) {
-        if (op_dist(rng) == 2 && !deleted_keys.empty()) {     // Insert
-            uint32_t insertee_ind = rng() % deleted_keys.size();
-            const uint64_t insertee = deleted_keys[insertee_ind];
-            wio.Insert(insertee);
-            is_deleted[std::lower_bound(keys_vec.begin(), keys_vec.end(), insertee) - keys_vec.begin()] = false;
-            std::swap(deleted_keys[insertee_ind], deleted_keys[deleted_keys.size() - 1]);
-            deleted_keys.pop_back();
-        }
-        else {                                               // Delete
-            uint32_t victim_ind;
-            do {
-                victim_ind = rng() % n_keys;
-            } while (is_deleted[victim_ind]);
-            uint64_t victim = keys_vec[victim_ind];
-            wio.Delete(victim);
-            is_deleted[victim_ind] = true;
-            deleted_keys.push_back(victim);
-            i++;
+    const uint32_t n_expansions = parser.get<uint64_t>("--n-expansions");
+    std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+    uint32_t cur_n_keys = n_keys >> n_expansions;
+    std::sort(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
+
+    {
+        std::vector<uint64_t> init_keys_vec = {keys_vec.begin(), keys_vec.begin() + cur_n_keys};
+
+        wio.Bulk(init_keys_vec);
+
+        wio.Timer('d');
+        std::cout << "Generating deletes..." << std::endl;
+        std::shuffle(perm, perm + cur_n_keys, rng);
+        for (uint32_t i = 0; i < n_deletes; i++) {
+            wio.Delete(keys_vec[perm[i]]);
             print_progress(1.0 * i / n_deletes);
         }
+        wio.Timer('d');
+        wio.Flush();
+        std::cout << std::endl;
+
+        std::cout << "Reinserting deleted keys..." << std::endl;
+        for (uint32_t i = 0; i < n_deletes; i++) {
+            wio.Insert(keys_vec[perm[i]]);
+            print_progress(1.0 * i / n_deletes);
+        }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
-    wio.Timer('d');
+
+    for (int32_t expansion = 0; expansion < n_expansions; expansion++) {
+        const uint32_t n_inserts = cur_n_keys;
+
+        std::cout << "Inserting new keys..." << std::endl;
+        for (uint32_t i = cur_n_keys; i < 2 * cur_n_keys; i++) {
+            wio.Insert(keys_vec[i]);
+            print_progress(1.0 * (i - cur_n_keys) / cur_n_keys);
+        }
+        std::cout << std::endl;
+
+        wio.Timer('d');
+        std::cout << "Generating deletes..." << std::endl;
+        std::shuffle(perm, perm + cur_n_keys, rng);
+        for (uint32_t i = 0; i < n_deletes; i++) {
+            wio.Delete(keys_vec[perm[i]]);
+            print_progress(1.0 * i / n_deletes);
+        }
+        wio.Timer('d');
+        wio.Flush();
+        std::cout << std::endl;
+
+        std::cout << "Reinserting deleted keys..." << std::endl;
+        for (uint32_t i = 0; i < n_deletes; i++) {
+            wio.Insert(keys_vec[perm[i]]);
+            print_progress(1.0 * i / n_deletes);
+        }
+        std::cout << std::endl;
+
+        cur_n_keys *= 2;
+    }
     wio.Flush();
 }
 
@@ -952,13 +986,14 @@ int main(int argc, char const *argv[]) {
             .nargs(1)
             .required()
             .scan<'u', uint64_t>()
-            .default_value(static_cast<uint64_t>(1));
+            .default_value(range_size_min);
 
     parser.add_argument("--max-range-size")
             .help("The maximum accepted length of a range query")
             .nargs(1)
             .required()
-            .scan<'u', uint64_t>();
+            .scan<'u', uint64_t>()
+            .default_value(range_size_max);
 
     parser.add_argument("--string-lens")
             .help("The lengths of the strings to be generated (chosen uniformly at random, can have duplicates)")

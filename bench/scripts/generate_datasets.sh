@@ -111,16 +111,9 @@ generate_delete_bench() {
     long=$(echo 2 ^ 20 | bc)
     norm_mu=$(echo 2 ^ 63 | bc)
     norm_std=$(echo 2 ^ 50 | bc)
-    n_deletes=10000000
+    n_deletes=100000
 
-    $WORKLOAD_GEN_PATH -t delete -d $n_deletes --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t delete -d $n_deletes --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $short -o norm_short
-    $WORKLOAD_GEN_PATH -t delete --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -d $n_deletes --max-range-size $long -o norm_long
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o books_short
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o books_long
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $short -o osm_short
-    $WORKLOAD_GEN_PATH -t delete --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -d $n_deletes --max-range-size $long -o osm_long
+    $WORKLOAD_GEN_PATH -t delete -d $n_deletes -o unif
 }
 
 generate_construction_bench() {
@@ -168,6 +161,7 @@ if ! generate_expansion_bench ; then
     exit 1
 fi
 echo "[!!] expansion_bench generated"
+'
 
 mkdir -p $OUT_PATH/delete_bench && cd $OUT_PATH/delete_bench || exit 1
 if ! generate_delete_bench ; then
@@ -176,13 +170,13 @@ if ! generate_delete_bench ; then
 fi
 echo "[!!] delete_bench generated"
 
+: '
 mkdir -p $OUT_PATH/construction_bench && cd $OUT_PATH/construction_bench || exit 1
 if ! generate_construction_bench ; then
     echo "[!!] construction_bench generation failed"
     exit 1
 fi
 echo "[!!] construction_bench generated"
-'
 
 mkdir -p $OUT_PATH/wiredtiger_bench && cd $OUT_PATH/wiredtiger_bench || exit 1
 if ! generate_wiredtiger_bench ; then
@@ -191,4 +185,5 @@ if ! generate_wiredtiger_bench ; then
 fi
 echo "[!!] wiredtiger_bench generated"
 
+'
 echo "[!!] success, all workloads generated"
