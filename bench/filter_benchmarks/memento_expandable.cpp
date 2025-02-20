@@ -89,8 +89,8 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     const uint64_t seed = 1380;
     const uint64_t max_range_size = query_lengths.empty() ? 0
                                         : *std::max_element(query_lengths.begin(), query_lengths.end());
-    const double load_factor = 0.95;
-    const uint64_t n_slots = n_items / load_factor + std::sqrt(n_items);
+    const double load_factor = 0.945;
+    const uint64_t n_slots = n_items / load_factor;
     uint32_t memento_bits = 1;
     if (predef_memento_size == -1) {
         while ((1ULL << memento_bits) < max_range_size)
@@ -99,7 +99,7 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     }
     else 
         memento_bits = predef_memento_size;
-    const uint32_t fingerprint_size = round(bpk * load_factor - memento_bits - 2.125);
+    const uint32_t fingerprint_size = round(bpk * load_factor - memento_bits - 3.125);
     uint32_t key_size = 0;
     while ((1ULL << key_size) <= n_slots)
         key_size++;
@@ -139,13 +139,15 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
 inline void insert(QF *f, uint64_t key) {
     uint64_t prefix = key >> f->metadata->memento_bits;
     uint64_t memento = key & ((1ULL << f->metadata->memento_bits) - 1);
-    qf_insert_single(f, prefix, memento, QF_NO_LOCK);
+    const int res = qf_insert_single(f, prefix, memento, QF_NO_LOCK);
+    assert(res);
 }
 
 inline void del(QF *f, uint64_t key) {
     uint64_t prefix = key >> f->metadata->memento_bits;
     uint64_t memento = key & ((1ULL << f->metadata->memento_bits) - 1);
-    qf_delete_single(f, prefix, memento, QF_NO_LOCK);
+    const int res = qf_delete_single(f, prefix, memento, QF_NO_LOCK);
+    assert(res == 0);
 }
 
 inline bool query(QF *f, uint64_t left, uint64_t right) {

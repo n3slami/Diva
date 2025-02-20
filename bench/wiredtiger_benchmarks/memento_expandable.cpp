@@ -143,13 +143,15 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
 inline void insert(QF *f, uint64_t key) {
     uint64_t prefix = key >> f->metadata->memento_bits;
     uint64_t memento = key & ((1ULL << f->metadata->memento_bits) - 1);
-    qf_insert_single(f, prefix, memento, QF_NO_LOCK);
+    const int res = qf_insert_single(f, prefix, memento, QF_NO_LOCK);
+    assert(res == 0);
 }
 
 inline void del(QF *f, uint64_t key) {
     uint64_t prefix = key >> f->metadata->memento_bits;
     uint64_t memento = key & ((1ULL << f->metadata->memento_bits) - 1);
-    qf_delete_single(f, prefix, memento, QF_NO_LOCK);
+    const int res = qf_delete_single(f, prefix, memento, QF_NO_LOCK);
+    assert(res == 0);
 }
 
 inline bool query(QF *f, uint64_t left, uint64_t right) {

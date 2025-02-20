@@ -667,6 +667,7 @@ void delete_bench(argparse::ArgumentParser& parser) {
 
     const uint32_t n_deletes = parser.get<uint64_t>("--n-deletes");
     const uint32_t n_expansions = parser.get<uint64_t>("--n-expansions");
+    const float expansion_ratio = 2; // 1.954;
     std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
     uint32_t cur_n_keys = n_keys >> n_expansions;
     std::sort(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
@@ -696,18 +697,18 @@ void delete_bench(argparse::ArgumentParser& parser) {
     }
 
     for (int32_t expansion = 0; expansion < n_expansions; expansion++) {
-        const uint32_t n_inserts = cur_n_keys;
+        const uint32_t n_inserts = (expansion_ratio - 1) * cur_n_keys;
 
         std::cout << "Inserting new keys..." << std::endl;
-        for (uint64_t i = cur_n_keys; i < 2 * cur_n_keys; i++) {
-            wio.Insert(keys_vec[i]);
-            print_progress(1.0 * (i - cur_n_keys) / cur_n_keys);
+        for (uint64_t i = 0; i < n_inserts; i++) {
+            wio.Insert(keys_vec[cur_n_keys + i]);
+            print_progress(1.0 * i / cur_n_keys);
         }
         std::cout << std::endl;
 
         wio.Timer('d');
         std::cout << "Generating deletes..." << std::endl;
-        std::shuffle(perm.begin(), perm.begin() + 2 * cur_n_keys, rng);
+        std::shuffle(perm.begin(), perm.begin() + cur_n_keys + n_inserts, rng);
         for (uint32_t i = 0; i < n_deletes; i++) {
             wio.Delete(keys_vec[perm[i]]);
             print_progress(1.0 * i / n_deletes);
@@ -723,7 +724,7 @@ void delete_bench(argparse::ArgumentParser& parser) {
         }
         std::cout << std::endl;
 
-        cur_n_keys *= 2;
+        cur_n_keys += n_inserts;
     }
     wio.Flush();
 }
