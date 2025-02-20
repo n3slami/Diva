@@ -111,7 +111,7 @@ generate_delete_bench() {
     long=$(echo 2 ^ 20 | bc)
     norm_mu=$(echo 2 ^ 63 | bc)
     norm_std=$(echo 2 ^ 50 | bc)
-    n_deletes=100000
+    n_deletes=500000
 
     $WORKLOAD_GEN_PATH -t delete -d $n_deletes -o unif
 }

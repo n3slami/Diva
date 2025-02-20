@@ -91,7 +91,8 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     });
     const uint64_t n_items = std::distance(begin, end);
     const uint64_t seed = 1380;
-    const uint64_t max_range_size = *std::max_element(query_lengths.begin(), query_lengths.end());
+    const uint64_t max_range_size = query_lengths.empty() ? 0 
+                                        : *std::max_element(query_lengths.begin(), query_lengths.end());
     const double load_factor = 0.95;
     const uint64_t n_slots = n_items / load_factor + std::sqrt(n_items);
     uint32_t memento_bits = 1;

@@ -87,7 +87,8 @@ inline QF *init(const t_itr begin, const t_itr end, const double bpk, Args... ar
     });
     const uint64_t n_items = std::distance(begin, end);
     const uint64_t seed = 1380;
-    const uint64_t max_range_size = *std::max_element(query_lengths.begin(), query_lengths.end());
+    const uint64_t max_range_size = query_lengths.empty() ? 0
+                                        : *std::max_element(query_lengths.begin(), query_lengths.end());
     const double load_factor = 0.95;
     const uint64_t n_slots = n_items / load_factor + std::sqrt(n_items);
     uint32_t memento_bits = 1;
@@ -179,6 +180,7 @@ int main(int argc, char const *argv[]) {
     if (auto max_range_size = parser.present<int>("--range_size")) {
         for (predef_memento_size = 0; (1 << predef_memento_size) < *max_range_size; predef_memento_size++);
     }
+    std::cerr << "welp predef_memento_size=" << predef_memento_size << std::endl;
 
     experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_ref(query), pass_ref(size),
                wio.GetIntQueries(), -1);
