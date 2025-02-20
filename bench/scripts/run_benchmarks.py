@@ -33,10 +33,10 @@ def corr_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    # filters = ["memento", "rosetta"]
-    memory_footprints = [8, 10, 12]
+    #filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["steroids", "steroids_int"]
+    memory_footprints = [8, 10, 12, 14, 16, 18]
     MEDIAN_RANGE_SIZE = 2 ** 7
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -54,8 +54,9 @@ def fpr_bench():
                     execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_string_bench():
-    filters = ["steroids", "surf"]
-    memory_footprints = [14, 16, 18, 20]
+    #filters = ["steroids", "surf"]
+    filters = ["steroids"]
+    memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -67,8 +68,9 @@ def fpr_string_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def true_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    #filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["steroids", "steroids_int"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = "true_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -81,8 +83,9 @@ def true_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def expansion_bench():
-    filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
-               "rencoder", "snarf"]
+    #filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
+    #           "rencoder", "snarf"]
+    filters = ["memento_expandable"]
     memory_footprints = [16]
     workload_subdir = "expansion_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -96,9 +99,8 @@ def expansion_bench():
                                   filter, bpk - (2 if "steroids" in filter else 0))
 
 def delete_bench():
-    #filters = ["steroids", "steroids_int", "memento", "snarf"]
-    filters = ["memento"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
+    filters = ["memento_expandable", "snarf", "steroids", "steroids_int"]
+    memory_footprints = [16]
     workload_subdir = "delete_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -110,8 +112,9 @@ def delete_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def construction_bench():
-    filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
-               "memento", "steroids", "steroids_int", "grafite"]
+    #filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
+    #           "memento", "steroids", "steroids_int", "grafite"]
+    filters = ["steroids", "steroids_int"]
     memory_footprints = [16]
     workload_subdir = "construction_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -124,7 +127,8 @@ def construction_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def wiredtiger_bench():
-    filters = ["steroids"]
+    #filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    filters = ["memento_expandable"]
     memory_footprints = [16]
     workload_subdir = "wiredtiger_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -134,9 +138,9 @@ def wiredtiger_bench():
     for workload in workload_path.iterdir():
         if workload.is_file():
             for filter, bpk in itertools.product(filters, memory_footprints):
+                remove_amount = 1 if "steroids" in filter else 0
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
-                                  filter, bpk - (2 if "steroids" in filter else 0),
-                                  wiredtiger=True)
+                                  filter, bpk - remove_amount, wiredtiger=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="run_benchmarks")
@@ -161,8 +165,8 @@ if __name__ == "__main__":
         #fpr_bench()
         #true_bench()
         #construction_bench()
-        #expansion_bench()
-        #delete_bench()
+        delete_bench()
+        expansion_bench()
         wiredtiger_bench()
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
