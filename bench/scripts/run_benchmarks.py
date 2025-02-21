@@ -1,3 +1,4 @@
+from io import DEFAULT_BUFFER_SIZE
 import argparse, shutil, itertools, subprocess
 from pathlib import Path
 from datetime import datetime
@@ -82,6 +83,8 @@ def true_bench():
     #           "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     filters = ["steroids", "steroids_int"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
+    DEFAULT_MEMORY_FOOTPRINT = 16
+    MEDIAN_RANGE_SIZE = 2 ** 7
     workload_subdir = "true_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -89,8 +92,15 @@ def true_bench():
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
         if workload.is_file():
-            for filter, bpk in itertools.product(filters, memory_footprints):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+            if workload.name == "unif":
+                for filter, bpk in itertools.product(filters, memory_footprints):
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+            else:
+                for filter in filters:
+                    if filter in ["memento", "rosetta", "proteus"]:
+                        execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, DEFAULT_MEMORY_FOOTPRINT, MEDIAN_RANGE_SIZE)
+                    else:
+                        execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, DEFAULT_MEMORY_FOOTPRINT)
 
 def expansion_bench():
     #filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",

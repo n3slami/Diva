@@ -75,18 +75,15 @@ generate_fpr_bench() {
 
 generate_true_bench() {
     short=1024
-    long=1048576
-    norm_mu=$(echo 2 ^ 63 | bc)
-    norm_std=$(echo 2 ^ 50 | bc)
-    $WORKLOAD_GEN_PATH -t true --max-range-size 1 -o unif_point
-    $WORKLOAD_GEN_PATH -t true --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t true --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t true --kdist norm $norm_mu $norm_std --max-range-size 1 -o norm_point
-    $WORKLOAD_GEN_PATH -t true --kdist norm $norm_mu $norm_std --max-range-size $short -o norm_short
-    $WORKLOAD_GEN_PATH -t true --kdist norm $norm_mu $norm_std --max-range-size $long -o norm_long
-    $WORKLOAD_GEN_PATH -t true --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --max-range-size 1 -o real_point
-    $WORKLOAD_GEN_PATH -t true --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --max-range-size $short -o real_short
-    $WORKLOAD_GEN_PATH -t true --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --max-range-size $long -o real_long
+    $WORKLOAD_GEN_PATH -t true --max-range-size $short -o unif
+
+    i=0
+    while [ $i -le 24 ]
+    do
+        range_size=$(echo 2 ^ $i | bc)
+        $WORKLOAD_GEN_PATH -t true --kdist unif --qdist unif --min-range-size $range_size --max-range-size $range_size -o unif_${i}
+        i=$(($i + 4))
+    done
 }
 
 generate_expansion_bench() {
