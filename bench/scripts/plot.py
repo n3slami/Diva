@@ -14,7 +14,6 @@
 import argparse
 import json
 import numpy as np
-from copy import deepcopy
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -267,6 +266,7 @@ def plot_fpr_memory(result_dir, output_dir):
                     continue
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
+                print(filter, result)
                 plot_data[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0), result[-1]["fpr"]))
         for filter in filters:
             axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
@@ -295,52 +295,72 @@ def plot_fpr_memory(result_dir, output_dir):
 
 
 def plot_true(result_dir, output_dir):
-    TITLE_FONT_SIZE = 11.5
     LEGEND_FONT_SIZE = 8
     YLABEL_FONT_SIZE = 11.5
     XLABEL_FONT_SIZE = 11.5
+    XTICK_FONT_SIZE = 9
     WIDTH = 3.5
     HEIGHT = 1.5
+    XTICKS = [2 ** i for i in range(0, 25, 4)]
+    XTICK_LABELS = ["$2^{" + str(i) + "}$" for i in range(0, 25, 4)]
     YTICKS = [1e6, 1e5, 1e4, 1e3, 1e2]
 
     WORKLOAD = "unif"
     filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    memory_footprints = [10, 12, 14, 16, 18, 20]
-    range_sizes = ["short", "long"]
     workload_subdir = Path("true_bench")
 
-    fig, axes = plt.subplots(nrows=1, ncols=len(range_sizes),
-                             sharex=True, sharey='row', figsize=(WIDTH, HEIGHT))
-    for i, range_size in enumerate(range_sizes):
-        plot_data = {filter: [] for filter in filters}
-        for filter, memory_footprint in itertools.product(filters, memory_footprints):
-            file_path = result_dir / workload_subdir / Path(f"{filter}_{memory_footprint}_{WORKLOAD}_{range_size}.json")
-            if not file_path.is_file():
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharey='row', figsize=(WIDTH, HEIGHT))
+    memory_footprints = [10, 12, 14, 16, 18, 20]
+    plot_data_memory = {filter: [] for filter in filters}
+    for filter, memory_footprint in itertools.product(filters, memory_footprints):
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{memory_footprint}_{WORKLOAD}.json")
+        if not file_path.is_file():
+            continue
+        with open(file_path, 'r') as result_file:
+            contents = result_file.read()
+            if len(contents) == 0:
                 continue
-            with open(file_path, 'r') as result_file:
-                contents = result_file.read()
-                if len(contents) == 0:
-                    continue
-                json_string = "[" + fix_file_contents(contents[:-2]) + "]"
-                result = json.loads(json_string)
-                plot_data[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0),
-                                          result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
-        for filter in filters:
-            axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+            json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+            result = json.loads(json_string)
+            plot_data_memory[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0),
+                                      result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
 
-    title = DATASET_NAMES[WORKLOAD if WORKLOAD != "real" else "books"] + "\nQuery Latency [ns/op]" 
-    axes[0].set_ylabel(title, fontsize=YLABEL_FONT_SIZE)
-    for i, range_size in enumerate(range_sizes):
-        axes[i].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
-        axes[i].text(9.5, 4e5, RANGE_LENGTH_TAGS[range_size], fontsize=XLABEL_FONT_SIZE)
+    range_sizes = [0, 4, 8, 12, 16, 20, 24]
+    MEMORY_FOOTPRINT = 16
+    plot_data_range_size = {filter: [] for filter in filters}
+    for filter, range_size in itertools.product(filters, range_sizes):
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT}_{WORKLOAD}_{range_size}.json")
+        if not file_path.is_file():
+            continue
+        with open(file_path, 'r') as result_file:
+            contents = result_file.read()
+            if len(contents) == 0:
+                continue
+            json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+            result = json.loads(json_string)
+            plot_data_range_size[filter].append((2 ** range_size, result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
+
+    for filter in filters:
+        axes[0].plot(*zip(*plot_data_memory[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+        axes[1].plot(*zip(*plot_data_range_size[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    y_label = DATASET_NAMES[WORKLOAD if WORKLOAD != "real" else "books"] + "\nQuery Latency [ns/op]" 
+    axes[0].set_ylabel(y_label, fontsize=YLABEL_FONT_SIZE)
+    axes[0].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
+    axes[0].set_xticks(memory_footprints)
+    axes[1].set_xlabel("Range Size", fontsize=XLABEL_FONT_SIZE)
+    axes[0].text(9.5, 2.5e5, RANGE_LENGTH_TAGS["short"], fontsize=XLABEL_FONT_SIZE)
+    axes[1].text(1, 2.5e5, "16 BPK", fontsize=XLABEL_FONT_SIZE)
+
     for ax in axes.flatten():
-        ax.set_xlim(left=min(memory_footprints) - 1, right=max(memory_footprints) + 1)
         ax.set_yscale('log')
         ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
         ax.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
-        ax.set_xticks(memory_footprints)
         ax.set_yticks(YTICKS)
+    axes[1].set_xscale("log")
+    axes[1].minorticks_off()
+    axes[1].set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
     fig.subplots_adjust(wspace=0.1)
 
     legend_lines, legend_labels = axes[0].get_legend_handles_labels()
@@ -408,7 +428,6 @@ def plot_construction(result_dir, output_dir):
 
 
 def plot_expansion(result_dir, output_dir):
-    TITLE_FONT_SIZE = 9.5
     LEGEND_FONT_SIZE = 7
     YLABEL_FONT_SIZE = 9.5
     XLABEL_FONT_SIZE = 9.5
@@ -441,15 +460,16 @@ def plot_expansion(result_dir, output_dir):
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
                 for j, entry in enumerate(result[1:]):
-                    current_dataset_fraction = 2 ** (j // FRAC_EXPANSION_COUNT - N_EXPANSIONS) * (j % FRAC_EXPANSION_COUNT + 1)
+                    current_dataset_fraction = 2 ** (j / FRAC_EXPANSION_COUNT - N_EXPANSIONS)
                     plot_data[i][filter].append([current_dataset_fraction, entry["fpr"]])
                     plot_data[2][filter].append([current_dataset_fraction, entry["bpk"]])
                     if "time_i" in entry:
                         n_inserts = entry["n_keys"] - result[j]["n_keys"]
-                        plot_data[3][filter].append([2 ** (j / FRAC_EXPANSION_COUNT - N_EXPANSIONS), entry["time_i"] * 1e6 / n_inserts])
+                        plot_data[3][filter].append([current_dataset_fraction, entry["time_i"] * 1e6 / n_inserts])
     for filter in filters:
         plot_data[0][filter] = plot_data[0][filter][:-1]
         plot_data[1][filter] = plot_data[1][filter][:-1]
+        plot_data[2][filter] = plot_data[2][filter][:-1]
         if filter != "memento_expandable":
             for i in range(2, 4):
                 for j in range(len(plot_data[i][filter]) // 2):
@@ -598,6 +618,84 @@ def plot_wiredtiger(result_dir, output_dir):
     fig.savefig(output_dir / "wiredtiger.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
+def plot_delete_wiredtiger(result_dir, output_dir):
+    LEGEND_FONT_SIZE = 7
+    TITLE_FONT_SIZE = 9.5
+    YLABEL_FONT_SIZE = 9.5
+    XLABEL_FONT_SIZE = 9.5
+    WIDTH = 3.35
+    HEIGHT = 1.55
+    N_EXPANSIONS = 6
+    N_DELETES = 500000
+    XTICK_FONT_SIZE = 9
+    XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
+    XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
+
+    filters = ["steroids", "steroids_int", "memento_expandable", "snarf"]
+    RANGE_SIZE = "short"
+    MEMORY_FOOTPRINT = 16
+    workload_subdir = Path("delete_bench")
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(WIDTH, HEIGHT))
+
+    delete_data = {filter: [] for filter in filters}
+    for filter in filters:
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT}_unif.json")
+        if not file_path.is_file():
+            continue
+        with open(file_path, 'r') as result_file:
+            contents = result_file.read()
+            if len(contents) == 0:
+                continue
+            json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+            result = json.loads(json_string)
+            for i in range((min(len(result) - 1, N_EXPANSIONS + 1))):
+                entry = result[i + 1]
+                delete_data[filter].append([2 ** (i - N_EXPANSIONS), entry["time_d"] * 1e6 / N_DELETES])
+    for filter in filters:
+        axes[0].plot(*zip(*delete_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    workload_subdir = Path("wiredtiger_bench")
+
+    wiredtiger_data = {filter: [] for filter in filters}
+    for filter in filters:
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "steroids" in filter else 0)}_unif_{RANGE_SIZE}.json")
+        if not file_path.is_file():
+            continue
+        with open(file_path, 'r') as result_file:
+            contents = result_file.read()
+            if len(contents) == 0:
+                continue
+            json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+            result = json.loads(json_string)
+            for i in range(min(len(result) - 1, N_EXPANSIONS + 1)):
+                entry = result[i + 1]
+                wiredtiger_data[filter].append([2 ** (i - N_EXPANSIONS), entry["time_q"] * 1e6 / entry["n_queries"]])
+    for filter in filters:
+        axes[1].plot(*zip(*wiredtiger_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    for ax in axes:
+        ax.set_xlabel("Dataset Fraction", fontsize=XLABEL_FONT_SIZE)
+        ax.set_xscale("log")
+        ax.minorticks_off()
+        ax.set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
+        ax.set_yscale("log")
+    axes[0].set_ylabel("Delete Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
+    axes[1].set_ylabel("$\\;\\;\\;$End-to-End\\\\Query Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
+    axes[1].yaxis.tick_right()
+    axes[1].yaxis.set_label_position("right")
+    axes[1].text(0.2, 200, RANGE_LENGTH_TAGS[RANGE_SIZE], fontsize=XLABEL_FONT_SIZE)
+
+    legend_lines, legend_labels = axes[1].get_legend_handles_labels()
+    legend_lines.insert(3, axes[0].get_legend_handles_labels()[0][-1])
+    legend_labels.insert(3, axes[0].get_legend_handles_labels()[1][-1])
+    axes[1].legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(-1.025,1.35),
+                   fancybox=True, shadow=False, ncol=3, fontsize=LEGEND_FONT_SIZE)
+    fig.subplots_adjust(hspace=0.1, wspace=0.1)
+    fig.savefig(output_dir / "delete_wiredtiger.pdf", bbox_inches='tight', pad_inches=0.01)
+
+
 PLOTTERS = {"fpr": plot_fpr,
             "fpr_string": plot_fpr_string,
             "fpr_memory": plot_fpr_memory,
@@ -605,7 +703,8 @@ PLOTTERS = {"fpr": plot_fpr,
             "construction": plot_construction,
             "expansion": plot_expansion,
             "delete": plot_delete,
-            "wiredtiger": plot_wiredtiger}
+            "wiredtiger": plot_wiredtiger,
+            "delete_wiredtiger": plot_delete_wiredtiger}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='BenchResultPlotter')
