@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: make and move into build directory
-        run: mkdir build && cd build
-      - name: configure
-        run: cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=0
-      - name: build
-        run: cmake --build . -j8
-      - name: make test
-        run: ctest -VV
+      - name: Make Build Directory
+        run: mkdir build
+      - name: Configure
+        run: cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=0
+      - name: Build
+        run: cd build && cmake --build . -j8
+      - name: Run Unit Tests
+        run: cd build && ctest -VV

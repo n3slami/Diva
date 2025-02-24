@@ -53,6 +53,11 @@ static_assert(sizeof(struct wormmeta) == 32, "sizeof(wormmeta) != 32");
 
 struct wormkv64 { u64 key; void * ptr; }; // u64 keys (whu64)
 
+struct store_sim_hack {
+  uint32_t a;
+  uint64_t b;
+};
+
 struct wormleaf_int {
   // first line
   rwlock leaflock;
@@ -69,7 +74,7 @@ struct wormleaf_int {
   struct int_store_pair {
       u8 key_size;
       u64 key;
-      u8 store[12];
+      u8 store[sizeof(struct store_sim_hack)];
   } kvs[WH_KPN]; 
 };
 

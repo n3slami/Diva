@@ -1992,6 +1992,7 @@ private:
                 check_popcnts[1] += __builtin_popcountll(runends[i] & mask);
             }
         }
+
         REQUIRE_EQ(popcnts[0], check_popcnts[0]);
         REQUIRE_EQ(popcnts[1], check_popcnts[1]);
     }

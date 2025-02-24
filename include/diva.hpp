@@ -162,7 +162,7 @@ private:
         }
 
         static uint32_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size) {
-            return 1 + (Diva::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64 + 1;
+            return 1 + (Diva::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
         }
 
         uint32_t GetElemCount() const {
@@ -864,6 +864,7 @@ inline void Diva<int_optimized>::InsertSplit(const InfiniteByteString key) {
     InfixStore store_gt = AllocateInfixStoreWithList(right_infix_list + (zero_pos != -1),
                                                      right_list_len - (zero_pos != -1),
                                                      total_implicit_gt);
+    
     auto *ptr_to_free = infix_store.ptr;
     if constexpr (int_optimized)
         wh_int_put(better_tree_int_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
