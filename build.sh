@@ -12,13 +12,13 @@ export CC=$COMPILER
 export LD=$COMPILER
 pushd
 cd ./bench/wiredtiger/
-mkdir buid && cd build 
-cmake ..
-make -j
+mkdir build && cd build 
+cmake ../CMakeLists.txt
+make -j8
 popd
 
 # Build Diva
 mkdir build && cd build 
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j
+make -j8
 
