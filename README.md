@@ -65,8 +65,10 @@ results:
 
 ## TL;DR
 You can automate all the following steps by running the `evaluate.sh` script
-from the project's root directory. 
-
+from the project's root directory: 
+```Bash
+bash evaluate.sh
+```
 The plots from the experiments will be placed in the `paper_results/figures`,
 with the `paper_results` neighboring the project's root directory. Pictorially,
 the directory structure will be like so:
