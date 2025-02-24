@@ -1,4 +1,6 @@
 # Diva
+[![Build and Run Unit Tests](https://github.com/n3slami/Diva/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/n3slami/Diva/actions/workflows/build_and_test.yml)
+
 Diva is the first range filter to simultaneously support **d**ynam**i**c
 operations, **va**riable-length keys, range queries of any length, and high
 performance while providing a theoretical false positive rate guarantee. This
