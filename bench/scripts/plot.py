@@ -13,7 +13,6 @@
 
 import argparse
 import json
-import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -409,7 +408,7 @@ def plot_construction(result_dir, output_dir):
                            alpha=ALPHA_MODELING)
 
     ax.set_ylabel("Construction Time [ns/key]", fontsize=YLABEL_FONT_SIZE)
-    ax.set_xticks(np.arange(len(log_number_of_keys)) + 4.5 * BARW, [f"$10^{logn}$" for logn in log_number_of_keys])
+    ax.set_xticks([i + 4.5 * BARW for i in range(len(log_number_of_keys))], [f"$10^{logn}$" for logn in log_number_of_keys])
     ax.set_xlabel('Number of Keys', fontsize=XLABEL_FONT_SIZE)
     ax.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(100))
 

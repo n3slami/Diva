@@ -1,4 +1,4 @@
-#!bash
+#!/bin/bash
 
 # Script adapted from https://github.com/marcocosta97/grafite/blob/main/bench/scripts/download_datasets.sh.
 
