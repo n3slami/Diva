@@ -1,0 +1,21 @@
+name: Build and Run Unit Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: make and move into build directory
+        run: mkdir build && cd build
+      - name: configure
+        run: cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=0
+      - name: build
+        run: cmake --build . -j8
+      - name: make test
+        run: ctest -VV
