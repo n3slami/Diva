@@ -176,7 +176,7 @@ function(compile_bench_wiredtiger ds)
         endif ()
     elseif (ds STREQUAL "base")
     endif()
-endfunction(compile_bench)
+endfunction(compile_bench_wiredtiger)
 
 foreach(ds ${Targets})
     compile_bench(${ds})
