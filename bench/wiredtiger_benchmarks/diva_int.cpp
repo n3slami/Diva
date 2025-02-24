@@ -16,40 +16,40 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "../bench_template.hpp"
+#include "../bench_template_wiredtiger.hpp"
 #include <cstdint>
-#include "steroids.hpp"
+#include "diva.hpp"
 
 template <typename t_itr>
-inline Steroids<true> *init(const t_itr begin, const t_itr end, const double bpk) {
+inline Diva<true> *init(const t_itr begin, const t_itr end, const double bpk) {
     const uint32_t rng_seed = 1024;
     const double load_factor = 0.95;
     const uint32_t infix_size = std::round(load_factor * (bpk - 1));
     
-    Steroids<true> *filter = new Steroids<true>(infix_size, begin, end, sizeof(uint64_t),
-                                                rng_seed, load_factor);
+    Diva<true> *filter = new Diva<true>(infix_size, begin, end, sizeof(uint64_t),
+                                        rng_seed, load_factor);
     return filter;
 }
 
-inline void insert(Steroids<true> *filter, uint64_t key) {
+inline void insert(Diva<true> *filter, uint64_t key) {
     filter->Insert(key);
 }
 
-inline void del(Steroids<true> *filter, uint64_t key) {
+inline void del(Diva<true> *filter, uint64_t key) {
     filter->Delete(key);
 }
 
-inline bool query(const Steroids<true> *filter, uint64_t l_key, uint64_t r_key) {
+inline bool query(const Diva<true> *filter, uint64_t l_key, uint64_t r_key) {
     return filter->RangeQuery(l_key, r_key);
 }
 
-inline size_t size(const Steroids<true> *filter) {
+inline size_t size(const Diva<true> *filter) {
     return filter->Size();
 }
 
 
 int main(int argc, char const *argv[]) {
-    auto parser = init_parser("bench-steroids-int");
+    auto parser = init_parser("bench-diva-int");
 
     try {
         parser.parse_args(argc, argv);
@@ -60,6 +60,8 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
     memory_budget = parser.get<double>("arg");
+    memory_to_disk_ratio = parser.get<double>("--memory_to_disk_ratio");
+    val_len = parser.get<int>("--val_len");
     read_workload(parser.get<std::string>("--workload"));
 
     experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));

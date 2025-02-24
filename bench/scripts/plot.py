@@ -31,8 +31,8 @@ matplotlib.rcParams.update(rc_fonts)
 
 logging.getLogger().setLevel(logging.INFO)
 
-RANGE_FILTERS_STYLE_KWARGS = {"steroids_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
-                              "steroids": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
+RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
+                              "diva": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "memento_expandable": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "grafite": {"marker": 'o', "color": "teal", "label": "Grafite"},
@@ -44,8 +44,8 @@ RANGE_FILTERS_STYLE_KWARGS = {"steroids_int": {"marker": 'v', "color": "fuchsia"
                               "proteus_mistuned": {"marker": 'X', "color": "dimgray", "label": "Proteus (Diff. Tune)", "linestyle": ":"},
                               "rosetta": {"marker": 'd', "color": "C4", "label": "Rosetta"},
                               "rencoder": {"marker": '>', "color": "C5", "label": "REncoder"}}
-RANGE_FILTERS_HATCHES = {"steroids_int": '',
-                         "steroids": '...',
+RANGE_FILTERS_HATCHES = {"diva_int": '',
+                         "diva": '...',
                          "memento": '///',
                          "memento_expandable": '///',
                          "grafite": '\\\\\\',
@@ -98,9 +98,8 @@ def plot_fpr(result_dir, output_dir):
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
 
     workloads = ["unif", "norm", "books", "osm"]
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "proteus_mistuned", "rencoder", "snarf",
-               "oasis"]
+    filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
+               "proteus", "proteus_mistuned", "rencoder", "snarf", "oasis"]
     memory_footprints = [10, 16]
     range_sizes = [0, 4, 8, 12, 16, 20, 24]
     workload_subdir = Path("fpr_bench")
@@ -121,7 +120,7 @@ def plot_fpr(result_dir, output_dir):
                         continue
                     json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                     result = json.loads(json_string)
-                    if result[-1]["bpk"] - (1 if "steroids" in filter else 0) < memory_footprint + 1:
+                    if result[-1]["bpk"] - (1 if "diva" in filter else 0) < memory_footprint + 1:
                         plot_data[filter].append((2 ** range_size, result[-1]["fpr"]))
                         if i == len(memory_footprints) - 1:
                             speed_plot_data[filter].append((2 ** range_size, result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
@@ -177,7 +176,7 @@ def plot_fpr_string(result_dir, output_dir):
     YTICKS_QUERY = [1000, 100, 10, 1]
 
     workloads = ["unif", "norm"]
-    filters = ["steroids", "surf"]
+    filters = ["diva", "surf"]
     memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = Path("fpr_bench")
 
@@ -198,8 +197,8 @@ def plot_fpr_string(result_dir, output_dir):
                     json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                     result = json.loads(json_string)
                     if result[-1]["bpk"] < memory_footprint + 1:
-                        plot_data[filter].append((result[-1]["bpk"] - (1 if filter == "steroids" else 0), result[-1]["fpr"]))
-                        speed_plot_data[filter].append((result[-1]["bpk"] - (1 if filter == "steroids" else 0), result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
+                        plot_data[filter].append((result[-1]["bpk"] - (1 if filter == "diva" else 0), result[-1]["fpr"]))
+                        speed_plot_data[filter].append((result[-1]["bpk"] - (1 if filter == "diva" else 0), result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
         for filter in filters:
             axes[i][0].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
             axes[i][1].plot(*zip(*speed_plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
@@ -245,9 +244,8 @@ def plot_fpr_memory(result_dir, output_dir):
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
 
     workloads = ["unif", "osm"]
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "proteus_mistuned", "rencoder", "snarf",
-               "oasis"]
+    filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
+               "proteus", "proteus_mistuned", "rencoder", "snarf", "oasis"]
     memory_footprints = [8, 10, 12, 14, 16, 18]
     RANGE_SIZE = 8
     workload_subdir = Path("fpr_bench")
@@ -267,7 +265,7 @@ def plot_fpr_memory(result_dir, output_dir):
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
                 print(filter, result)
-                plot_data[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0), result[-1]["fpr"]))
+                plot_data[filter].append((result[-1]["bpk"] - (1 if "diva" in filter else 0), result[-1]["fpr"]))
         for filter in filters:
             axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
     
@@ -306,8 +304,8 @@ def plot_true(result_dir, output_dir):
     YTICKS = [1e6, 1e5, 1e4, 1e3, 1e2]
 
     WORKLOAD = "unif"
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
+               "proteus", "rencoder", "snarf", "oasis"]
     workload_subdir = Path("true_bench")
 
     fig, axes = plt.subplots(nrows=1, ncols=2, sharey='row', figsize=(WIDTH, HEIGHT))
@@ -323,7 +321,7 @@ def plot_true(result_dir, output_dir):
                 continue
             json_string = "[" + fix_file_contents(contents[:-2]) + "]"
             result = json.loads(json_string)
-            plot_data_memory[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0),
+            plot_data_memory[filter].append((result[-1]["bpk"] - (1 if "diva" in filter else 0),
                                       result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
 
     range_sizes = [0, 4, 8, 12, 16, 20, 24]
@@ -382,8 +380,8 @@ def plot_construction(result_dir, output_dir):
     PATTERN_DENSITY = 2
     matplotlib.rcParams["hatch.linewidth"] = 0.3
 
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
-               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
+               "proteus", "rencoder", "snarf", "oasis"]
     log_number_of_keys = [6, 7, 8, 9]
     workload_subdir = Path("construction_bench")
 
@@ -442,7 +440,7 @@ def plot_expansion(result_dir, output_dir):
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
     YTICKS_MEMORY = [15, 20, 25, 30, 35]
 
-    filters = ["steroids", "steroids_int", "memento_expandable", "rosetta", "rencoder", "snarf"]
+    filters = ["diva", "diva_int", "memento_expandable", "rosetta", "rencoder", "snarf"]
     range_sizes = ["short", "long"]
     workload_subdir = Path("expansion_bench")
 
@@ -450,7 +448,7 @@ def plot_expansion(result_dir, output_dir):
     plot_data = [{filter: [] for filter in filters} for _ in range(len(range_sizes) + 2)]
     for i, range_size in enumerate(range_sizes):
         for filter in filters:
-            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if 'steroids' in filter else 0)}_unif_{range_size}.json")
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "diva" in filter else 0)}_unif_{range_size}.json")
             if not file_path.is_file():
                 continue
             with open(file_path, 'r') as result_file:
@@ -530,7 +528,7 @@ def plot_delete(result_dir, output_dir):
     WIDTH = 1.8
     HEIGHT = 1.7
 
-    filters = ["steroids", "steroids_int", "memento", "snarf"]
+    filters = ["diva", "diva_int", "memento", "snarf"]
     range_sizes = ["short", "long"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = Path("delete_bench")
@@ -549,7 +547,7 @@ def plot_delete(result_dir, output_dir):
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
                 n_deletes = result[0]["n_keys"] / 20
-                plot_data[filter].append([result[-1]["bpk"] - (1 if "steroids" in filter else 0),
+                plot_data[filter].append([result[-1]["bpk"] - (1 if "diva" in filter else 0),
                                           result[-1]["time_d"] * 1e6 / n_deletes])
     for filter in filters:
         for i in range(len(plot_data[filter]) // 2):
@@ -582,7 +580,7 @@ def plot_wiredtiger(result_dir, output_dir):
     XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
     XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
 
-    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    filters = ["diva", "diva_int", "memento_expandable", "base"]
     RANGE_SIZE = "short"
     MEMORY_FOOTPRINT = 16
     workload_subdir = Path("wiredtiger_bench")
@@ -590,7 +588,7 @@ def plot_wiredtiger(result_dir, output_dir):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, HEIGHT))
     plot_data = {filter: [] for filter in filters}
     for filter in filters:
-        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if 'steroids' in filter else 0)}_unif_{RANGE_SIZE}.json")
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "diva" in filter else 0)}_unif_{RANGE_SIZE}.json")
         if not file_path.is_file():
             continue
         with open(file_path, 'r') as result_file:
@@ -631,7 +629,7 @@ def plot_delete_wiredtiger(result_dir, output_dir):
     XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
     XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
 
-    filters = ["steroids", "steroids_int", "memento_expandable", "snarf"]
+    filters = ["diva", "diva_int", "memento_expandable", "snarf"]
     RANGE_SIZE = "short"
     MEMORY_FOOTPRINT = 16
     workload_subdir = Path("delete_bench")
@@ -655,12 +653,12 @@ def plot_delete_wiredtiger(result_dir, output_dir):
     for filter in filters:
         axes[0].plot(*zip(*delete_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
 
-    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    filters = ["diva", "diva_int", "memento_expandable", "base"]
     workload_subdir = Path("wiredtiger_bench")
 
     wiredtiger_data = {filter: [] for filter in filters}
     for filter in filters:
-        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "steroids" in filter else 0)}_unif_{RANGE_SIZE}.json")
+        file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "diva" in filter else 0)}_unif_{RANGE_SIZE}.json")
         if not file_path.is_file():
             continue
         with open(file_path, 'r') as result_file:

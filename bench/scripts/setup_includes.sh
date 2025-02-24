@@ -23,3 +23,6 @@ git submodule update --init ../include/snarf/
 git submodule update --init ../include/oasis/
 sed -i '$ d' ../include/oasis/CMakeLists.txt
 
+
+git submodule update --init ../wiredtiger
+

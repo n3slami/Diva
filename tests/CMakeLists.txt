@@ -8,12 +8,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(doctest)
 
 # tests
-add_executable(SteroidsTests ./steroids_tests.cpp)
-target_link_libraries(SteroidsTests SteroidsLib doctest)
-add_test(NAME test_steroids COMMAND SteroidsTests)
+add_executable(DivaTests ./diva_tests.cpp)
+target_link_libraries(DivaTests DivaLib doctest)
+add_test(NAME test_diva COMMAND DivaTests)
 
 add_executable(InfixStoreTests ./infix_store_tests.cpp)
-target_link_libraries(InfixStoreTests SteroidsLib doctest)
+target_link_libraries(InfixStoreTests DivaLib doctest)
 add_test(NAME test_infix_store COMMAND InfixStoreTests)
 
 add_executable(WormholeIntTests ./wormhole_int_tests.cpp)

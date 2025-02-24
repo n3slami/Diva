@@ -19,38 +19,38 @@
 #include "../bench_template_wiredtiger.hpp"
 #include <cmath>
 #include <cstdint>
-#include "steroids.hpp"
+#include "diva.hpp"
 
 template <typename t_itr>
-inline Steroids<false> *init(const t_itr begin, const t_itr end, const double bpk) {
+inline Diva<false> *init(const t_itr begin, const t_itr end, const double bpk) {
     const uint32_t rng_seed = 1024;
     const double load_factor = 0.95;
     const uint32_t infix_size = load_factor * (bpk - 1);
     
-    Steroids<false> *filter = new Steroids<false>(infix_size, begin, end, rng_seed, load_factor);
+    Diva<false> *filter = new Diva<false>(infix_size, begin, end, rng_seed, load_factor);
     return filter;
 }
 
-inline void insert(Steroids<false> *filter, const uint8_t *key, uint16_t key_length) {
+inline void insert(Diva<false> *filter, const uint8_t *key, uint16_t key_length) {
     filter->Insert(key, key_length);
 }
 
-inline void del(Steroids<false> *filter, const uint8_t *key, uint16_t key_length) {
+inline void del(Diva<false> *filter, const uint8_t *key, uint16_t key_length) {
     filter->Delete(key, key_length);
 }
 
-inline bool query(const Steroids<false> *filter, const uint8_t *l_key, uint16_t l_key_length,
-                                                 const uint8_t *r_key, uint16_t r_key_length) {
+inline bool query(const Diva<false> *filter, const uint8_t *l_key, uint16_t l_key_length,
+                                             const uint8_t *r_key, uint16_t r_key_length) {
     return filter->RangeQuery(l_key, l_key_length, r_key, r_key_length);
 }
 
-inline size_t size(const Steroids<false> *filter) {
+inline size_t size(const Diva<false> *filter) {
     return filter->Size();
 }
 
 
 int main(int argc, char const *argv[]) {
-    auto parser = init_parser("bench-steroids");
+    auto parser = init_parser("bench-diva");
 
     try {
         parser.parse_args(argc, argv);

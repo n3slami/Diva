@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(SNARFOnSteroids
+project(Diva
         VERSION 1.0
-        HOMEPAGE_URL https://github.com/n3slami/SNARFOnSteroids)
+        HOMEPAGE_URL https://github.com/n3slami/Diva)
 
 option(BUILD_TESTS "Build the tests" ON)
 option(BUILD_EXAMPLES "Build the examples" ON)
@@ -15,7 +15,6 @@ else()
 endif ()
 
 set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
-#set(BITHACKING_COMPILE_FLAGS -Ofast -mbmi2 -msse4.2 -D__SSE4_2_)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
                                ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh.h)
@@ -45,11 +44,11 @@ target_include_directories(
     "$<INSTALL_INTERFACE:include/wormhole>"
 )
 
-add_library(SteroidsLib STATIC ./include/steroids.hpp)
-set_target_properties(SteroidsLib PROPERTIES LINKER_LANGUAGE CXX)
-target_include_directories(SteroidsLib PUBLIC ./include)
-target_compile_options(SteroidsLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
-target_link_libraries(SteroidsLib PRIVATE WormholeLib WormholeIntLib)
+add_library(DivaLib STATIC ./include/diva.hpp)
+set_target_properties(DivaLib PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(DivaLib PUBLIC ./include)
+target_compile_options(DivaLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
+target_link_libraries(DivaLib PRIVATE WormholeLib WormholeIntLib)
 
 if (BUILD_TESTS)
     # enable testing 

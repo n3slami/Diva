@@ -102,7 +102,7 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    if (auto max_range_size = parser.present<int>("--range_size")) {
+    if (auto max_range_size = parser.present<int>("--range-size")) {
         range_size = *max_range_size;
     }
 

@@ -467,7 +467,7 @@ inline argparse::ArgumentParser init_parser(const std::string& name) {
         .required()
         .default_value(default_val_len);
 
-    parser.add_argument("-R", "--range_size")
+    parser.add_argument("-R", "--range-size")
             .help("Maximum range query size")
             .nargs(1)
             .scan<'i', int>();

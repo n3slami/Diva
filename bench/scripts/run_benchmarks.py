@@ -11,7 +11,7 @@ RANGE_FIXED_FILTERS = ["memento", "memento_expandable", "rosetta", "proteus"]
 
 def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False):
     file_to_execute = f"bench/bench_{filter}_wiredtiger" if wiredtiger else f"bench/bench_{filter}"
-    range_size_option = f"--range_size {force_range_size}" if force_range_size else ""
+    range_size_option = f"--range-size {force_range_size}" if force_range_size else ""
     command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
     cli_message_command = f"<build_dir>/{file_to_execute} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} {range_size_option} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json"
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     output_prefix = Path(f"results/{datetime.now().strftime('%Y-%m-%d.%H:%M:%S')}")
 
     try:
-        corr_bench()
+        # corr_bench()
         fpr_string_bench()
         fpr_bench()
         true_bench()

@@ -63,10 +63,10 @@ generate_fpr_bench() {
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
-        #$WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
-        #$WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
-        #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
-        #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
+        $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
         i=$(($i + 4))
     done
     $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size 1024 -o unif_string
@@ -95,12 +95,6 @@ generate_expansion_bench() {
 
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $short -o norm_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std -e $n_expansions --max-range-size $long -o norm_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $short -o books_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $long -o books_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $short -o osm_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist corr --corr-degree 0.1 -e $n_expansions --max-range-size $long -o osm_long
 }
 
 generate_delete_bench() {
@@ -130,7 +124,6 @@ generate_wiredtiger_bench() {
     $WORKLOAD_GEN_PATH -t wiredtiger --qdist unif -e $n_expansions --max-range-size $short -o unif_short
 }
 
-: '
 mkdir -p $OUT_PATH/corr_bench && cd $OUT_PATH/corr_bench || exit 1
 if ! generate_corr_bench ; then
     echo "[!!] generate_corr_bench generation failed"
@@ -158,7 +151,6 @@ if ! generate_expansion_bench ; then
     exit 1
 fi
 echo "[!!] expansion_bench generated"
-'
 
 mkdir -p $OUT_PATH/delete_bench && cd $OUT_PATH/delete_bench || exit 1
 if ! generate_delete_bench ; then
@@ -167,7 +159,6 @@ if ! generate_delete_bench ; then
 fi
 echo "[!!] delete_bench generated"
 
-: '
 mkdir -p $OUT_PATH/construction_bench && cd $OUT_PATH/construction_bench || exit 1
 if ! generate_construction_bench ; then
     echo "[!!] construction_bench generation failed"
@@ -182,5 +173,4 @@ if ! generate_wiredtiger_bench ; then
 fi
 echo "[!!] wiredtiger_bench generated"
 
-'
 echo "[!!] success, all workloads generated"

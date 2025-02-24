@@ -179,7 +179,7 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    if (auto max_range_size = parser.present<int>("--range_size")) {
+    if (auto max_range_size = parser.present<int>("--range-size")) {
         for (predef_memento_size = 0; (1 << predef_memento_size) < *max_range_size; predef_memento_size++);
     }
     std::cerr << "welp predef_memento_size=" << predef_memento_size << std::endl;

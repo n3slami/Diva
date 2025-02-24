@@ -279,7 +279,7 @@ inline argparse::ArgumentParser init_parser(const std::string& name) {
             .help("Pass the workload from file")
             .nargs(1);
 
-    parser.add_argument("-R", "--range_size")
+    parser.add_argument("-R", "--range-size")
             .help("Maximum range query size")
             .nargs(1)
             .scan<'i', int>();
