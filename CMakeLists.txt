@@ -6,7 +6,6 @@ project(Diva
 option(BUILD_TESTS "Build the tests" ON)
 option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_BENCHMARKS "Build the benchmark targets" ON)
-option(SETUP_BUILD_BENCHMARK "Clone WiredTiger and the required baselines" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")

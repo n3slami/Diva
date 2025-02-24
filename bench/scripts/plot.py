@@ -703,15 +703,16 @@ PLOTTERS = {"fpr": plot_fpr,
             "wiredtiger": plot_wiredtiger,
             "delete_wiredtiger": plot_delete_wiredtiger}
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='BenchResultPlotter')
 
     parser.add_argument("-f", "--figures", nargs="+", choices=["all",] + list(PLOTTERS.keys()),
                         default=["all"], type=str, help="The figures to create")
     parser.add_argument("-t", "--timestamp", nargs="?", type=str, help="Result timestamp to process")
-    parser.add_argument("--result_dir", default=Path("../../../paper_results/results/"),
+    parser.add_argument("--result_dir", default=Path("./results/"),
                         type=Path, help="The directory containing benchmark results")
-    parser.add_argument("--figure_dir", default=Path("../../../paper_results/figures/"),
+    parser.add_argument("--figure_dir", default=Path("./figures/"),
                         type=Path, help="The output directory storing the figures")
 
     args = parser.parse_args()
@@ -724,9 +725,6 @@ if __name__ == "__main__":
 
     logging.info(f"Result Path: {RESULT_DIR}")
     logging.info(f"Ouput Figure Path: {FIGURE_DIR}")
-    if "all" in args.figures:
-        for figure in PLOTTERS:
-            PLOTTERS[figure](RESULT_DIR, FIGURE_DIR)
-    else:
-        for figure in args.figures:
-            PLOTTERS[figure](RESULT_DIR, FIGURE_DIR)
+    for figure in (PLOTTERS if "all" in args.figures else args.figures):
+        PLOTTERS[figure](RESULT_DIR, FIGURE_DIR)
+

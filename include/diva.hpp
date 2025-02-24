@@ -97,7 +97,7 @@ private:
                 return 0;
             uint64_t res = 0;
             memcpy(&res, str + byte_pos, std::min<uint32_t>(sizeof(res), length - byte_pos));
-            return __bswap_64(res);
+            return __builtin_bswap64(res);
         };
 
         __attribute__((always_inline))
@@ -106,7 +106,7 @@ private:
                 return 0;
             uint64_t res = 0;
             memcpy(&res, str + bit_pos / 8, std::min<uint32_t>(sizeof(res), length - bit_pos / 8));
-            res = __bswap_64(res) >> (8 * sizeof(res) - res_width - bit_pos % 8);
+            res = __builtin_bswap64(res) >> (8 * sizeof(res) - res_width - bit_pos % 8);
             return res & BITMASK(res_width);
         };
 
@@ -395,7 +395,7 @@ inline void Diva<int_optimized>::SetupScaleFactors() {
 
 template <bool int_optimized>
 inline void Diva<int_optimized>::Insert(uint64_t key) {
-    key = _bswap64(key);
+    key = __builtin_bswap64(key);
     Insert(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
 }
 
@@ -490,8 +490,8 @@ inline void Diva<int_optimized>::InsertSimple(const InfiniteByteString key) {
 
 template <bool int_optimized>
 inline bool Diva<int_optimized>::RangeQuery(uint64_t l, uint64_t r) const {
-    l = _bswap64(l);
-    r = _bswap64(r);
+    l = __builtin_bswap64(l);
+    r = __builtin_bswap64(r);
     return RangeQuery(reinterpret_cast<const uint8_t *>(&l), sizeof(l),
                       reinterpret_cast<const uint8_t *>(&r), sizeof(r));
 }
@@ -567,10 +567,10 @@ inline bool Diva<int_optimized>::RangeQuery(const uint8_t *input_l, const uint32
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
 
     if constexpr (int_optimized) {
-        const uint64_t l_key_int = _bswap64(*((uint64_t *) l_key.str));
-        const uint64_t r_key_int = _bswap64(*((uint64_t *) r_key.str));
-        const uint64_t prev_key_int = _bswap64(*((uint64_t *) prev_key.str));
-        const uint64_t next_key_int = _bswap64(*((uint64_t *) next_key.str));
+        const uint64_t l_key_int = __builtin_bswap64(*((uint64_t *) l_key.str));
+        const uint64_t r_key_int = __builtin_bswap64(*((uint64_t *) r_key.str));
+        const uint64_t prev_key_int = __builtin_bswap64(*((uint64_t *) prev_key.str));
+        const uint64_t next_key_int = __builtin_bswap64(*((uint64_t *) next_key.str));
 
         const uint32_t shamt_left = std::max<int>(0, shared + ignore + implicit_size + infix_size_ - 64);
         const uint32_t shamt_right = std::max<int>(0, 64 - shared - ignore - implicit_size - infix_size_);
@@ -605,7 +605,7 @@ inline bool Diva<int_optimized>::RangeQuery(const uint8_t *input_l, const uint32
 
 template <bool int_optimized>
 inline bool Diva<int_optimized>::PointQuery(uint64_t key) const {
-    key = _bswap64(key);
+    key = __builtin_bswap64(key);
     return PointQuery(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
 }
 
@@ -1094,7 +1094,7 @@ inline uint64_t Diva<int_optimized>::ExtractPartialKey(const InfiniteByteString 
 
 template <bool int_optimized>
 inline void Diva<int_optimized>::Delete(uint64_t key) {
-    key = _bswap64(key);
+    key = __builtin_bswap64(key);
     Delete(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
 }
 
@@ -1369,7 +1369,7 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
     t_itr last_key_it = begin, key_it = begin;
     InfiniteByteString left_key {}, right_key {};
     if constexpr (int_optimized) {
-        int_opt_buf[0] = _bswap64(*key_it);
+        int_opt_buf[0] = __builtin_bswap64(*key_it);
         left_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 0), key_len};
     }
     else
@@ -1379,7 +1379,7 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
     for (++key_it; key_it != end; ++key_it) {
         if (cnt % infix_store_target_size == 0) {   // New boundary key
             if constexpr (int_optimized) {
-                int_opt_buf[1] = _bswap64(*key_it);
+                int_opt_buf[1] = __builtin_bswap64(*key_it);
                 right_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 1), key_len};
             }
             else
@@ -1423,7 +1423,7 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
             for (int32_t i = 0; i < infix_store_target_size - 1; i++) {
                 InfiniteByteString key;
                 if constexpr (int_optimized) {
-                    int_opt_buf[2] = _bswap64(*last_key_it);
+                    int_opt_buf[2] = __builtin_bswap64(*last_key_it);
                     key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
                 }
                 else 
@@ -1484,7 +1484,7 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
     while (last_key_it != key_it) {
         InfiniteByteString key;
         if constexpr (int_optimized) {
-            int_opt_buf[2] = _bswap64(*last_key_it);
+            int_opt_buf[2] = __builtin_bswap64(*last_key_it);
             key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
         }
         else 
