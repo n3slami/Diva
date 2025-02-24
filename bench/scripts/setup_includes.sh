@@ -21,7 +21,7 @@ git submodule update --init ../include/rencoder/
 git submodule update --init ../include/snarf/
 
 git submodule update --init ../include/oasis/
-sed -i '$ d' ../include/oasis/CMakeLists.txt
+sed -i '/add_subdirectory(benchmark)/d' ../include/oasis/CMakeLists.txt
 
 
 git submodule update --init ../wiredtiger

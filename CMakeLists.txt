@@ -6,6 +6,7 @@ project(Diva
 option(BUILD_TESTS "Build the tests" ON)
 option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_BENCHMARKS "Build the benchmark targets" ON)
+option(SETUP_BUILD_BENCHMARK "Clone WiredTiger and the required baselines" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -63,6 +64,14 @@ if (BUILD_EXAMPLES)
 endif ()
 
 if (BUILD_BENCHMARKS)
+    if (NOT EXISTS ../bench/wiredtiger/README)
+        message(STATUS "Cloning baselines and WiredTiger")
+        execute_process(COMMAND bash -c "cd ../bench/scripts && bash setup_includes.sh")
+
+        message(STATUS "Building WiredTiger")
+        execute_process(COMMAND bash -c "cd ../bench/scripts && bash build_wiredtiger.sh")
+    endif()
+
     message(STATUS "Building benchmarks")
     add_subdirectory(bench)
 endif ()
