@@ -547,10 +547,9 @@ wormmeta_free(struct wormhmap * const hmap, struct wormmeta * const meta)
 // }}} alloc
 
 // lock {{{
-  static void
+  void
 wormleaf_int_lock_write(struct wormleaf_int * const leaf, struct wormref_int * const ref)
 {
-    
   if (!rwlock_trylock_write(&(leaf->leaflock))) {
     wormhole_int_park(ref);
     rwlock_lock_write(&(leaf->leaflock));
@@ -558,7 +557,13 @@ wormleaf_int_lock_write(struct wormleaf_int * const leaf, struct wormref_int * c
   }
 }
 
-  static void
+  static bool
+wormleaf_int_trylock_write(struct wormleaf_int * const leaf, struct wormref_int * const ref)
+{
+  return rwlock_trylock_write_nr(&(leaf->leaflock), 64);
+}
+
+  void
 wormleaf_int_lock_read(struct wormleaf_int * const leaf, struct wormref_int * const ref)
 {
   if (!rwlock_trylock_read(&(leaf->leaflock))) {
@@ -568,13 +573,18 @@ wormleaf_int_lock_read(struct wormleaf_int * const leaf, struct wormref_int * co
   }
 }
 
-  static void
+  static bool
+wormleaf_int_trylock_read(struct wormleaf_int * const leaf, struct wormref_int * const ref)
+{
+  return rwlock_trylock_read_nr(&(leaf->leaflock), 64);
+}
+
+  void
 wormleaf_int_unlock_write(struct wormleaf_int * const leaf)
 {
   rwlock_unlock_write(&(leaf->leaflock));
 }
 
-// HAAAAAAAAAAAAAAAAAAAAAAACK
   void
 wormleaf_int_unlock_read(struct wormleaf_int * const leaf)
 {
@@ -1381,6 +1391,22 @@ wormhole_jump_leaf_read(struct wormref_int * const ref, const struct kref * cons
 }
 
   static struct wormleaf_int *
+wormhole_jump_leaf_read_has_lock(struct wormref_int * const ref, const struct kref * const key)
+{
+  struct wormhole_int * const map = ref->map;
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf_int * const leaf = wormhole_jump_leaf(hmap, key);
+    if (wormleaf_int_version_load(leaf) <= v)
+      return leaf;
+    //wormleaf_int_unlock_read(leaf);
+  } while (true);
+}
+
+  static struct wormleaf_int *
 wormhole_jump_leaf_write(struct wormref_int * const ref, const struct kref * const key)
 {
   struct wormhole_int * const map = ref->map;
@@ -1405,6 +1431,23 @@ wormhole_jump_leaf_write(struct wormref_int * const ref, const struct kref * con
         break;
       wormhole_qsbr_update_pause(ref, v1);
     } while (true);
+  } while (true);
+}
+
+  static struct wormleaf_int *
+wormhole_jump_leaf_write_has_lock(struct wormref_int * const ref, const struct kref * const key)
+{
+  struct wormhole_int * const map = ref->map;
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf_int * const leaf = wormhole_jump_leaf(hmap, key);
+    wormleaf_int_prefetch(leaf, key->hash32);
+    if (wormleaf_int_version_load(leaf) <= v)
+      return leaf;
+    //wormleaf_int_unlock_write(leaf);
   } while (true);
 }
 // }}} jump-rw
@@ -2378,14 +2421,15 @@ whunsafe_int_meta_leaf_merge(struct wormhole_int * const map, struct wormleaf_in
 
 // put {{{
   bool
-wormhole_int_put(struct wormref_int * const ref, struct kv * const kv)
+wormhole_int_put(struct wormref_int * const ref, struct kv * const kv, bool lock)
 {
   struct wormhole_int * const map = ref->map;
   if (unlikely(kv == NULL))
     return false;
   const struct kref kref = kv_kref(kv);
 
-  struct wormleaf_int * const leaf = wormhole_jump_leaf_write(ref, &kref);
+  struct wormleaf_int * const leaf = lock ? wormhole_jump_leaf_write(ref, &kref)
+                                          : wormhole_jump_leaf(ref, &kref);
   // update
   const u32 im = wormleaf_int_search_eq(leaf, &kref);
   if (im < WH_KPN) {
@@ -2469,12 +2513,13 @@ whunsafe_int_merge(struct wormhole_int * const map, const struct kref * const kr
 
 // del {{{
   static void
-wormhole_del_try_merge(struct wormref_int * const ref, struct wormleaf_int * const leaf)
+wormhole_del_try_merge(struct wormref_int * const ref, struct wormleaf_int * const leaf, bool has_next_lock)
 {
   struct wormleaf_int * const next = leaf->next;
   if (next && ((leaf->nr_keys == 0) || ((leaf->nr_keys + next->nr_keys) < WH_KPN_MRG))) {
     // try merge, it may fail if size becomes larger after locking
-    wormleaf_int_lock_write(next, ref);
+    if (!has_next_lock)
+      wormleaf_int_lock_write(next, ref);
     (void)wormhole_meta_leaf_merge(ref, leaf);
     // locks are already released; immediately return
   } else {
@@ -2483,13 +2528,14 @@ wormhole_del_try_merge(struct wormref_int * const ref, struct wormleaf_int * con
 }
 
   bool
-wormhole_int_del(struct wormref_int * const ref, const struct kref * const key)
+wormhole_int_del(struct wormref_int * const ref, const struct kref * const key, bool has_lock, bool has_next_lock)
 {
-  struct wormleaf_int * const leaf = wormhole_jump_leaf_write(ref, key);
+  struct wormleaf_int * const leaf = has_lock ? wormhole_jump_leaf_write_has_lock(ref, key)
+                                              : wormhole_jump_leaf_write(ref, key);
   const u32 im = wormleaf_int_search_eq(leaf, key);
   if (im < WH_KPN) { // found
     wormleaf_int_remove(leaf, im);
-    wormhole_del_try_merge(ref, leaf);
+    wormhole_del_try_merge(ref, leaf, has_next_lock);
     debug_assert(kv);
     return true;
   } else {
@@ -2499,10 +2545,10 @@ wormhole_int_del(struct wormref_int * const ref, const struct kref * const key)
 }
 
   bool
-whsafe_int_del(struct wormref_int * const ref, const struct kref * const key)
+whsafe_int_del(struct wormref_int * const ref, const struct kref * const key, bool has_lock, bool has_next_lock)
 {
   wormhole_int_resume(ref);
-  const bool r = wormhole_int_del(ref, key);
+  const bool r = wormhole_int_del(ref, key, has_lock, has_next_lock);
   wormhole_int_park(ref);
   return r;
 }
@@ -2552,7 +2598,7 @@ wormhole_int_delr(struct wormref_int * const ref, const struct kref * const star
   struct wormhole_int * const map = ref->map;
   wormleaf_int_delete_range(leafa, ia, iaz);
   if (leafa->nr_keys > ia) { // end hit; done
-    wormhole_del_try_merge(ref, leafa);
+    wormhole_del_try_merge(ref, leafa, false);
     return ndel;
   }
 
@@ -2658,7 +2704,7 @@ wormhole_int_iter_create(struct wormref_int * const ref)
 }
 
   static void
-wormhole_int_iter_fix(struct wormhole_int_iter * const iter)
+wormhole_int_iter_fix(struct wormhole_int_iter * const iter, bool write, bool unlock)
 {
   if (!wormhole_int_iter_valid(iter))
     return;
@@ -2667,12 +2713,23 @@ wormhole_int_iter_fix(struct wormhole_int_iter * const iter)
     struct wormleaf_int * const next = iter->leaf->next;
     if (likely(next != NULL)) {
       struct wormref_int * const ref = iter->ref;
-      wormleaf_int_lock_read(next, ref);
-      wormleaf_int_unlock_read(iter->leaf);
+      if (write) {
+        wormleaf_int_lock_write(next, ref);
+        if (unlock)
+          wormleaf_int_unlock_write(iter->leaf);
+      }
+      else {
+        wormleaf_int_lock_read(next, ref);
+        if (unlock)
+          wormleaf_int_unlock_read(iter->leaf);
+      }
 
       wormhole_int_iter_leaf_sync_sorted(next);
-    } else {
-      wormleaf_int_unlock_read(iter->leaf);
+    } else if (unlock) {
+      if (write)
+        wormleaf_int_unlock_write(iter->leaf);
+      else
+        wormleaf_int_unlock_read(iter->leaf);
     }
     iter->leaf = next;
     iter->is = 0;
@@ -2681,50 +2738,65 @@ wormhole_int_iter_fix(struct wormhole_int_iter * const iter)
   }
 }
 
-  static void
-wormhole_int_iter_fix_rev(struct wormhole_int_iter * const iter)
+  static bool
+wormhole_int_iter_fix_rev(struct wormhole_int_iter * const iter, bool write, bool unlock)
 {
   if (!wormhole_int_iter_valid(iter))
-    return;
+    return true;
 
   while (unlikely(iter->is < 0)) {
     struct wormleaf_int * const prev = iter->leaf->prev;
     if (likely(prev != NULL)) {
       struct wormref_int * const ref = iter->ref;
-      wormleaf_int_lock_read(prev, ref);
-      wormleaf_int_unlock_read(iter->leaf);
+      if (write) {
+        if (!wormleaf_int_trylock_write(prev, ref))
+          return false;
+        if (unlock)
+          wormleaf_int_unlock_write(iter->leaf);
+      }
+      else {
+        if (!wormleaf_int_trylock_read(prev, ref))
+          return false;
+        if (unlock)
+          wormleaf_int_unlock_read(iter->leaf);
+      }
 
       wormhole_int_iter_leaf_sync_sorted(prev);
-    } else {
-      wormleaf_int_unlock_read(iter->leaf);
+    } else if (unlock) {
+      if (write)
+        wormleaf_int_unlock_write(iter->leaf);
+      else
+        wormleaf_int_unlock_read(iter->leaf);
     }
     iter->leaf = prev;
     if (!wormhole_int_iter_valid(iter))
-      return;
+      return true;
     iter->is = prev->nr_keys - 1;
   }
+  return true;
 }
 
   void
-wormhole_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key)
+wormhole_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key, bool write)
 {
   debug_assert(key);
   if (iter->leaf)
     wormleaf_int_unlock_read(iter->leaf);
 
-  struct wormleaf_int * const leaf = wormhole_jump_leaf_read(iter->ref, key);
+  struct wormleaf_int * const leaf = write ? wormhole_jump_leaf_write(iter->ref, key)
+                                           : wormhole_jump_leaf_read(iter->ref, key);
   wormhole_int_iter_leaf_sync_sorted(leaf);
 
   iter->leaf = leaf;
   iter->is = wormleaf_int_seek(leaf, key);
-  wormhole_int_iter_fix(iter);
+  wormhole_int_iter_fix(iter, write, true);
 }
 
   void
-whsafe_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key)
+whsafe_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key, bool write)
 {
   wormhole_int_resume(iter->ref);
-  wormhole_int_iter_seek(iter, key);
+  wormhole_int_iter_seek(iter, key, write);
 }
 
   bool
@@ -2771,50 +2843,52 @@ wormhole_int_iter_kvref(struct wormhole_int_iter * const iter, struct kvref * co
 }
 
   void
-wormhole_int_iter_skip1(struct wormhole_int_iter * const iter)
+wormhole_int_iter_skip1(struct wormhole_int_iter * const iter, bool write, bool unlock)
 {
   if (wormhole_int_iter_valid(iter)) {
     iter->is++;
-    wormhole_int_iter_fix(iter);
+    wormhole_int_iter_fix(iter, write, unlock);
   }
 }
 
   void
-wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr)
+wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write)
 {
   u32 todo = nr;
   while (todo && wormhole_int_iter_valid(iter)) {
     const u32 cap = iter->leaf->nr_sorted - iter->is;
     const u32 nskip = (cap < todo) ? cap : todo;
     iter->is += nskip;
-    wormhole_int_iter_fix(iter);
+    wormhole_int_iter_fix(iter, write, true);
     todo -= nskip;
   }
 }
 
   struct kv *
-wormhole_int_iter_next(struct wormhole_int_iter * const iter, struct kv * const out)
+wormhole_int_iter_next(struct wormhole_int_iter * const iter, struct kv * const out, bool write, bool unlock)
 {
   struct kv * const ret = wormhole_int_iter_peek(iter, out);
-  wormhole_int_iter_skip1(iter);
+  wormhole_int_iter_skip1(iter, write, unlock);
   return ret;
 }
 
-  void
-wormhole_int_iter_skip1_rev(struct wormhole_int_iter * const iter)
+  bool
+wormhole_int_iter_skip1_rev(struct wormhole_int_iter * const iter, bool write, bool unlock)
 {
   if (wormhole_int_iter_valid(iter)) {
     iter->is--;
-    wormhole_int_iter_fix_rev(iter);
+    return wormhole_int_iter_fix_rev(iter, write, unlock);
   }
+  return true;
 }
 
 
   struct kv *
-wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const out)
+wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const out, bool write, bool unlock)
 {
   struct kv * const ret = wormhole_int_iter_peek(iter, out);
-  wormhole_int_iter_skip1_rev(iter);
+  if (!wormhole_int_iter_skip1_rev(iter, write, unlock))
+      return NULL;
   return ret;
 }
 
@@ -2834,34 +2908,41 @@ wormhole_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, voi
 }
 
   void
-wormhole_int_iter_park(struct wormhole_int_iter * const iter)
+wormhole_int_iter_park(struct wormhole_int_iter * const iter, bool write)
 {
   if (iter->leaf) {
-    wormleaf_int_unlock_read(iter->leaf);
+    if (write)
+      wormleaf_int_unlock_write(iter->leaf);
+    else
+      wormleaf_int_unlock_read(iter->leaf);
     iter->leaf = NULL;
   }
 }
 
   void
-whsafe_int_iter_park(struct wormhole_int_iter * const iter)
+whsafe_int_iter_park(struct wormhole_int_iter * const iter, bool write)
 {
-  wormhole_int_iter_park(iter);
+  wormhole_int_iter_park(iter, write);
   wormhole_int_park(iter->ref);
 }
 
   void
-wormhole_int_iter_destroy(struct wormhole_int_iter * const iter)
+wormhole_int_iter_destroy(struct wormhole_int_iter * const iter, bool write)
 {
-  if (iter->leaf)
-    wormleaf_int_unlock_read(iter->leaf);
+  if (iter->leaf) {
+    if (write)
+      wormleaf_int_unlock_write(iter->leaf);
+    else
+      wormleaf_int_unlock_read(iter->leaf);
+  }
   free(iter);
 }
 
   void
-whsafe_int_iter_destroy(struct wormhole_int_iter * const iter)
+whsafe_int_iter_destroy(struct wormhole_int_iter * const iter, bool write)
 {
   wormhole_int_park(iter->ref);
-  wormhole_int_iter_destroy(iter);
+  wormhole_int_iter_destroy(iter, write);
 }
 // }}} iter
 
@@ -3162,11 +3243,11 @@ wh_int_put(struct wormref_int * const ref, const void * const kbuf, const u32 kl
 
 // delete a key
   bool
-wh_int_del(struct wormref_int * const ref, const void * const kbuf, const u32 klen)
+wh_int_del(struct wormref_int * const ref, const void * const kbuf, const u32 klen, bool has_lock, bool has_next_lock)
 {
   struct kref kref;
   kref_ref_hash32(&kref, kbuf, klen);
-  return wh_api->del(ref, &kref);
+  return wh_api->del(ref, &kref, has_lock, has_next_lock);
 }
 
 // test if the key exist in Wormhole
@@ -3258,11 +3339,11 @@ wh_int_iter_create(struct wormref_int * const ref)
 }
 
   void
-wh_int_iter_seek(struct wormhole_int_iter * const iter, const void * const kbuf, const u32 klen)
+wh_int_iter_seek(struct wormhole_int_iter * const iter, const void * const kbuf, const u32 klen, bool write)
 {
   struct kref kref;
   kref_ref_hash32(&kref, kbuf, klen);
-  wh_api->iter_seek(iter, &kref);
+  wh_api->iter_seek(iter, &kref, write);
 }
 
   bool
@@ -3325,21 +3406,21 @@ wh_int_iter_peek_ref(struct wormhole_int_iter * const iter,
 }
 
   void
-wh_int_iter_skip1(struct wormhole_int_iter * const iter)
+wh_int_iter_skip1(struct wormhole_int_iter * const iter, bool write, bool unlock)
 {
-  wh_api->iter_skip1(iter);
+  wh_api->iter_skip1(iter, write, unlock);
+}
+
+  bool
+wh_int_iter_skip1_rev(struct wormhole_int_iter * const iter, bool write, bool unlock)
+{
+  return wh_api->iter_skip1_rev(iter, write, unlock);
 }
 
   void
-wh_int_iter_skip1_rev(struct wormhole_int_iter * const iter)
+wh_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write)
 {
-  wh_api->iter_skip1_rev(iter);
-}
-
-  void
-wh_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr)
-{
-  wh_api->iter_skip(iter, nr);
+  wh_api->iter_skip(iter, nr, write, true);
 }
 
   bool

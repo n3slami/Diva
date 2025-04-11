@@ -1,6 +1,8 @@
 #pragma once
 
+#include "wormhole/lib.h"
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <immintrin.h>
 
@@ -262,3 +264,81 @@ inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r,
         l_src_bit_pos += erase_amount;
     }
 }
+
+
+// Synchronization and Locking Primitives
+typedef uint32_t lock_t;
+static constexpr lock_t rwlock_no_access = 0;
+static constexpr lock_t rwlock_write_bit = 1ULL << (sizeof(lock_t) - 1);
+
+
+__attribute__((always_inline))
+inline void cpu_pause() {
+#if defined(__x86_64__)
+    _mm_pause();
+#elif defined(__aarch64__)
+    // nop
+#endif
+}
+
+
+__attribute__((always_inline))
+inline bool rwlock_trylock_read(std::atomic<lock_t>& lock) {
+    if ((lock.fetch_add(1, std::memory_order::memory_order_acquire) & rwlock_write_bit) == 0)
+        return true;
+    else {
+        lock.fetch_sub(1, std::memory_order::memory_order_relaxed);
+        return false;
+    }
+}
+
+__attribute__((always_inline))
+inline void rwlock_lock_read(std::atomic<lock_t>& lock) {
+#pragma nounroll
+    do {
+        if (rwlock_trylock_read(lock))
+            return;
+#pragma nounroll
+        do {
+            cpu_pause();
+        } while (lock.load(std::memory_order::memory_order_acquire) & rwlock_write_bit);
+    } while (true);
+}
+
+__attribute__((always_inline))
+inline void rwlock_unlock_read(std::atomic<lock_t>& lock) {
+    lock.fetch_sub(1, std::memory_order::memory_order_release);
+}
+
+__attribute__((always_inline))
+inline bool rwlock_trylock_write(std::atomic<lock_t>& lock) {
+    lock_t v0 = lock.load(std::memory_order::memory_order_acquire);
+    if (v0 == rwlock_no_access && lock.compare_exchange_weak(v0, rwlock_write_bit,
+                                                             std::memory_order::memory_order_acquire,
+                                                             std::memory_order::memory_order_relaxed)) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+__attribute__((always_inline))
+inline void rwlock_lock_write(std::atomic<lock_t>& lock) {
+#pragma nounroll
+    do {
+        if (rwlock_trylock_write(lock))
+            return;
+#pragma nounroll
+        do {
+            cpu_pause();
+        } while (lock.load(std::memory_order::memory_order_acquire));
+    } while (true);
+}
+
+__attribute__((always_inline))
+inline void rwlock_unlock_write(std::atomic<lock_t>& lock) {
+  lock.fetch_sub(rwlock_write_bit, std::memory_order::memory_order_release);
+}
+
+

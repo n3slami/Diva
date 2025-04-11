@@ -51,9 +51,10 @@ TEST_SUITE("wormhole_int") {
 
         std::sort(keys.begin(), keys.end());
 
+        const bool it_w = false;
         wormhole_int_iter *it = wh_int_iter_create(better_tree);
         int32_t ind = 0;
-        for (wh_int_iter_seek(it, "", 0); wh_int_iter_valid(it); wh_int_iter_skip1(it)) {
+        for (wh_int_iter_seek(it, "", 0, it_w); wh_int_iter_valid(it); wh_int_iter_skip1(it, it_w)) {
             const uint8_t *fetched_key;
             uint8_t *fetched_value;
             uint32_t fetched_key_size, fetched_value_size;
@@ -63,7 +64,7 @@ TEST_SUITE("wormhole_int") {
             REQUIRE_EQ(recovered_key, keys[ind++]);
         }
         const uint64_t tmp = _bswap64(keys[keys.size() - 1]);
-        for (wh_int_iter_seek(it, &tmp, sizeof(tmp)); wh_int_iter_valid(it); wh_int_iter_skip1_rev(it)) {
+        for (wh_int_iter_seek(it, &tmp, sizeof(tmp), it_w); wh_int_iter_valid(it); wh_int_iter_skip1_rev(it, it_w)) {
             const uint8_t *fetched_key;
             uint8_t *fetched_value;
             uint32_t fetched_key_size, fetched_value_size;

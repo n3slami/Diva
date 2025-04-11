@@ -50,7 +50,7 @@ wormhole_int_merge(struct wormref_int * const ref, const struct kref * const kre
     kv_merge_func uf, void * const priv);
 
   extern bool
-wormhole_int_del(struct wormref_int * const ref, const struct kref * const key);
+wormhole_int_del(struct wormref_int * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
 
   extern u64
 wormhole_int_delr(struct wormref_int * const ref, const struct kref * const start,
@@ -58,13 +58,22 @@ wormhole_int_delr(struct wormref_int * const ref, const struct kref * const star
 
 // HAAAAAAAAAAAAAAACK
   void
+wormleaf_int_lock_write(struct wormleaf_int * const leaf, struct wormref_int * const ref);
+
+  void
+wormleaf_int_lock_read(struct wormleaf_int * const leaf, struct wormref_int * const ref);
+
+  void
+wormleaf_int_unlock_write(struct wormleaf_int * const leaf);
+
+  void
 wormleaf_int_unlock_read(struct wormleaf_int * const leaf);
 
   extern struct wormhole_int_iter *
 wormhole_int_iter_create(struct wormref_int * const ref);
 
   extern void
-wormhole_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key);
+wormhole_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key, bool write);
 
   extern bool
 wormhole_int_iter_valid(struct wormhole_int_iter * const iter);
@@ -79,29 +88,29 @@ wormhole_int_iter_kref(struct wormhole_int_iter * const iter, struct kref * cons
 wormhole_int_iter_kvref(struct wormhole_int_iter * const iter, struct kvref * const kvref);
 
   extern void
-wormhole_int_iter_skip1(struct wormhole_int_iter * const iter);
+wormhole_int_iter_skip1(struct wormhole_int_iter * const iter, bool write, bool unlock);
 
   extern void
-wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr);
+wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write);
 
   extern struct kv *
-wormhole_int_iter_next(struct wormhole_int_iter * const iter, struct kv * const out);
+wormhole_int_iter_next(struct wormhole_int_iter * const iter, struct kv * const out, bool write, bool unlock);
 
-  extern void
-wormhole_int_iter_skip1_rev(struct wormhole_int_iter * const iter);
+  extern bool
+wormhole_int_iter_skip1_rev(struct wormhole_int_iter * const iter, bool write, bool unlock);
 
   extern struct kv *
-wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const out);
+wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const out, bool write, bool unlock);
 
 
   extern bool
 wormhole_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * const priv);
 
   extern void
-wormhole_int_iter_park(struct wormhole_int_iter * const iter);
+wormhole_int_iter_park(struct wormhole_int_iter * const iter, bool write);
 
   extern void
-wormhole_int_iter_destroy(struct wormhole_int_iter * const iter);
+wormhole_int_iter_destroy(struct wormhole_int_iter * const iter, bool write);
 
   extern struct wormref_int *
 wormhole_int_ref(struct wormhole_int * const map);
@@ -144,7 +153,7 @@ whsafe_int_merge(struct wormref_int * const ref, const struct kref * const kref,
     kv_merge_func uf, void * const priv);
 
   extern bool
-whsafe_int_del(struct wormref_int * const ref, const struct kref * const key);
+whsafe_int_del(struct wormref_int * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
 
   extern u64
 whsafe_int_delr(struct wormref_int * const ref, const struct kref * const start,
@@ -152,7 +161,7 @@ whsafe_int_delr(struct wormref_int * const ref, const struct kref * const start,
 
 // use wormhole_int_iter_create
   extern void
-whsafe_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key);
+whsafe_int_iter_seek(struct wormhole_int_iter * const iter, const struct kref * const key, bool write);
 
   extern struct kv *
 whsafe_int_iter_peek(struct wormhole_int_iter * const iter, struct kv * const out);
@@ -166,10 +175,10 @@ whsafe_int_iter_peek(struct wormhole_int_iter * const iter, struct kv * const ou
 // use wormhole_int_iter_next
 
   extern void
-whsafe_int_iter_park(struct wormhole_int_iter * const iter);
+whsafe_int_iter_park(struct wormhole_int_iter * const iter, bool write);
 
   extern void
-whsafe_int_iter_destroy(struct wormhole_int_iter * const iter);
+whsafe_int_iter_destroy(struct wormhole_int_iter * const iter, bool write);
 
   extern struct wormref_int *
 whsafe_int_ref(struct wormhole_int * const map);
@@ -211,7 +220,7 @@ wh_int_put(struct wormref_int * const ref, const void * const kbuf, const u32 kl
     const void * const vbuf, const u32 vlen);
 
   extern bool
-wh_int_del(struct wormref_int * const ref, const void * const kbuf, const u32 klen);
+wh_int_del(struct wormref_int * const ref, const void * const kbuf, const u32 klen, bool has_lock, bool has_next_lock);
 
   extern bool
 wh_int_probe(struct wormref_int * const ref, const void * const kbuf, const u32 klen);
@@ -232,7 +241,7 @@ wh_int_delr(struct wormref_int * const ref, const void * const kbuf_start, const
 wh_int_iter_create(struct wormref_int * const ref);
 
   extern void
-wh_int_iter_seek(struct wormhole_int_iter * const iter, const void * const kbuf, const u32 klen);
+wh_int_iter_seek(struct wormhole_int_iter * const iter, const void * const kbuf, const u32 klen, bool write);
 
   extern bool
 wh_int_iter_valid(struct wormhole_int_iter * const iter);
@@ -248,13 +257,13 @@ wh_int_iter_peek_ref(struct wormhole_int_iter * const iter,
     void ** vbuf_out, u32 * const vlen_out);
 
   extern void
-wh_int_iter_skip1(struct wormhole_int_iter * const iter);
+wh_int_iter_skip1(struct wormhole_int_iter * const iter, bool write, bool unlock);
 
   extern void
-wh_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr);
+wh_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write);
 
-  extern void
-wh_int_iter_skip1_rev(struct wormhole_int_iter * const iter);
+  extern bool
+wh_int_iter_skip1_rev(struct wormhole_int_iter * const iter, bool write, bool unlock);
 
   extern bool
 wh_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * const priv);

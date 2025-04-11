@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -142,6 +143,7 @@ private:
         static const uint32_t elem_count_bit_count = 20;
 
         uint32_t status = 0;
+        std::atomic<lock_t> rwlock {0};
         uint64_t *ptr = nullptr;
 
         InfixStore(const uint32_t slot_count, const uint32_t slot_size, const uint32_t size_grade=size_scalar_shrink_grow_sep) {
@@ -222,7 +224,7 @@ private:
     void AddTreeKey(const uint8_t *key, const uint32_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
-    void DeleteMerge(void *const it_inp);
+    void DeleteMerge(InfiniteByteString key);
     template <class t_itr>
     void BulkLoadFixedLength(t_itr begin, t_itr end, const uint32_t key_len);
     template <class t_itr>
@@ -234,6 +236,16 @@ private:
     uint64_t ExtractPartialKey(const InfiniteByteString key,
                                const uint32_t shared, const uint32_t ignore,
                                const uint32_t implicit_size, const uint64_t msb) const;
+    void GetLowerUpperBounds(const InfiniteByteString& key, bool write, bool unlock, void *leaves[3],
+                             wormhole_iter& it, wormhole_int_iter& it_int,
+                             InfiniteByteString& prev_key, InfiniteByteString& next_key,
+                             Diva<int_optimized>::InfixStore *& infix_store_ptr);
+    void GetLowerMiddleUpperBounds(const InfiniteByteString& key, bool write, bool unlock, void *leaves[3],
+                                   wormhole_iter& it, wormhole_int_iter& it_int,
+                                   InfiniteByteString& left_key, InfiniteByteString& middle_key, InfiniteByteString& right_key,
+                                   Diva<int_optimized>::InfixStore *& left_store_ptr, Diva<int_optimized>::InfixStore *& right_store_ptr);
+    void OrderLeaves(void *leaves[3], uint32_t l, uint32_t r);
+    void UnlockLeaves(void *leaves[3], bool write);
 
     uint32_t RankOccupieds(const InfixStore &store, const uint32_t pos) const;
     uint32_t SelectRunends(const InfixStore &store, const uint32_t rank) const;
@@ -394,6 +406,203 @@ inline void Diva<int_optimized>::SetupScaleFactors() {
 
 
 template <bool int_optimized>
+inline void Diva<int_optimized>::GetLowerUpperBounds(const InfiniteByteString& key, bool write, bool unlock, void *leaves[3],
+                                                     wormhole_iter& it, wormhole_int_iter& it_int,
+                                                     InfiniteByteString& prev_key, InfiniteByteString& next_key,
+                                                     Diva<int_optimized>::InfixStore *& infix_store_ptr) {
+GetLowerUpperBoundsRetry:
+    uint32_t l_ind = 0, r_ind = 0;
+    InfixStore *dummy_infix_store_ptr;
+    uint32_t dummy_val;
+    if constexpr (int_optimized) {
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, key.str, key.length, write);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                                      reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        leaves[r_ind++] = it_int.leaf;
+
+        do {
+            if (!wh_int_iter_skip1_rev(&it_int, write, unlock)) {
+                OrderLeaves(leaves, l_ind, r_ind);
+                UnlockLeaves(leaves, write);
+                goto GetLowerUpperBoundsRetry;
+            }
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+
+            const uint32_t prev_r_ind = (r_ind == 0 ? 2 : r_ind - 1);
+            if (it_int.leaf != leaves[prev_r_ind]) {
+                leaves[r_ind++] = it_int.leaf;
+                r_ind = (r_ind >= 3 ? 0 : r_ind);
+                if (!unlock && l_ind == r_ind) {
+                    if (write)
+                        wormleaf_int_unlock_write(reinterpret_cast<struct wormleaf_int *>(leaves[l_ind++]));
+                    else
+                        wormleaf_int_unlock_read(reinterpret_cast<struct wormleaf_int *>(leaves[l_ind++]));
+                    l_ind = (l_ind >= 3 ? 0 : l_ind);
+                }
+            }
+
+            if (prev_key > key)
+                next_key = prev_key;
+        } while (prev_key > key);
+    }
+    else {
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, key.str, key.length, write);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
+                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        leaves[r_ind++] = it.leaf;
+
+        do {
+            if (!wh_iter_skip1_rev(&it, write, unlock)) {
+                OrderLeaves(leaves, l_ind, r_ind);
+                UnlockLeaves(leaves, write);
+                goto GetLowerUpperBoundsRetry;
+            }
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
+                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
+
+            const uint32_t prev_r_ind = (r_ind == 0 ? 2 : r_ind - 1);
+            if (it_int.leaf != leaves[prev_r_ind]) {
+                leaves[r_ind++] = it_int.leaf;
+                r_ind = (r_ind >= 3 ? 0 : r_ind);
+                if (!unlock && l_ind == r_ind) {
+                    if (write)
+                        wormleaf_int_unlock_write(reinterpret_cast<struct wormleaf_int *>(leaves[l_ind++]));
+                    else
+                        wormleaf_int_unlock_read(reinterpret_cast<struct wormleaf_int *>(leaves[l_ind++]));
+                    l_ind = (l_ind >= 3 ? 0 : l_ind);
+                }
+            }
+
+            if (prev_key > key)
+                next_key = prev_key;
+        } while (prev_key > key);
+    }
+
+    if (!unlock)
+        OrderLeaves(leaves, l_ind, r_ind);
+
+    assert(prev_key <= key);
+    assert(key < next_key);
+}
+
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::GetLowerMiddleUpperBounds(const InfiniteByteString& key, bool write, bool unlock, void *leaves[3],
+                                                           wormhole_iter& it, wormhole_int_iter& it_int,
+                                                           InfiniteByteString& left_key, InfiniteByteString& middle_key, InfiniteByteString& right_key,
+                                                           Diva<int_optimized>::InfixStore *& left_store_ptr, Diva<int_optimized>::InfixStore *& right_store_ptr) {
+GetLowerMiddleUpperBoundsRetry:
+    uint32_t l_ind = 0, r_ind = 0;
+    InfixStore *dummy_infix_store_ptr;
+    uint32_t dummy_val;
+    if constexpr (int_optimized) {
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        wh_int_iter_seek(&it_int, key.str, key.length, write);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length,
+                                      reinterpret_cast<void **>(&right_store_ptr), &dummy_val);
+        leaves[r_ind++] = it_int.leaf;
+
+        wh_int_iter_skip1(&it_int, write, unlock);
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&right_key.str), &right_key.length,
+                                      reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        if (it_int.leaf != leaves[r_ind - 1])
+            leaves[r_ind++] = it_int.leaf;
+
+        wh_int_iter_skip1_rev(&it_int, write, unlock);
+        if (!wh_int_iter_skip1_rev(&it_int, write, unlock)) {
+            UnlockLeaves(leaves, write);
+            goto GetLowerMiddleUpperBoundsRetry;
+        }
+        if (it_int.leaf != leaves[r_ind - 1]) {
+            leaves[r_ind++] = it_int.leaf;
+            std::swap(leaves[0], leaves[1]);
+        }
+        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&left_key.str), &left_key.length,
+                                      reinterpret_cast<void **>(&left_store_ptr), &dummy_val);
+    }
+    else {
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        wh_iter_seek(&it, key.str, key.length, write);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length,
+                              reinterpret_cast<void **>(&right_store_ptr), &dummy_val);
+        leaves[r_ind++] = it.leaf;
+
+        wh_iter_skip1(&it, write, unlock);
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&right_key.str), &right_key.length,
+                              reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
+        if (it.leaf != leaves[r_ind - 1])
+            leaves[r_ind++] = it.leaf;
+
+        wh_iter_skip1_rev(&it, write, unlock);
+        if (!wh_iter_skip1_rev(&it, write, unlock)) {
+            UnlockLeaves(leaves, write);
+            goto GetLowerMiddleUpperBoundsRetry;
+        }
+        if (it.leaf != leaves[r_ind - 1]) {
+            leaves[r_ind++] = it.leaf;
+            std::swap(leaves[0], leaves[1]);
+        }
+        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&left_key.str), &left_key.length,
+                              reinterpret_cast<void **>(&left_store_ptr), &dummy_val);
+    }
+
+    assert(prev_key <= key);
+    assert(key < next_key);
+}
+
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::OrderLeaves(void *leaves[3], uint32_t l, uint32_t r) {
+    const uint32_t l_inc = l == 2 ? 0 : l + 1;
+    if (l_inc == r) {
+        leaves[0] = leaves[l];
+        leaves[1] = leaves[2] = nullptr;
+    }
+    else {
+        void *tmp[2];
+        tmp[0] = leaves[l];
+        tmp[1] = leaves[l_inc];
+        leaves[0] = tmp[0];
+        leaves[1] = tmp[1];
+        leaves[2] = nullptr;
+    }
+}
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::UnlockLeaves(void *leaves[3], bool write) {
+    for (uint32_t i = 0; i < 3 && leaves[i] != nullptr; i++) {
+        if (write) {
+            if constexpr (int_optimized)
+                wormleaf_int_unlock_write(reinterpret_cast<struct wormleaf_int *>(leaves[i]));
+            else
+                wormleaf_unlock_write(reinterpret_cast<struct wormleaf *>(leaves[i]));
+        }
+        else {
+            if constexpr (int_optimized)
+                wormleaf_int_unlock_read(reinterpret_cast<struct wormleaf_int *>(leaves[i]));
+            else
+                wormleaf_unlock_read(reinterpret_cast<struct wormleaf *>(leaves[i]));
+        }
+    }
+}
+
+
+template <bool int_optimized>
 inline void Diva<int_optimized>::Insert(uint64_t key) {
     key = __builtin_bswap64(key);
     Insert(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
@@ -417,65 +626,21 @@ inline void Diva<int_optimized>::Insert(const uint8_t *key, const uint32_t key_l
 
 template <bool int_optimized>
 inline void Diva<int_optimized>::InsertSimple(const InfiniteByteString key) {
-    InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
-    uint32_t dummy_val;
+    const bool it_write_lock = false;
+    InfixStore *infix_store_ptr;
+    void *leaves_to_unlock[3];
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, key.str, key.length);
-
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            prev_key = next_key;
-            wh_int_iter_skip1(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        }
-        else {
-            wh_int_iter_skip1_rev(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
-    }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, key.str, key.length);
-
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            prev_key = next_key;
-            wh_iter_skip1(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        }
-        else {
-            wh_iter_skip1_rev(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
-    }
-
-    assert(prev_key <= key);
-    assert(key < next_key);
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerUpperBounds(key, false, false, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
 
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_write(infix_store.rwlock);
+    UnlockLeaves(leaves_to_unlock, false);
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
 
@@ -485,6 +650,8 @@ inline void Diva<int_optimized>::InsertSimple(const InfiniteByteString key) {
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t insertee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
     InsertRawIntoInfixStore(infix_store, insertee, total_implicit);
+
+    rwlock_unlock_write(infix_store.rwlock);
 }
 
 
@@ -507,60 +674,32 @@ inline bool Diva<int_optimized>::RangeQuery(std::string_view input_l, std::strin
 template <bool int_optimized>
 inline bool Diva<int_optimized>::RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
                                             const uint8_t *input_r, const uint32_t input_r_len) const {
+    const bool it_write_lock = false;
     const InfiniteByteString l_key {input_l, static_cast<uint32_t>(input_l_len)};
     const InfiniteByteString r_key {input_r, static_cast<uint32_t>(input_r_len)};
 
     InfixStore *infix_store_ptr;
-    uint32_t dummy_val;
+    void *leaves_to_unlock[3];
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, l_key.str, l_key.length);
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerUpperBounds(l_key, false, false, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
 
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key <= r_key) {
-            if (it_int.leaf)
-                wormleaf_int_unlock_read(it_int.leaf);
-            return true;
-        }
-        wh_int_iter_skip1_rev(&it_int);
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
-    }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, l_key.str, l_key.length);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key <= r_key) {
-            if (it.leaf)
-                wormleaf_unlock_read(it.leaf);
-            return true;
-        }
-        wh_iter_skip1_rev(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
+    if (next_key <= r_key) {
+        UnlockLeaves(leaves_to_unlock, false);
+        return true;
     }
     
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_read(infix_store.rwlock);
+    UnlockLeaves(leaves_to_unlock, false);
 
     if (infix_store.IsPartialKey() && prev_key.IsPrefixOf(l_key, infix_store.GetInvalidBits())) {
         // Previous key was a partial key and a prefix of the left query key
+        rwlock_unlock_read(infix_store.rwlock);
         return true;
     }
 
@@ -621,61 +760,23 @@ inline bool Diva<int_optimized>::PointQuery(const uint8_t *input_key, const uint
     const InfiniteByteString key {input_key, static_cast<uint32_t>(key_len)};
     
     InfixStore *infix_store_ptr;
-    uint32_t dummy_val;
+    void *leaves_to_unlock[3];
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, input_key, key_len);
-
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            if (it_int.leaf)
-                wormleaf_int_unlock_read(it_int.leaf);
-            return true;
-        }
-        wh_int_iter_skip1_rev(&it_int);
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
-    }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, input_key, key_len);
-
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            if (it.leaf)
-                wormleaf_unlock_read(it.leaf);
-            return true;
-        }
-        wh_iter_skip1_rev(&it);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
-    }
-    
-    assert(prev_key <= key);
-    assert(key < next_key);
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerUpperBounds(key, false, false, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
 
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_read(infix_store.rwlock);
+    UnlockLeaves(leaves_to_unlock, false);
 
     if (infix_store.IsPartialKey() && prev_key.IsPrefixOf(key, infix_store.GetInvalidBits())) {
         // Previous key was a partial key and a prefix of the query key
+        rwlock_unlock_read(infix_store.rwlock);
         return true;
     }
 
@@ -693,77 +794,33 @@ template <bool int_optimized>
 inline void Diva<int_optimized>::AddTreeKey(const uint8_t *key, const uint32_t key_len) {
     InfixStore infix_store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_);
     if constexpr (int_optimized)
-        wh_int_put(better_tree_int_, key, key_len, &infix_store, sizeof(infix_store));
+        wh_int_put(better_tree_int_, key, key_len, &infix_store, sizeof(infix_store), false);
     else
-        wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store));
+        wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store), false);
 }
 
 
 template <bool int_optimized>
 inline void Diva<int_optimized>::InsertSplit(const InfiniteByteString key) {
-    InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
-    uint32_t dummy_val;
+    InfixStore *infix_store_ptr;
+    void *leaves_to_unlock[3];
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
-    if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, key.str, key.length);
-
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            prev_key = next_key;
-            wh_int_iter_skip1(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        }
-        else {
-            wh_int_iter_skip1_rev(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
-    }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, key.str, key.length);
-
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            prev_key = next_key;
-            wh_iter_skip1(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-        }
-        else {
-            wh_iter_skip1_rev(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
-    }
-
-    assert(prev_key <= key);
-    assert(key < next_key);
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerUpperBounds(key, true, false, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
 
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_write(infix_store.rwlock);
 
     if (infix_store.IsPartialKey() && prev_key.IsPrefixOf(key, infix_store.GetInvalidBits())) {
         // Previous key was a partial key and a prefix of the new boundary key
         // Inserting using the simple method...
+        rwlock_unlock_write(infix_store.rwlock);
+        UnlockLeaves(leaves_to_unlock, true);
         InsertSimple(key);
         return;
     }
@@ -866,29 +923,27 @@ inline void Diva<int_optimized>::InsertSplit(const InfiniteByteString key) {
                                                      total_implicit_gt);
     
     auto *ptr_to_free = infix_store.ptr;
-    if constexpr (int_optimized)
-        wh_int_put(better_tree_int_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
-    else 
-        wh_put(better_tree_, prev_key.str, prev_key.length, &store_lt, sizeof(InfixStore));
+    memcpy(&infix_store, &store_lt, sizeof(store_lt));
     if (zero_pos != -1) {
         const uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
         InsertRawIntoInfixStore(store_gt, key_extraction & BITMASK(infix_size_) | 1, total_implicit_gt);
         store_gt.SetInvalidBits(7 - (zero_pos - 1) % 8);
         store_gt.SetPartialKey(true);
         if constexpr (int_optimized)
-            wh_int_put(better_tree_int_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore));
+            wh_int_put(better_tree_int_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore), true);
         else 
-            wh_put(better_tree_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore));
+            wh_put(better_tree_, edited_key.str, edited_key.length, &store_gt, sizeof(InfixStore), true);
     }
     else {
         if constexpr (int_optimized)
-            wh_int_put(better_tree_int_, key.str, key.length, &store_gt, sizeof(InfixStore));
+            wh_int_put(better_tree_int_, key.str, key.length, &store_gt, sizeof(InfixStore), true);
         else
-            wh_put(better_tree_, key.str, key.length, &store_gt, sizeof(InfixStore));
+            wh_put(better_tree_, key.str, key.length, &store_gt, sizeof(InfixStore), true);
     }
 
     // No memory leaks!
     delete[] ptr_to_free;
+    UnlockLeaves(leaves_to_unlock, true);
 }
 
 
@@ -1001,6 +1056,7 @@ inline void Diva<int_optimized>::ShrinkInfixSize(const uint32_t new_infix_size) 
     InfixStore *store_ptr;
     const uint8_t *key;
     uint32_t key_len, dummy_val;
+    const bool write = false, unlock = true;
 
     if constexpr (int_optimized) {
         wormhole_int_iter it_int;
@@ -1008,12 +1064,12 @@ inline void Diva<int_optimized>::ShrinkInfixSize(const uint32_t new_infix_size) 
         it_int.map = better_tree_int_->map;
         it_int.leaf = nullptr;
         it_int.is = 0;
-        wh_int_iter_seek(&it_int, nullptr, 0);
+        wh_int_iter_seek(&it_int, nullptr, 0, write);
         do {
             wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&key), &key_len,
                                           reinterpret_cast<void **>(&store_ptr), &dummy_val);
             ShrinkInfixStoreInfixSize(*store_ptr, new_infix_size);
-            wh_int_iter_skip1(&it_int);
+            wh_int_iter_skip1(&it_int, write, unlock);
         } while (wh_int_iter_valid(&it_int));
         if (it_int.leaf)
             wormleaf_int_unlock_read(it_int.leaf);
@@ -1024,12 +1080,12 @@ inline void Diva<int_optimized>::ShrinkInfixSize(const uint32_t new_infix_size) 
         it.map = better_tree_->map;
         it.leaf = nullptr;
         it.is = 0;
-        wh_iter_seek(&it, nullptr, 0);
+        wh_iter_seek(&it, nullptr, 0, write);
         do {
             wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&key), &key_len,
                                   reinterpret_cast<void **>(&store_ptr), &dummy_val);
             ShrinkInfixStoreInfixSize(*store_ptr, new_infix_size);
-            wh_iter_skip1(&it);
+            wh_iter_skip1(&it, write, unlock);
         } while (wh_iter_valid(&it));
         if (it.leaf)
             wormleaf_unlock_read(it.leaf);
@@ -1045,6 +1101,7 @@ inline uint32_t Diva<int_optimized>::Size() const {
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
     InfixStore *store;
+    const bool write = false, unlock = true;
 
     if constexpr (int_optimized) {
         wormhole_int_iter it_int;
@@ -1052,7 +1109,7 @@ inline uint32_t Diva<int_optimized>::Size() const {
         it_int.map = better_tree_int_->map;
         it_int.leaf = nullptr;
         it_int.is = 0;
-        for (wh_int_iter_seek(&it_int, nullptr, 0); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int)) {
+        for (wh_int_iter_seek(&it_int, nullptr, 0, write); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int, write, unlock)) {
             wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                           reinterpret_cast<void **>(&store), &dummy);
             res += (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7) / 8;
@@ -1066,7 +1123,7 @@ inline uint32_t Diva<int_optimized>::Size() const {
         it.map = better_tree_->map;
         it.leaf = nullptr;
         it.is = 0;
-        for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
+        for (wh_iter_seek(&it, nullptr, 0, write); wh_iter_valid(&it); wh_iter_skip1(&it, write, unlock)) {
             wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                   reinterpret_cast<void **>(&store), &dummy);
             const uint32_t bits_used = (scaled_sizes_[store->GetSizeGrade()] * (1 + infix_size_) + infix_store_target_size + 7);
@@ -1110,71 +1167,26 @@ template <bool int_optimized>
 inline void Diva<int_optimized>::Delete(const uint8_t *input_key, const uint32_t input_key_len) {
     InfiniteByteString key {input_key, input_key_len};
 
-    InfixStore *infix_store_ptr, *dummy_infix_store_ptr;
-    uint32_t dummy_val;
+    InfixStore *infix_store_ptr;
+    void *leaves_to_unlock[3];
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
 
     wormhole_int_iter it_int;
     wormhole_iter it;
-    if constexpr (int_optimized) {
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, key.str, key.length);
+    GetLowerUpperBounds(key, false, false, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
 
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                      reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            if (!infix_store_ptr->IsPartialKey()) {
-                DeleteMerge(&it_int);
-                return;
-            }
-            prev_key = next_key;
-            wh_int_iter_skip1(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                          reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-            wh_int_iter_skip1_rev(&it_int);
-        }
-        else {
-            wh_int_iter_skip1_rev(&it_int);
-            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                          reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
+    if (prev_key == key && !infix_store_ptr->IsPartialKey()) {
+        UnlockLeaves(leaves_to_unlock, false);
+        DeleteMerge(key);
+        return;
     }
-    else {
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, key.str, key.length);
-
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                              reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        if (next_key == key) {
-            if (!infix_store_ptr->IsPartialKey()) {
-                DeleteMerge(&it);
-                return;
-            }
-            prev_key = next_key;
-            wh_iter_skip1(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&next_key.str), &next_key.length,
-                                  reinterpret_cast<void **>(&dummy_infix_store_ptr), &dummy_val);
-            wh_iter_skip1_rev(&it);
-        }
-        else {
-            wh_iter_skip1_rev(&it);
-            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&prev_key.str), &prev_key.length,
-                                  reinterpret_cast<void **>(&infix_store_ptr), &dummy_val);
-        }
-    }
-
-    assert(prev_key <= key);
-    assert(key < next_key);
 
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_write(infix_store.rwlock);
+
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
@@ -1187,10 +1199,9 @@ inline void Diva<int_optimized>::Delete(const uint8_t *input_key, const uint32_t
         const uint32_t longest_match_len = GetLongestMatchingInfixSize(infix_store, deletee);
         if (longest_match_len == 0 || 8 * prev_key.length - infix_store.GetInvalidBits() 
                                         > shared + ignore + implicit_size + longest_match_len - 1) {
-            if constexpr (int_optimized)
-                DeleteMerge(&it_int);
-            else
-                DeleteMerge(&it);
+            UnlockLeaves(leaves_to_unlock, false);
+            rwlock_unlock_write(infix_store.rwlock);
+            DeleteMerge(prev_key);
             return;
         }
     }
@@ -1205,45 +1216,25 @@ inline void Diva<int_optimized>::Delete(const uint8_t *input_key, const uint32_t
     }
 
     DeleteRawFromInfixStore(infix_store, deletee, total_implicit);
+    rwlock_unlock_write(infix_store.rwlock);
 }
 
 
 template <bool int_optimized>
-inline void Diva<int_optimized>::DeleteMerge(void *const it_inp) {
+inline void Diva<int_optimized>::DeleteMerge(InfiniteByteString key) {
     InfiniteByteString middle_key {};
     InfiniteByteString left_key {};
     InfiniteByteString right_key {};
     InfixStore *store_l, *store_r;
-    uint32_t dummy;
+    void *leaves_to_unlock[3];
 
-    if constexpr (int_optimized) {
-        wormhole_int_iter *const it_int = reinterpret_cast<wormhole_int_iter *const>(it_inp);
-        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
-                                     reinterpret_cast<void **>(&store_r), &dummy);
-        wh_int_iter_skip1(it_int);
-        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
-                                     reinterpret_cast<void **>(&store_l), &dummy);
-        wh_int_iter_skip1_rev(it_int);
-        wh_int_iter_skip1_rev(it_int);
-        wh_int_iter_peek_ref(it_int, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
-                                     reinterpret_cast<void **>(&store_l), &dummy);
-        if (it_int->leaf)
-            wormleaf_int_unlock_read(it_int->leaf);
-    }
-    else {
-        wormhole_iter *const it = reinterpret_cast<wormhole_iter *const>(it_inp);
-        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&middle_key.str), &middle_key.length, 
-                             reinterpret_cast<void **>(&store_r), &dummy);
-        wh_iter_skip1(it);
-        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&right_key.str), &right_key.length, 
-                             reinterpret_cast<void **>(&store_l), &dummy);
-        wh_iter_skip1_rev(it);
-        wh_iter_skip1_rev(it);
-        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&left_key.str), &left_key.length, 
-                             reinterpret_cast<void **>(&store_l), &dummy);
-        if (it->leaf)
-            wormleaf_unlock_read(it->leaf);
-    }
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerMiddleUpperBounds(key, true, false, leaves_to_unlock, it, it_int, 
+                              left_key, middle_key, right_key, store_l, store_r);
+
+    rwlock_lock_write(store_l->rwlock);
+    rwlock_lock_write(store_r->rwlock);
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
 
@@ -1269,9 +1260,9 @@ inline void Diva<int_optimized>::DeleteMerge(void *const it_inp) {
     delete[] store_l->ptr;
     delete[] store_r->ptr;
     if constexpr (int_optimized)
-        wh_int_del(better_tree_int_, middle_key.str, middle_key.length);
+        wh_int_del(better_tree_int_, middle_key.str, middle_key.length, true, leaves_to_unlock[1] != nullptr);
     else
-        wh_del(better_tree_, middle_key.str, middle_key.length);
+        wh_del(better_tree_, middle_key.str, middle_key.length, true, leaves_to_unlock[1] != nullptr);
 
     const uint64_t left_extraction = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0);
     const uint64_t right_extraction = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1);
@@ -1280,10 +1271,10 @@ inline void Diva<int_optimized>::DeleteMerge(void *const it_inp) {
     InfixStore store = AllocateInfixStoreWithList(infix_list, total_elem_count, total_implicit);
     store.SetPartialKey(store_l->IsPartialKey());
     store.SetInvalidBits(store_l->GetInvalidBits());
-    if constexpr (int_optimized)
-        wh_int_put(better_tree_int_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
-    else
-        wh_put(better_tree_, left_key.str, left_key.length, reinterpret_cast<const void *>(&store), sizeof(InfixStore));
+    memcpy(store_l, &store, sizeof(store));
+
+    leaves_to_unlock[1] = nullptr;
+    UnlockLeaves(leaves_to_unlock, true);
 }
 
 template <bool int_optimized>
