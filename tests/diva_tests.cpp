@@ -4,6 +4,7 @@
  */
 
 #include "wormhole/wh.h"
+#include "wormhole/wh_int.h"
 #include <endian.h>
 #include <limits>
 #include <random>
@@ -1939,6 +1940,39 @@ public:
         }
     }
 
+
+    template <bool O>
+    static void SerializeDeserialize() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 40000;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        std::vector<uint64_t> keys;
+        for (int32_t i = 0; i < n_keys; i++)
+            keys.push_back(rng());
+        std::sort(keys.begin(), keys.end());
+        std::vector<std::string> string_keys;
+        for (int32_t i = 0; i < n_keys; i++) {
+            size_t str_length;
+            if constexpr (O)
+                str_length = 8;
+            else
+                str_length = 6 + rng() % 3;
+            const uint64_t value = to_big_endian_order(keys[i]);
+            string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
+        }
+
+        Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+        char *buf = new char[20000000];
+        s.Serialize(buf);
+        Diva<O> reconstructed_s(buf);
+        AssertDivas(s, reconstructed_s);
+    }
+
 private:
     template <bool O>
     static void AssertStoreContents(const Diva<O>& s, const typename Diva<O>::InfixStore& store,
@@ -1995,6 +2029,96 @@ private:
 
         REQUIRE_EQ(popcnts[0], check_popcnts[0]);
         REQUIRE_EQ(popcnts[1], check_popcnts[1]);
+    }
+
+
+    template <bool O>
+    static void AssertDivas(const Diva<O>& a, const Diva<O>& b) {
+        REQUIRE_EQ(a.infix_store_target_size, b.infix_store_target_size);
+        REQUIRE_EQ(a.base_implicit_size, b.base_implicit_size);
+        REQUIRE_EQ(a.scale_shift, b.scale_shift);
+        REQUIRE_EQ(a.scale_implicit_shift, b.scale_implicit_shift);
+        REQUIRE_EQ(a.size_scalar_count, b.size_scalar_count);
+        REQUIRE_EQ(a.size_scalar_shrink_grow_sep, b.size_scalar_shrink_grow_sep);
+        REQUIRE_EQ(a.load_factor_, b.load_factor_);
+        REQUIRE_EQ(a.load_factor_alt_, b.load_factor_alt_);
+
+        REQUIRE_EQ(a.infix_size_, b.infix_size_);
+        REQUIRE_EQ(a.rng_seed_, b.rng_seed_);
+
+        for (int32_t i = 0; i < a.size_scalar_count; i++) {
+            REQUIRE_EQ(a.size_scalars_[i], b.size_scalars_[i]);
+            REQUIRE_EQ(a.scaled_sizes_[i], b.scaled_sizes_[i]);
+            REQUIRE_EQ(a.implicit_scalars_[i], b.implicit_scalars_[i]);
+        }
+
+        const uint8_t *tree_key_a, *tree_key_b;
+        uint32_t tree_key_a_len, tree_key_b_len, dummy;
+        typename Diva<O>::InfixStore *store_a, *store_b;
+        if constexpr (O) {
+            wormhole_int_iter it_a, it_b;
+            it_a.ref = a.better_tree_int_;
+            it_a.map = a.better_tree_int_->map;
+            it_a.leaf = nullptr;
+            it_a.is = 0;
+            it_b.ref = b.better_tree_int_;
+            it_b.map = b.better_tree_int_->map;
+            it_b.leaf = nullptr;
+            it_b.is = 0;
+            wh_int_iter_seek(&it_a, nullptr, 0);
+            wh_int_iter_seek(&it_b, nullptr, 0);
+            while (wh_int_iter_valid(&it_a) && wh_int_iter_valid(&it_b)) {
+                wh_int_iter_peek_ref(&it_a, reinterpret_cast<const void **>(&tree_key_a), &tree_key_a_len, 
+                                            reinterpret_cast<void **>(&store_a), &dummy);
+                wh_int_iter_peek_ref(&it_b, reinterpret_cast<const void **>(&tree_key_b), &tree_key_b_len, 
+                                            reinterpret_cast<void **>(&store_b), &dummy);
+                REQUIRE_EQ(tree_key_a_len, tree_key_b_len);
+                REQUIRE_EQ(memcmp(tree_key_a, tree_key_b, tree_key_a_len), 0);
+                REQUIRE_EQ(store_a->status, store_b->status);
+                const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
+                const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
+                REQUIRE_EQ(memcmp(store_a->ptr, store_b->ptr, word_count * sizeof(uint64_t)), 0);
+                wh_int_iter_skip1(&it_a);
+                wh_int_iter_skip1(&it_b);
+            }
+            REQUIRE_EQ(wh_int_iter_valid(&it_a), wh_int_iter_valid(&it_b));
+            if (it_a.leaf)
+                wormleaf_int_unlock_read(it_a.leaf);
+            if (it_b.leaf)
+                wormleaf_int_unlock_read(it_b.leaf);
+        }
+        else {
+            wormhole_iter it_a, it_b;
+            it_a.ref = a.better_tree_;
+            it_a.map = a.better_tree_->map;
+            it_a.leaf = nullptr;
+            it_a.is = 0;
+            it_b.ref = b.better_tree_;
+            it_b.map = b.better_tree_->map;
+            it_b.leaf = nullptr;
+            it_b.is = 0;
+            wh_iter_seek(&it_a, nullptr, 0);
+            wh_iter_seek(&it_b, nullptr, 0);
+            while (wh_iter_valid(&it_a) && wh_iter_valid(&it_b)) {
+                wh_iter_peek_ref(&it_a, reinterpret_cast<const void **>(&tree_key_a), &tree_key_a_len, 
+                                        reinterpret_cast<void **>(&store_a), &dummy);
+                wh_iter_peek_ref(&it_b, reinterpret_cast<const void **>(&tree_key_b), &tree_key_b_len, 
+                                        reinterpret_cast<void **>(&store_b), &dummy);
+                REQUIRE_EQ(tree_key_a_len, tree_key_b_len);
+                REQUIRE_EQ(memcmp(tree_key_a, tree_key_b, tree_key_a_len), 0);
+                REQUIRE_EQ(store_a->status, store_b->status);
+                const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
+                const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
+                REQUIRE_EQ(memcmp(store_a->ptr, store_b->ptr, word_count * sizeof(uint64_t)), 0);
+                wh_iter_skip1(&it_a);
+                wh_iter_skip1(&it_b);
+            }
+            REQUIRE_EQ(wh_iter_valid(&it_a), wh_iter_valid(&it_b));
+            if (it_a.leaf)
+                wormleaf_unlock_read(it_a.leaf);
+            if (it_b.leaf)
+                wormleaf_unlock_read(it_b.leaf);
+        }
     }
 
 
@@ -2062,6 +2186,10 @@ TEST_SUITE("diva") {
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<false>();
     }
+
+    TEST_CASE("serialize and deserialize") {
+        DivaTests::SerializeDeserialize<false>();
+    }
 }
 
 TEST_SUITE("diva (int optimized)") {
@@ -2091,6 +2219,10 @@ TEST_SUITE("diva (int optimized)") {
 
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<true>();
+    }
+
+    TEST_CASE("serialize and deserialize") {
+        DivaTests::SerializeDeserialize<true>();
     }
 }
 

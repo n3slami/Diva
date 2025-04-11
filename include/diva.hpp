@@ -9,6 +9,7 @@
 #include <endian.h>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <string_view>
 #include <tuple>
@@ -56,6 +57,8 @@ public:
     Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, 
          const uint32_t rng_seed, const float load_factor);
 
+    Diva(const char *deser_buf);
+
     void Insert(uint64_t key);
     void Insert(std::string_view key);
     void Insert(const uint8_t *key, const uint32_t key_len);
@@ -71,6 +74,7 @@ public:
     bool PointQuery(const uint8_t *key, const uint32_t key_len) const;
     void ShrinkInfixSize(const uint32_t new_infix_size);
     uint32_t Size() const;
+    uint32_t Serialize(char *out) const;
 
 private:
     static constexpr uint32_t infix_store_target_size = 1024;
@@ -150,6 +154,7 @@ private:
             ptr = new uint64_t[word_count];
             memset(ptr, 0, sizeof(uint64_t) * word_count);
         }
+        InfixStore(const char *deser_buf);
         InfixStore(uint64_t *ptr): status(0), ptr(ptr) {};
         InfixStore() = default;
         InfixStore(const InfixStore &other) = default;
@@ -214,6 +219,7 @@ private:
     wormhole_int *wh_int_;
     wormref_int *better_tree_int_;
     std::mt19937 rng_;
+    uint32_t rng_seed_;
     const float load_factor_ = 0.95;
     const float load_factor_alt_ = 0.95;
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count], exception_scaled_size_;
@@ -282,6 +288,11 @@ private:
     void UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
                                const InfiniteByteString left_key, const InfiniteByteString right_key,
                                uint64_t *infix_list, const uint32_t infix_list_len);
+
+    uint32_t SerializeMetadata(char *out) const;
+    uint32_t SerializeInfixStore(char *out, const InfixStore& store) const;
+    uint32_t DeserializeMetadata(const char *deser_buf);
+    uint32_t DeserializeInfixStore(const char *deser_buf, InfixStore& store) const;
 };
 
 
@@ -292,6 +303,7 @@ inline Diva<int_optimized>::Diva(const uint32_t infix_size, const uint32_t rng_s
             wh_int_(nullptr),
             better_tree_int_(nullptr),
             infix_size_(infix_size),
+            rng_seed_(rng_seed),
             load_factor_(load_factor) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -301,7 +313,7 @@ inline Diva<int_optimized>::Diva(const uint32_t infix_size, const uint32_t rng_s
         wh_ = wh_create();
         better_tree_ = wh_ref(wh_);
     }
-    rng_.seed(rng_seed);
+    rng_.seed(rng_seed_);
     SetupScaleFactors();
 }
 
@@ -315,6 +327,7 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         wh_int_(nullptr),
         better_tree_int_(nullptr),
         infix_size_(infix_size),
+        rng_seed_(rng_seed),
         load_factor_(load_factor) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -325,7 +338,7 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         better_tree_ = wh_ref(wh_);
     }
 
-    rng_.seed(rng_seed);
+    rng_.seed(rng_seed_);
     SetupScaleFactors();
 
     uint8_t key[key_len];
@@ -347,6 +360,7 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         wh_int_(nullptr),
         better_tree_int_(nullptr),
         infix_size_(infix_size),
+        rng_seed_(rng_seed),
         load_factor_(load_factor) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -357,7 +371,7 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         better_tree_ = wh_ref(wh_);
     }
 
-    rng_.seed(rng_seed);
+    rng_.seed(rng_seed_);
     SetupScaleFactors();
 
     uint8_t key[8];
@@ -893,7 +907,7 @@ inline void Diva<int_optimized>::InsertSplit(const InfiniteByteString key) {
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline std::tuple<uint32_t, bool> Diva<int_optimized>::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len,
                                                                                   const uint32_t implicit_size, const uint32_t shamt,
                                                                                   const uint64_t lower_lim, const uint64_t upper_lim) {
@@ -917,7 +931,7 @@ inline std::tuple<uint32_t, bool> Diva<int_optimized>::GetExpandedInfixListLengt
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
                                                  const uint64_t lower_lim, const uint64_t upper_lim,
                                                  uint64_t *res, const uint32_t res_len, const bool expanded) const {
@@ -1080,7 +1094,219 @@ inline uint32_t Diva<int_optimized>::Size() const {
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+inline uint32_t Diva<int_optimized>::Serialize(char *out) const {
+    uint32_t res = SerializeMetadata(out);
+
+    const uint8_t *tree_key;
+    uint32_t tree_key_len, dummy;
+    InfixStore *store;
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        for (wh_int_iter_seek(&it_int, nullptr, 0); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int)) {
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
+                                          reinterpret_cast<void **>(&store), &dummy);
+            memcpy(out + res, &tree_key_len, sizeof(tree_key_len));
+            res += sizeof(tree_key_len);
+            memcpy(out + res, tree_key, tree_key_len);
+            res += tree_key_len;
+            res += SerializeInfixStore(out + res, *store);
+        }
+        if (it_int.leaf)
+            wormleaf_int_unlock_read(it_int.leaf);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
+                                  reinterpret_cast<void **>(&store), &dummy);
+            memcpy(out + res, &tree_key_len, sizeof(tree_key_len));
+            res += sizeof(tree_key_len);
+            memcpy(out + res, tree_key, tree_key_len);
+            res += tree_key_len;
+            res += SerializeInfixStore(out + res, *store);
+        }
+        if (it.leaf)
+            wormleaf_unlock_read(it.leaf);
+    }
+    tree_key_len = std::numeric_limits<uint32_t>::max();
+    memcpy(out + res, &tree_key_len, sizeof(tree_key_len));
+    return res;
+}
+
+
+template <bool int_optimized>
+inline uint32_t Diva<int_optimized>::SerializeMetadata(char *out) const {
+    uint32_t res = 0;
+    // Diva Version
+    out[res++] = int_optimized;
+
+    // Global Metadata
+    memcpy(out + res, &infix_store_target_size, sizeof(infix_store_target_size));
+    res += sizeof(infix_store_target_size);
+    memcpy(out + res, &base_implicit_size, sizeof(base_implicit_size));
+    res += sizeof(base_implicit_size);
+    memcpy(out + res, &scale_shift, sizeof(scale_shift));
+    res += sizeof(scale_shift);
+    memcpy(out + res, &scale_implicit_shift, sizeof(scale_implicit_shift));
+    res += sizeof(scale_implicit_shift);
+    memcpy(out + res, &size_scalar_count, sizeof(size_scalar_count));
+    res += sizeof(size_scalar_count);
+    memcpy(out + res, &size_scalar_shrink_grow_sep, sizeof(size_scalar_shrink_grow_sep));
+    res += sizeof(size_scalar_shrink_grow_sep);
+    memcpy(out + res, &load_factor_, sizeof(load_factor_));
+    res += sizeof(load_factor_);
+    memcpy(out + res, &load_factor_alt_, sizeof(load_factor_alt_));
+    res += sizeof(load_factor_alt_);
+
+    // Infix Size and Random Seed
+    memcpy(out + res, &infix_size_, sizeof(infix_size_));
+    res += sizeof(infix_size_);
+    memcpy(out + res, &rng_seed_, sizeof(rng_seed_));
+    res += sizeof(rng_seed_);
+
+    // Infix Store Metadata
+    memcpy(out + res, &InfixStore::size_grade_bit_count, sizeof(InfixStore::size_grade_bit_count));
+    res += sizeof(InfixStore::size_grade_bit_count);
+    memcpy(out + res, &InfixStore::elem_count_bit_count, sizeof(InfixStore::elem_count_bit_count));
+    res += sizeof(InfixStore::elem_count_bit_count);
+
+    return res;
+}
+
+
+template <bool int_optimized>
+inline uint32_t Diva<int_optimized>::SerializeInfixStore(char *out, const Diva<int_optimized>::InfixStore& store) const {
+    memcpy(out, &store.status, sizeof(store.status));
+    const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_);
+    memcpy(out + sizeof(store.status), store.ptr, word_count * sizeof(uint64_t));
+    return sizeof(store.status) + word_count * sizeof(uint64_t);
+}
+
+
+template <bool int_optimized>
+inline Diva<int_optimized>::Diva(const char *deser_buf) {
+    uint32_t ind = DeserializeMetadata(deser_buf);
+    if constexpr (int_optimized) {
+        wh_int_ = wh_int_create();
+        better_tree_int_ = wh_int_ref(wh_int_);
+    }
+    else {
+        wh_ = wh_create();
+        better_tree_ = wh_ref(wh_);
+    }
+    SetupScaleFactors();
+
+    const uint32_t max_key_length = 20000;
+    char key[max_key_length];
+    uint32_t key_length;
+    InfixStore store;
+
+    memcpy(&key_length, deser_buf + ind, sizeof(key_length));
+    ind += sizeof(key_length);
+    while (key_length != std::numeric_limits<uint32_t>::max()) {
+        assert(key_length < max_key_length);
+        memcpy(key, deser_buf + ind, key_length);
+        ind += key_length;
+        ind += DeserializeInfixStore(deser_buf + ind, store);
+
+        if constexpr (int_optimized) {
+            assert(key_length == sizeof(uint64_t));
+            wh_int_put(better_tree_int_, key, key_length, &store, sizeof(store));
+        }
+        else {
+            wh_put(better_tree_, key, key_length, &store, sizeof(store));
+        }
+
+        memcpy(&key_length, deser_buf + ind, sizeof(key_length));
+        ind += sizeof(key_length);
+    }
+}
+
+
+template <bool int_optimized>
+inline uint32_t Diva<int_optimized>::DeserializeMetadata(const char *deser_buf) {
+    uint32_t res = 0;
+    uint32_t buf32;
+    float buf_float;
+
+    // Diva Version
+    assert(deser_buf[res++] == int_optimized && "Mismatched Diva version");
+
+    // Global Metadata
+    memcpy(&buf32, deser_buf + res, sizeof(infix_store_target_size));
+    assert(buf32 == infix_store_target_size && "Mismatched Diva version");
+    res += sizeof(infix_store_target_size);
+
+    memcpy(&buf32, deser_buf + res, sizeof(base_implicit_size));
+    assert(buf32 == base_implicit_size && "Mismatched Diva version");
+    res += sizeof(base_implicit_size);
+
+    memcpy(&buf32, deser_buf + res, sizeof(scale_shift));
+    assert(buf32 == scale_shift && "Mismatched Diva version");
+    res += sizeof(scale_shift);
+
+    memcpy(&buf32, deser_buf + res, sizeof(scale_implicit_shift));
+    assert(buf32 == scale_implicit_shift && "Mismatched Diva version");
+    res += sizeof(scale_implicit_shift);
+
+    memcpy(&buf32, deser_buf + res, sizeof(size_scalar_count));
+    assert(buf32 == size_scalar_count && "Mismatched Diva version");
+    res += sizeof(size_scalar_count);
+
+    memcpy(&buf32, deser_buf + res, sizeof(size_scalar_shrink_grow_sep));
+    assert(buf32 == size_scalar_shrink_grow_sep && "Mismatched Diva version");
+    res += sizeof(size_scalar_shrink_grow_sep);
+
+    memcpy(&buf_float, deser_buf + res, sizeof(load_factor_));
+    assert(buf_float == load_factor_ && "Mismatched Diva version");
+    res += sizeof(load_factor_);
+
+    memcpy(&buf_float, deser_buf + res, sizeof(load_factor_alt_));
+    assert(buf_float == load_factor_alt_ && "Mismatched Diva version");
+    res += sizeof(load_factor_alt_);
+
+    // Infix Size and Random Seed
+    memcpy(&infix_size_, deser_buf + res, sizeof(infix_size_));
+    res += sizeof(infix_size_);
+
+    memcpy(&rng_seed_, deser_buf + res, sizeof(rng_seed_));
+    res += sizeof(rng_seed_);
+    rng_.seed(rng_seed_);
+
+    // Infix Store Metadata
+    memcpy(&buf32, deser_buf + res, sizeof(InfixStore::size_grade_bit_count));
+    assert(buf32 == InfixStore::size_grade_bit_count && "Mismatched Diva version");
+    res += sizeof(InfixStore::size_grade_bit_count);
+
+    memcpy(&buf32, deser_buf + res, sizeof(InfixStore::elem_count_bit_count));
+    assert(buf32 == InfixStore::elem_count_bit_count && "Mismatched Diva version");
+    res += sizeof(InfixStore::elem_count_bit_count);
+
+    return res;
+}
+
+
+template <bool int_optimized>
+inline uint32_t Diva<int_optimized>::DeserializeInfixStore(const char *deser_buf, Diva<int_optimized>::InfixStore& store) const {
+    memcpy(&store.status, deser_buf, sizeof(store.status));
+    const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_);
+    store.ptr = new uint64_t[word_count];
+    memcpy(store.ptr, deser_buf + sizeof(store.status), word_count * sizeof(uint64_t));
+    return sizeof(store.status) + word_count * sizeof(uint64_t);
+}
+
+
+template <bool int_optimized>
+__attribute__((always_inline))
 inline uint64_t Diva<int_optimized>::ExtractPartialKey(const InfiniteByteString key,
                                                        const uint32_t shared, const uint32_t ignore,
                                                        const uint32_t implicit_size, const uint64_t msb) const {
@@ -1624,7 +1850,7 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline uint32_t Diva<int_optimized>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint64_t *occupieds = store.ptr + 1;
@@ -1638,7 +1864,7 @@ inline uint32_t Diva<int_optimized>::RankOccupieds(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline uint32_t Diva<int_optimized>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint32_t size_grade = store.GetSizeGrade();
@@ -1669,7 +1895,7 @@ inline int32_t Diva<int_optimized>::NextOccupied(const InfixStore &store, const 
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr + 1;
     int32_t res = pos - 1, hb_pos;
@@ -1684,7 +1910,7 @@ inline int32_t Diva<int_optimized>::PreviousOccupied(const InfixStore &store, co
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     const uint32_t size_grade = store.GetSizeGrade();
@@ -1699,7 +1925,7 @@ inline int32_t Diva<int_optimized>::NextRunend(const InfixStore &store, const ui
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     int32_t res = pos - 1, hb_pos;
@@ -1714,7 +1940,7 @@ inline int32_t Diva<int_optimized>::PreviousRunend(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::GetMappedPos(const uint32_t implicit_part, const uint32_t size_grade,
                                                  const uint64_t implicit_scalar) const {
     uint32_t res = (implicit_part * size_scalars_[size_grade] * implicit_scalar)
@@ -1724,7 +1950,7 @@ inline int32_t Diva<int_optimized>::GetMappedPos(const uint32_t implicit_part, c
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline uint64_t Diva<int_optimized>::GetSlot(const InfixStore &store, const uint32_t pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
@@ -1736,7 +1962,7 @@ inline uint64_t Diva<int_optimized>::GetSlot(const InfixStore &store, const uint
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
@@ -1750,7 +1976,7 @@ inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, 
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width) {
     assert(value > 0);
     const uint32_t size_grade = store.GetSizeGrade();
@@ -1765,7 +1991,7 @@ inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, 
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                  const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
@@ -1783,7 +2009,7 @@ inline void Diva<int_optimized>::ShiftSlotsRight(const InfixStore &store, const 
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                 const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
@@ -1799,7 +2025,7 @@ inline void Diva<int_optimized>::ShiftSlotsLeft(const InfixStore &store, const u
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
                                                    const uint32_t shamt) {
     shift_bitmap_right(store.ptr + 1 + infix_store_target_size / 64, l, r - 1, shamt);
@@ -1807,7 +2033,7 @@ inline void Diva<int_optimized>::ShiftRunendsRight(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                   const uint32_t shamt) {
     shift_bitmap_left(store.ptr + 1 + infix_store_target_size / 64, l, r - 1, shamt);
@@ -1815,7 +2041,7 @@ inline void Diva<int_optimized>::ShiftRunendsLeft(const InfixStore &store, const
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
@@ -1827,7 +2053,7 @@ inline int32_t Diva<int_optimized>::FindEmptySlotAfter(const InfixStore &store, 
 
 
 template <bool int_optimized>
-//__attribute__((always_inline))
+__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
