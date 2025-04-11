@@ -75,6 +75,9 @@ public:
     void ShrinkInfixSize(const uint32_t new_infix_size);
     uint32_t Size() const;
     uint32_t Serialize(char *out) const;
+    void BulkLoadStreaming(uint64_t key, bool flush=false);
+    void BulkLoadStreaming(std::string_view key, bool flush=false);
+    void BulkLoadStreaming(const uint8_t *key, const uint32_t key_len, bool flush=false);
 
 private:
     static constexpr uint32_t infix_store_target_size = 1024;
@@ -225,6 +228,9 @@ private:
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count], exception_scaled_size_;
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
 
+    uint32_t bulk_load_streaming_ind_, bulk_load_streaming_max_len_;
+    InfiniteByteString bulk_load_left_key_, bulk_load_key_list_[infix_store_target_size];
+
     void AddTreeKey(const uint8_t *key, const uint32_t key_len);
     void InsertSimple(const InfiniteByteString key);
     void InsertSplit(const InfiniteByteString key);
@@ -304,7 +310,8 @@ inline Diva<int_optimized>::Diva(const uint32_t infix_size, const uint32_t rng_s
             better_tree_int_(nullptr),
             infix_size_(infix_size),
             rng_seed_(rng_seed),
-            load_factor_(load_factor) {
+            load_factor_(load_factor),
+            bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
@@ -328,7 +335,8 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         better_tree_int_(nullptr),
         infix_size_(infix_size),
         rng_seed_(rng_seed),
-        load_factor_(load_factor) {
+        load_factor_(load_factor),
+        bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
@@ -361,7 +369,8 @@ Diva<int_optimized>::Diva(const uint32_t infix_size, const t_itr begin, const t_
         better_tree_int_(nullptr),
         infix_size_(infix_size),
         rng_seed_(rng_seed),
-        load_factor_(load_factor) {
+        load_factor_(load_factor),
+        bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
@@ -1193,7 +1202,8 @@ inline uint32_t Diva<int_optimized>::SerializeInfixStore(char *out, const Diva<i
 
 
 template <bool int_optimized>
-inline Diva<int_optimized>::Diva(const char *deser_buf) {
+inline Diva<int_optimized>::Diva(const char *deser_buf):
+        bulk_load_streaming_ind_(0) {
     uint32_t ind = DeserializeMetadata(deser_buf);
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -1846,6 +1856,84 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
     }
     if (i)
         LoadListToInfixStore(*store, infix_list, i, total_implicit);
+}
+
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::BulkLoadStreaming(uint64_t key, bool flush) {
+    key = __builtin_bswap64(key);
+    BulkLoadStreaming(reinterpret_cast<const uint8_t *>(&key), sizeof(key), flush);
+}
+
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::BulkLoadStreaming(std::string_view key, bool flush) {
+    BulkLoadStreaming(reinterpret_cast<const uint8_t *>(key.data()), key.size(), flush);
+}
+
+
+template <bool int_optimized>
+inline void Diva<int_optimized>::BulkLoadStreaming(const uint8_t *key, const uint32_t key_len, bool flush) {
+    uint8_t *key_copy = new uint8_t[key_len];
+    memcpy(key_copy, key, key_len);
+
+    if (bulk_load_left_key_.str == nullptr) {
+        assert(!flush);
+        delete[] bulk_load_left_key_.str;
+        bulk_load_left_key_ = {key_copy, key_len};
+        memset(bulk_load_key_list_, 0, sizeof(bulk_load_key_list_));
+        bulk_load_streaming_max_len_ = key_len;
+        return;
+    }
+    bulk_load_streaming_max_len_ = std::max(bulk_load_streaming_max_len_, key_len);
+    if (bulk_load_streaming_ind_ < infix_store_target_size - 1) {
+        delete[] bulk_load_key_list_[bulk_load_streaming_ind_].str;
+        bulk_load_key_list_[bulk_load_streaming_ind_] = {key_copy, key_len};
+        bulk_load_streaming_ind_++;
+        if (!flush)
+            return;
+    }
+
+    assert(flush || bulk_load_streaming_ind_ == infix_store_target_size - 1);
+
+    InfiniteByteString bulk_load_right_key {key_copy, key_len};
+    if (flush) {
+        key_copy = new uint8_t[bulk_load_streaming_max_len_];
+        memset(key_copy, 0x00, bulk_load_streaming_max_len_);
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+        memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+        bulk_load_right_key = {key_copy, key_len};
+    }
+
+    uint64_t infix_list[infix_store_target_size];
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(bulk_load_left_key_, bulk_load_right_key);
+    const uint64_t prev_implicit = ExtractPartialKey(bulk_load_left_key_, shared, ignore, implicit_size, 0) >> infix_size_;
+    const uint64_t next_implicit = ExtractPartialKey(bulk_load_right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    for (int32_t i = 0; i < bulk_load_streaming_ind_; i++) {
+        const uint64_t extraction = ExtractPartialKey(bulk_load_key_list_[i], shared, ignore, implicit_size, bulk_load_key_list_[i].GetBit(shared));
+        infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+    }
+    InfixStore store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_);
+    LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
+    else
+        wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
+
+    delete[] bulk_load_left_key_.str;
+    bulk_load_left_key_ = bulk_load_right_key;
+    bulk_load_streaming_ind_ = 0;
+
+    if (flush) {
+        delete[] bulk_load_left_key_.str;
+        bulk_load_left_key_ = {};
+        for (int32_t i = 0; i < infix_store_target_size; i++) {
+            delete[] bulk_load_key_list_[i].str;
+            bulk_load_key_list_[i] = {};
+        }
+    }
 }
 
 

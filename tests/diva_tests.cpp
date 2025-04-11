@@ -1973,6 +1973,42 @@ public:
         AssertDivas(s, reconstructed_s);
     }
 
+
+    template <bool O>
+    static void BulkLoadStreaming() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 40000;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        std::vector<uint64_t> keys;
+        for (int32_t i = 0; i < n_keys; i++)
+            keys.push_back(rng());
+        std::sort(keys.begin(), keys.end());
+        std::vector<std::string> string_keys;
+        for (int32_t i = 0; i < n_keys; i++) {
+            size_t str_length;
+            if constexpr (O)
+                str_length = 8;
+            else
+                str_length = 6 + rng() % 3;
+            const uint64_t value = to_big_endian_order(keys[i]);
+            string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
+        }
+
+        SUBCASE("streaming") {
+            Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+            Diva<O> streamed_s(infix_size, seed, load_factor);
+            for (int32_t i = 0; i < n_keys; i++)
+                streamed_s.BulkLoadStreaming(string_keys[i], i == n_keys - 1);
+            AssertDivas(s, streamed_s);
+        }
+    }
+
+
 private:
     template <bool O>
     static void AssertStoreContents(const Diva<O>& s, const typename Diva<O>::InfixStore& store,
@@ -2185,6 +2221,7 @@ TEST_SUITE("diva") {
 
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<false>();
+        DivaTests::BulkLoadStreaming<false>();
     }
 
     TEST_CASE("serialize and deserialize") {
@@ -2219,6 +2256,7 @@ TEST_SUITE("diva (int optimized)") {
 
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<true>();
+        DivaTests::BulkLoadStreaming<true>();
     }
 
     TEST_CASE("serialize and deserialize") {
