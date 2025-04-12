@@ -92,6 +92,10 @@ private:
         const uint8_t *str;
         uint32_t length;
 
+        InfiniteByteString(): str(nullptr), length(0) {};
+        InfiniteByteString(const uint8_t *str, uint32_t length): str(str), length(length) {};
+        InfiniteByteString(const InfiniteByteString& other): str(other.str), length(other.length) {};
+
         InfiniteByteString& operator=(const InfiniteByteString& other) {
             str = other.str;
             length = other.length;
@@ -1881,7 +1885,6 @@ inline void Diva<int_optimized>::BulkLoadStreaming(const uint8_t *key, const uin
         assert(!flush);
         delete[] bulk_load_left_key_.str;
         bulk_load_left_key_ = {key_copy, key_len};
-        memset(bulk_load_key_list_, 0, sizeof(bulk_load_key_list_));
         bulk_load_streaming_max_len_ = key_len;
         return;
     }
