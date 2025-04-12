@@ -1971,11 +1971,8 @@ public:
         memset(buf, 0, buf_size);
 
         Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
-        std::cerr << "SERIALIZING" << std::endl;
         s.Serialize(buf);
-        std::cerr << "DESERIALIZING" << std::endl;
         Diva<O> reconstructed_s(buf);
-        std::cerr << "BEFORE ASSERTING DIVAS" << std::endl;
         AssertDivas(s, reconstructed_s);
 
         delete[] buf;

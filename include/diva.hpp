@@ -1114,7 +1114,6 @@ inline uint32_t Diva<int_optimized>::Serialize(char *out) const {
     uint32_t tree_key_len, dummy;
     InfixStore *store;
 
-    bool tmp = true;
     if constexpr (int_optimized) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
@@ -1142,10 +1141,6 @@ inline uint32_t Diva<int_optimized>::Serialize(char *out) const {
         for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
             wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                   reinterpret_cast<void **>(&store), &dummy);
-            if (tmp) {
-                std::cerr << "welp tree_key_len=" << tree_key_len << std::endl;
-                tmp = false;
-            }
             memcpy(out + res, &tree_key_len, sizeof(tree_key_len));
             res += sizeof(tree_key_len);
             memcpy(out + res, tree_key, tree_key_len);
@@ -1223,7 +1218,6 @@ template <bool int_optimized>
 inline Diva<int_optimized>::Diva(const char *deser_buf):
         bulk_load_streaming_ind_(0) {
     uint32_t ind = DeserializeMetadata(deser_buf);
-    std::cerr << "DESERIALIZE METADATA OFFSET: " << ind << std::endl;
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
@@ -1234,8 +1228,6 @@ inline Diva<int_optimized>::Diva(const char *deser_buf):
     }
     SetupScaleFactors();
 
-    std::cerr << "SETUP SCALING FACTORS DONE" << std::endl;
-
     const uint32_t max_key_length = 20000;
     char key[max_key_length];
     uint32_t key_length;
@@ -1244,7 +1236,6 @@ inline Diva<int_optimized>::Diva(const char *deser_buf):
     memcpy(&key_length, deser_buf + ind, sizeof(key_length));
     ind += sizeof(key_length);
     while (key_length != std::numeric_limits<uint32_t>::max()) {
-        std::cerr << "key_length=" << key_length << std::endl;
         assert(key_length < max_key_length);
         memcpy(key, deser_buf + ind, key_length);
         ind += key_length;
@@ -1256,15 +1247,10 @@ inline Diva<int_optimized>::Diva(const char *deser_buf):
         }
         else
             wh_put(better_tree_, key, key_length, &store, sizeof(store));
-        std::cerr << "INSERTED key=";
-        for (int32_t i = 0; i < key_length; i++)
-            std::cerr << +key[i] << ' ';
-        std::cerr << std::endl;
 
         memcpy(&key_length, deser_buf + ind, sizeof(key_length));
         ind += sizeof(key_length);
     }
-    std::cerr << "FINAL key_length=" << key_length << std::endl;
 }
 
 
@@ -1335,7 +1321,6 @@ inline uint32_t Diva<int_optimized>::DeserializeMetadata(const char *deser_buf) 
 template <bool int_optimized>
 inline uint32_t Diva<int_optimized>::DeserializeInfixStore(const char *deser_buf, Diva<int_optimized>::InfixStore& store) const {
     memcpy(&store.status, deser_buf, sizeof(store.status));
-    std::cerr << "store.status=" << store.status << std::endl;
     const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_);
     store.ptr = new uint64_t[word_count];
     memcpy(store.ptr, deser_buf + sizeof(store.status), word_count * sizeof(uint64_t));
