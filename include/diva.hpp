@@ -1165,7 +1165,7 @@ template <bool int_optimized>
 inline uint32_t Diva<int_optimized>::SerializeMetadata(char *out) const {
     uint32_t res = 0;
     // Diva Version
-    out[res++] = int_optimized;
+    out[res++] = static_cast<char>(int_optimized);
 
     // Global Metadata
     memcpy(out + res, &infix_store_target_size, sizeof(infix_store_target_size));
@@ -1223,6 +1223,7 @@ template <bool int_optimized>
 inline Diva<int_optimized>::Diva(const char *deser_buf):
         bulk_load_streaming_ind_(0) {
     uint32_t ind = DeserializeMetadata(deser_buf);
+    std::cerr << "DESERIALIZE METADATA OFFSET: " << ind << std::endl;
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
@@ -1274,7 +1275,8 @@ inline uint32_t Diva<int_optimized>::DeserializeMetadata(const char *deser_buf) 
     float buf_float;
 
     // Diva Version
-    assert(deser_buf[res++] == int_optimized && "Mismatched Diva version");
+    assert(static_cast<bool>(deser_buf[res]) == int_optimized && "Mismatched Diva version");
+    res++;
 
     // Global Metadata
     memcpy(&buf32, deser_buf + res, sizeof(infix_store_target_size));
