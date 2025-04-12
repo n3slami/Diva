@@ -1968,8 +1968,11 @@ public:
 
         Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
         char *buf = new char[20000000];
+        std::cerr << "SERIALIZING" << std::endl;
         s.Serialize(buf);
+        std::cerr << "DESERIALIZING" << std::endl;
         Diva<O> reconstructed_s(buf);
+        std::cerr << "BEFORE ASSERTING DIVAS" << std::endl;
         AssertDivas(s, reconstructed_s);
     }
 
