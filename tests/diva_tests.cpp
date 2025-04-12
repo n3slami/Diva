@@ -1966,14 +1966,19 @@ public:
             string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
         }
 
+        const uint32_t buf_size = 20000000;
+        char *buf = new char[buf_size];
+        memset(buf, 0, buf_size);
+
         Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
-        char *buf = new char[20000000];
         std::cerr << "SERIALIZING" << std::endl;
         s.Serialize(buf);
         std::cerr << "DESERIALIZING" << std::endl;
         Diva<O> reconstructed_s(buf);
         std::cerr << "BEFORE ASSERTING DIVAS" << std::endl;
         AssertDivas(s, reconstructed_s);
+
+        delete[] buf;
     }
 
 

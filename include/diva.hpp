@@ -1114,6 +1114,7 @@ inline uint32_t Diva<int_optimized>::Serialize(char *out) const {
     uint32_t tree_key_len, dummy;
     InfixStore *store;
 
+    bool tmp = true;
     if constexpr (int_optimized) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
@@ -1141,6 +1142,10 @@ inline uint32_t Diva<int_optimized>::Serialize(char *out) const {
         for (wh_iter_seek(&it, nullptr, 0); wh_iter_valid(&it); wh_iter_skip1(&it)) {
             wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                   reinterpret_cast<void **>(&store), &dummy);
+            if (tmp) {
+                std::cerr << "welp tree_key_len=" << tree_key_len << std::endl;
+                tmp = false;
+            }
             memcpy(out + res, &tree_key_len, sizeof(tree_key_len));
             res += sizeof(tree_key_len);
             memcpy(out + res, tree_key, tree_key_len);
@@ -1165,30 +1170,39 @@ inline uint32_t Diva<int_optimized>::SerializeMetadata(char *out) const {
     // Global Metadata
     memcpy(out + res, &infix_store_target_size, sizeof(infix_store_target_size));
     res += sizeof(infix_store_target_size);
+
     memcpy(out + res, &base_implicit_size, sizeof(base_implicit_size));
     res += sizeof(base_implicit_size);
+
     memcpy(out + res, &scale_shift, sizeof(scale_shift));
     res += sizeof(scale_shift);
+
     memcpy(out + res, &scale_implicit_shift, sizeof(scale_implicit_shift));
     res += sizeof(scale_implicit_shift);
+
     memcpy(out + res, &size_scalar_count, sizeof(size_scalar_count));
     res += sizeof(size_scalar_count);
+
     memcpy(out + res, &size_scalar_shrink_grow_sep, sizeof(size_scalar_shrink_grow_sep));
     res += sizeof(size_scalar_shrink_grow_sep);
+
     memcpy(out + res, &load_factor_, sizeof(load_factor_));
     res += sizeof(load_factor_);
+
     memcpy(out + res, &load_factor_alt_, sizeof(load_factor_alt_));
     res += sizeof(load_factor_alt_);
 
     // Infix Size and Random Seed
     memcpy(out + res, &infix_size_, sizeof(infix_size_));
     res += sizeof(infix_size_);
+
     memcpy(out + res, &rng_seed_, sizeof(rng_seed_));
     res += sizeof(rng_seed_);
 
     // Infix Store Metadata
     memcpy(out + res, &InfixStore::size_grade_bit_count, sizeof(InfixStore::size_grade_bit_count));
     res += sizeof(InfixStore::size_grade_bit_count);
+
     memcpy(out + res, &InfixStore::elem_count_bit_count, sizeof(InfixStore::elem_count_bit_count));
     res += sizeof(InfixStore::elem_count_bit_count);
 
@@ -1239,9 +1253,8 @@ inline Diva<int_optimized>::Diva(const char *deser_buf):
             assert(key_length == sizeof(uint64_t));
             wh_int_put(better_tree_int_, key, key_length, &store, sizeof(store));
         }
-        else {
+        else
             wh_put(better_tree_, key, key_length, &store, sizeof(store));
-        }
         std::cerr << "INSERTED key=";
         for (int32_t i = 0; i < key_length; i++)
             std::cerr << +key[i] << ' ';
