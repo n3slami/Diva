@@ -1074,8 +1074,7 @@ inline uint32_t Diva<int_optimized>::Size() const {
                  + sizeof(scale_implicit_shift) + sizeof(size_scalar_count)
                  + sizeof(size_scalar_shrink_grow_sep) + sizeof(load_factor_)
                  + sizeof(load_factor_alt_) + sizeof(infix_size_) 
-                 + sizeof(rng_seed_) + sizeof(InfixStore::size_grade_bit_count)
-                 + sizeof(InfixStore::elem_count_bit_count);
+                 + sizeof(rng_seed_) + 2 * sizeof(uint32_t);
 
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
