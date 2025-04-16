@@ -6,6 +6,7 @@
 #include "wormhole/wh.h"
 #include "wormhole/wh_int.h"
 #include <endian.h>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <x86intrin.h>
@@ -1966,12 +1967,14 @@ public:
             string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
         }
 
-        const uint32_t buf_size = 20000000;
+        Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+
+        const uint32_t buf_size = s.Size();
         char *buf = new char[buf_size];
         memset(buf, 0, buf_size);
+        const uint32_t serialized_size = s.Serialize(buf);
+        REQUIRE_EQ(s.Size(), serialized_size);
 
-        Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
-        s.Serialize(buf);
         Diva<O> reconstructed_s(buf);
         AssertDivas(s, reconstructed_s);
 
@@ -2008,7 +2011,8 @@ public:
             Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
             Diva<O> streamed_s(infix_size, seed, load_factor);
             for (int32_t i = 0; i < n_keys; i++)
-                streamed_s.BulkLoadStreaming(string_keys[i], i == n_keys - 1);
+                streamed_s.BulkLoadStreaming(string_keys[i]);
+            streamed_s.BulkLoadStreamingFinish();
             AssertDivas(s, streamed_s);
         }
     }
