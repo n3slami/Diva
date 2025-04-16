@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -103,7 +104,7 @@ private:
             return *this;
         }
 
-        __attribute__((always_inline))
+        //__attribute__((always_inline))
         uint64_t WordAt(const uint32_t byte_pos) const {
             if (byte_pos >= length)
                 return 0;
@@ -112,7 +113,7 @@ private:
             return __builtin_bswap64(res);
         };
 
-        __attribute__((always_inline))
+        //__attribute__((always_inline))
         uint64_t BitsAt(const uint32_t bit_pos, const uint32_t res_width) const {
             if (bit_pos / 8 >= length)
                 return 0;
@@ -122,12 +123,12 @@ private:
             return res & BITMASK(res_width);
         };
 
-        __attribute__((always_inline))
+        //__attribute__((always_inline))
         uint32_t GetBit(const uint32_t pos) const {
             return (pos / 8 < length ? (str[pos / 8] >> (7 - pos % 8)) & 1 : 0);
         };
 
-        __attribute__((always_inline))
+        //__attribute__((always_inline))
         bool IsPrefixOf(const InfiniteByteString& other, const uint32_t bits_to_ignore=0) const {
             if (length <= other.length && memcmp(str, other.str, length - 1) == 0)
                 return (str[length - 1] | BITMASK(bits_to_ignore)) == (other.str[length - 1] | BITMASK(bits_to_ignore));
@@ -921,7 +922,7 @@ inline void Diva<int_optimized>::InsertSplit(const InfiniteByteString key) {
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+////__attribute__((always_inline))
 inline std::tuple<uint32_t, bool> Diva<int_optimized>::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len,
                                                                                   const uint32_t implicit_size, const uint32_t shamt,
                                                                                   const uint64_t lower_lim, const uint64_t upper_lim) {
@@ -945,7 +946,7 @@ inline std::tuple<uint32_t, bool> Diva<int_optimized>::GetExpandedInfixListLengt
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
                                                  const uint64_t lower_lim, const uint64_t upper_lim,
                                                  uint64_t *res, const uint32_t res_len, const bool expanded) const {
@@ -1074,7 +1075,8 @@ inline uint32_t Diva<int_optimized>::Size() const {
                  + sizeof(scale_implicit_shift) + sizeof(size_scalar_count)
                  + sizeof(size_scalar_shrink_grow_sep) + sizeof(load_factor_)
                  + sizeof(load_factor_alt_) + sizeof(infix_size_) 
-                 + sizeof(rng_seed_) + 2 * sizeof(uint32_t);
+                 + sizeof(rng_seed_) + sizeof(InfixStore::size_grade_bit_count)
+                 + sizeof(InfixStore::elem_count_bit_count);
 
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
@@ -1341,7 +1343,7 @@ inline uint32_t Diva<int_optimized>::DeserializeInfixStore(const char *deser_buf
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint64_t Diva<int_optimized>::ExtractPartialKey(const InfiniteByteString key,
                                                        const uint32_t shared, const uint32_t ignore,
                                                        const uint32_t implicit_size, const uint64_t msb) const {
@@ -1636,7 +1638,6 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
     }
     else
         left_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
-    AddTreeKey(left_key.str, left_key.length);
     int32_t cnt = 1;
     for (++key_it; key_it != end; ++key_it) {
         if (cnt % infix_store_target_size == 0) {   // New boundary key
@@ -1646,36 +1647,6 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
             }
             else
                 right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
-            AddTreeKey(right_key.str, right_key.length);
-
-            InfixStore *store;
-            const uint8_t *tree_key;
-            uint32_t tree_key_len, dummy;
-
-            if constexpr (int_optimized) {
-                wormhole_int_iter it_int;
-                it_int.ref = better_tree_int_;
-                it_int.map = better_tree_int_->map;
-                it_int.leaf = nullptr;
-                it_int.is = 0;
-                wh_int_iter_seek(&it_int, left_key.str, left_key.length);
-                wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                              reinterpret_cast<void **>(&store), &dummy);
-                if (it_int.leaf)
-                    wormleaf_int_unlock_read(it_int.leaf);
-            }
-            else {
-                wormhole_iter it;
-                it.ref = better_tree_;
-                it.map = better_tree_->map;
-                it.leaf = nullptr;
-                it.is = 0;
-                wh_iter_seek(&it, left_key.str, left_key.length);
-                wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                      reinterpret_cast<void **>(&store), &dummy);
-                if (it.leaf)
-                    wormleaf_unlock_read(it.leaf);
-            }
 
             auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
             const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1694,7 +1665,14 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
                 infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
                 ++last_key_it;
             }
-            LoadListToInfixStore(*store, infix_list, infix_store_target_size - 1, total_implicit);
+
+            InfixStore store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_);
+            LoadListToInfixStore(store, infix_list, infix_store_target_size - 1, total_implicit);
+            if constexpr (int_optimized)
+                wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store));
+            else
+                wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store));
+
             if constexpr (int_optimized)
                 int_opt_buf[0] = int_opt_buf[1];
             else
@@ -1704,38 +1682,14 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
     }
 
     // Add what was left from the loop
-    uint8_t max_str[key_len];
-    memset(max_str, 0xFF, key_len);
-    right_key = {max_str, key_len};
-
-    InfixStore *store;
-    const uint8_t *tree_key;
-    uint32_t tree_key_len, dummy;
-
+    key_it--;
     if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, left_key.str, left_key.length);
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                      reinterpret_cast<void **>(&store), &dummy);
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
+        int_opt_buf[1] = __builtin_bswap64(*key_it);
+        right_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 1), key_len};
     }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, left_key.str, left_key.length);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                              reinterpret_cast<void **>(&store), &dummy);
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
-    }
+    else
+        right_key = {reinterpret_cast<const uint8_t *>(&(*key_it)), key_len};
+    const bool add_last_key = key_it != last_key_it;
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
     const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1755,8 +1709,21 @@ inline void Diva<int_optimized>::BulkLoadFixedLength(const t_itr begin, const t_
         infix_list[i++] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
         ++last_key_it;
     }
-    if (i)
-        LoadListToInfixStore(*store, infix_list, i, total_implicit);
+
+    const uint32_t size_scalar = std::lower_bound(scaled_sizes_, scaled_sizes_ + size_scalar_count, i) - scaled_sizes_;
+    InfixStore store(scaled_sizes_[size_scalar], infix_size_, size_scalar);
+    LoadListToInfixStore(store, infix_list, i, total_implicit);
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store));
+    else
+        wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store));
+
+    if (add_last_key)
+        AddTreeKey(right_key.str, right_key.length);
+
+    uint8_t max_str[key_len];
+    memset(max_str, 0xFF, key_len);
+    right_key = {max_str, key_len};
 }
 
 
@@ -1769,7 +1736,6 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
     InfiniteByteString left_key {reinterpret_cast<const uint8_t *>(sv.data()), 
                                  static_cast<uint32_t>(sv.size())};
     InfiniteByteString right_key {};
-    AddTreeKey(left_key.str, left_key.length);
     int32_t cnt = 1;
     uint32_t max_len = sv.size();
     for (++key_it; key_it != end; ++key_it) {
@@ -1777,36 +1743,6 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
             std::string_view sv = *key_it;
             right_key = {reinterpret_cast<const uint8_t *>(sv.data()), 
                          static_cast<uint32_t>(sv.size())};
-            AddTreeKey(right_key.str, right_key.length);
-
-            InfixStore *store;
-            const uint8_t *tree_key;
-            uint32_t tree_key_len, dummy;
-
-            if constexpr (int_optimized) {
-                wormhole_int_iter it_int;
-                it_int.ref = better_tree_int_;
-                it_int.map = better_tree_int_->map;
-                it_int.leaf = nullptr;
-                it_int.is = 0;
-                wh_int_iter_seek(&it_int, left_key.str, left_key.length);
-                wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                              reinterpret_cast<void **>(&store), &dummy);
-                if (it_int.leaf)
-                    wormleaf_int_unlock_read(it_int.leaf);
-            }
-            else {
-                wormhole_iter it;
-                it.ref = better_tree_;
-                it.map = better_tree_->map;
-                it.leaf = nullptr;
-                it.is = 0;
-                wh_iter_seek(&it, left_key.str, left_key.length);
-                wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                      reinterpret_cast<void **>(&store), &dummy);
-                if (it.leaf)
-                    wormleaf_unlock_read(it.leaf);
-            }
 
             auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
             const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1821,7 +1757,14 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
                 infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
                 ++last_key_it;
             }
-            LoadListToInfixStore(*store, infix_list, infix_store_target_size - 1, total_implicit);
+
+            InfixStore store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_);
+            LoadListToInfixStore(store, infix_list, infix_store_target_size - 1, total_implicit);
+            if constexpr (int_optimized)
+                wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store));
+            else
+                wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store));
+
             left_key = right_key;
         }
         sv = *key_it;
@@ -1830,40 +1773,11 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
     }
 
     // Add what was left from the loop
-    uint8_t max_str[max_len];
-    memset(max_str, 0xFF, max_len);
-    AddTreeKey(max_str, max_len);
-
-    right_key = {max_str, max_len};
-
-    InfixStore *store;
-    const uint8_t *tree_key;
-    uint32_t tree_key_len, dummy;
-
-    if constexpr (int_optimized) {
-        wormhole_int_iter it_int;
-        it_int.ref = better_tree_int_;
-        it_int.map = better_tree_int_->map;
-        it_int.leaf = nullptr;
-        it_int.is = 0;
-        wh_int_iter_seek(&it_int, left_key.str, left_key.length);
-        wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                                      reinterpret_cast<void **>(&store), &dummy);
-        if (it_int.leaf)
-            wormleaf_int_unlock_read(it_int.leaf);
-    }
-    else {
-        wormhole_iter it;
-        it.ref = better_tree_;
-        it.map = better_tree_->map;
-        it.leaf = nullptr;
-        it.is = 0;
-        wh_iter_seek(&it, left_key.str, left_key.length);
-        wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
-                              reinterpret_cast<void **>(&store), &dummy);
-        if (it.leaf)
-            wormleaf_unlock_read(it.leaf);
-    }
+    key_it--;
+    sv = *key_it;
+    right_key = {reinterpret_cast<const uint8_t *>(sv.data()), 
+                 static_cast<uint32_t>(sv.size())};
+    const bool add_last_key = key_it != last_key_it;
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
     const uint64_t prev_implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1879,8 +1793,21 @@ inline void Diva<int_optimized>::BulkLoad(const t_itr begin, const t_itr end) {
         infix_list[i++] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
         ++last_key_it;
     }
-    if (i)
-        LoadListToInfixStore(*store, infix_list, i, total_implicit);
+
+    const uint32_t size_scalar = std::lower_bound(scaled_sizes_, scaled_sizes_ + size_scalar_count, i) - scaled_sizes_;
+    InfixStore store(scaled_sizes_[size_scalar], infix_size_, size_scalar);
+    LoadListToInfixStore(store, infix_list, i, total_implicit);
+    if constexpr (int_optimized)
+        wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store));
+    else
+        wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store));
+
+    if (add_last_key)
+        AddTreeKey(right_key.str, right_key.length);
+
+    uint8_t max_str[max_len];
+    memset(max_str, 0xFF, max_len);
+    AddTreeKey(max_str, max_len);
 }
 
 
@@ -1946,26 +1873,34 @@ inline void Diva<int_optimized>::BulkLoadStreamingFinish() {
     AddTreeKey(key_copy, bulk_load_streaming_max_len_);
     memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
     AddTreeKey(key_copy, bulk_load_streaming_max_len_);
-    InfiniteByteString bulk_load_right_key {key_copy, bulk_load_streaming_max_len_};
 
-    uint64_t infix_list[infix_store_target_size];
-    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(bulk_load_left_key_, bulk_load_right_key);
-    const uint64_t prev_implicit = ExtractPartialKey(bulk_load_left_key_, shared, ignore, implicit_size, 0) >> infix_size_;
-    const uint64_t next_implicit = ExtractPartialKey(bulk_load_right_key, shared, ignore, implicit_size, 1) >> infix_size_;
-    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
-    for (int32_t i = 0; i < bulk_load_streaming_ind_; i++) {
-        const uint64_t extraction = ExtractPartialKey(bulk_load_key_list_[i], shared, ignore, implicit_size, bulk_load_key_list_[i].GetBit(shared));
-        infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+    if (bulk_load_streaming_ind_ > 0) {
+        InfiniteByteString bulk_load_right_key {bulk_load_key_list_[bulk_load_streaming_ind_ - 1].str,
+                                                bulk_load_key_list_[bulk_load_streaming_ind_ - 1].length};
+        bulk_load_key_list_[bulk_load_streaming_ind_ - 1] = {};
+        bulk_load_streaming_ind_--;
+
+        uint64_t infix_list[infix_store_target_size];
+        auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(bulk_load_left_key_, bulk_load_right_key);
+        const uint64_t prev_implicit = ExtractPartialKey(bulk_load_left_key_, shared, ignore, implicit_size, 0) >> infix_size_;
+        const uint64_t next_implicit = ExtractPartialKey(bulk_load_right_key, shared, ignore, implicit_size, 1) >> infix_size_;
+        const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+        for (int32_t i = 0; i < bulk_load_streaming_ind_; i++) {
+            const uint64_t extraction = ExtractPartialKey(bulk_load_key_list_[i], shared, ignore, implicit_size, bulk_load_key_list_[i].GetBit(shared));
+            infix_list[i] = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+        }
+        const uint32_t size_scalar = std::lower_bound(scaled_sizes_, scaled_sizes_ + size_scalar_count, bulk_load_streaming_ind_) - scaled_sizes_;
+        InfixStore store(scaled_sizes_[size_scalar], infix_size_, size_scalar);
+        LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
+        if constexpr (int_optimized)
+            wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
+        else
+            wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
+        AddTreeKey(bulk_load_right_key.str, bulk_load_right_key.length);
+        delete[] bulk_load_right_key.str;
     }
-    InfixStore store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_);
-    LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
-    if constexpr (int_optimized)
-        wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
-    else
-        wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store));
 
     delete[] bulk_load_left_key_.str;
-    delete[] bulk_load_right_key.str;
     bulk_load_streaming_ind_ = 0;
     bulk_load_left_key_ = {};
     for (int32_t i = 0; i < infix_store_target_size; i++) {
@@ -1976,7 +1911,7 @@ inline void Diva<int_optimized>::BulkLoadStreamingFinish() {
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint32_t Diva<int_optimized>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint64_t *occupieds = store.ptr + 1;
@@ -1990,7 +1925,7 @@ inline uint32_t Diva<int_optimized>::RankOccupieds(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint32_t Diva<int_optimized>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint32_t size_grade = store.GetSizeGrade();
@@ -2021,7 +1956,7 @@ inline int32_t Diva<int_optimized>::NextOccupied(const InfixStore &store, const 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *occupieds = store.ptr + 1;
     int32_t res = pos - 1, hb_pos;
@@ -2036,7 +1971,7 @@ inline int32_t Diva<int_optimized>::PreviousOccupied(const InfixStore &store, co
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::NextRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     const uint32_t size_grade = store.GetSizeGrade();
@@ -2051,7 +1986,7 @@ inline int32_t Diva<int_optimized>::NextRunend(const InfixStore &store, const ui
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
     const uint64_t *runends = store.ptr + 1 + infix_store_target_size / 64;
     int32_t res = pos - 1, hb_pos;
@@ -2066,7 +2001,7 @@ inline int32_t Diva<int_optimized>::PreviousRunend(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::GetMappedPos(const uint32_t implicit_part, const uint32_t size_grade,
                                                  const uint64_t implicit_scalar) const {
     uint32_t res = (implicit_part * size_scalars_[size_grade] * implicit_scalar)
@@ -2076,7 +2011,7 @@ inline int32_t Diva<int_optimized>::GetMappedPos(const uint32_t implicit_part, c
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline uint64_t Diva<int_optimized>::GetSlot(const InfixStore &store, const uint32_t pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
@@ -2088,7 +2023,7 @@ inline uint64_t Diva<int_optimized>::GetSlot(const InfixStore &store, const uint
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
@@ -2102,7 +2037,7 @@ inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width) {
     assert(value > 0);
     const uint32_t size_grade = store.GetSizeGrade();
@@ -2117,7 +2052,7 @@ inline void Diva<int_optimized>::SetSlot(InfixStore &store, const uint32_t pos, 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                  const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
@@ -2135,7 +2070,7 @@ inline void Diva<int_optimized>::ShiftSlotsRight(const InfixStore &store, const 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                 const uint32_t shamt) {
 #ifdef NAIVE_SLOT_SHIFT
@@ -2151,7 +2086,7 @@ inline void Diva<int_optimized>::ShiftSlotsLeft(const InfixStore &store, const u
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
                                                    const uint32_t shamt) {
     shift_bitmap_right(store.ptr + 1 + infix_store_target_size / 64, l, r - 1, shamt);
@@ -2159,7 +2094,7 @@ inline void Diva<int_optimized>::ShiftRunendsRight(const InfixStore &store, cons
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void Diva<int_optimized>::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
                                                   const uint32_t shamt) {
     shift_bitmap_left(store.ptr + 1 + infix_store_target_size / 64, l, r - 1, shamt);
@@ -2167,7 +2102,7 @@ inline void Diva<int_optimized>::ShiftRunendsLeft(const InfixStore &store, const
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
@@ -2179,7 +2114,7 @@ inline int32_t Diva<int_optimized>::FindEmptySlotAfter(const InfixStore &store, 
 
 
 template <bool int_optimized>
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline int32_t Diva<int_optimized>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
@@ -2557,6 +2492,7 @@ inline bool Diva<int_optimized>::RangeQueryInfixStore(InfixStore &store, const u
     }
 
     // l_implicit_part == r_implicit_part
+    assert(l_explicit_part <= r_explicit_part);
     if (!get_bitmap_bit(occupieds, l_implicit_part))
         return false;
     const uint32_t rank = RankOccupieds(store, l_implicit_part);
