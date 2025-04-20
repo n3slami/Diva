@@ -14,23 +14,35 @@ DIR_DATA="real_datasets"
 # Set download urls
 declare -A urls
 urls["books_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/A6HDNT"
-#urls["fb_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/EATHF7"
-#urls["osm_cellids_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/8FX9BV"
+urls["fb_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/EATHF7"
+urls["osm_cellids_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/8FX9BV"
+urls["quotes_2008-08"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-08.txt.gz"
+urls["quotes_2008-09"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-09.txt.gz"
+urls["quotes_2008-10"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-10.txt.gz"
+urls["quotes_2008-11"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-11.txt.gz"
+urls["quotes_2008-12"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-12.txt.gz"
+urls["quotes_2009-01"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-01.txt.gz"
+urls["quotes_2009-02"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-02.txt.gz"
+urls["quotes_2009-03"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-03.txt.gz"
+urls["quotes_2009-04"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-04.txt.gz"
 
 # Set md5 for compressed files
 declare -A md5zst
 md5zst["books_200M_uint64"]="cd1f8bcb0dfd36f9ab08d160b887bf8a"
-#md5zst["fb_200M_uint64"]="fec241e8b021b198b0849fbd5564c05f"
-#md5zst["osm_cellids_200M_uint64"]="42575cb58f24bb7ea0a623d422d4c9a6"
+md5zst["fb_200M_uint64"]="fec241e8b021b198b0849fbd5564c05f"
+md5zst["osm_cellids_200M_uint64"]="42575cb58f24bb7ea0a623d422d4c9a6"
 
 # Set md5 for decompressed files
 declare -A md5bin
 md5bin["books_200M_uint64"]="aeedc7be338399ced89d0bb82287e024"
-#md5bin["fb_200M_uint64"]="3b0f820caa0d62150e87ce94ec989978"
-#md5bin["osm_cellids_200M_uint64"]="a7f6b8d2df09fcda5d9cfbc87d765979"
+md5bin["fb_200M_uint64"]="3b0f820caa0d62150e87ce94ec989978"
+md5bin["osm_cellids_200M_uint64"]="a7f6b8d2df09fcda5d9cfbc87d765979"
 
 check_md5() {
     FILE=$1
+    if [[ "$FILE" =~ q* ]]; then
+        return
+    fi
     MD5_EXPECTED=$2
     echo "Checking '${FILE}'..."
     MD5_ACTUAL=$(md5sum -b ${FILE} | cut -d ' ' -f 1)
@@ -39,9 +51,13 @@ check_md5() {
 
 download() {
     DATASET=$1
-    FILE="${DIR_DATA}/${DATASET}.zst"
+    if [[ "$FILE" =~ q* ]]; then
+        FILE="${DIR_DATA}/${DATASET}.txt.gz"
+    else
+        FILE="${DIR_DATA}/${DATASET}.zst"
+    fi
     URL=${urls[${DATASET}]}
-    echo "Downloading '${DATASET}'..."
+    echo "Downloading '${DATASET}'... welp ${FILE}"
     wget -q --progress=bar -O ${FILE} ${URL}
     return $?
 }
@@ -49,7 +65,11 @@ download() {
 decompress() {
     FILE=$1
     echo "Decompressing '${FILE}'..."
-    zstd -f -d ${FILE}
+    if [[ "$FILE" =~ q* ]]; then
+        gzip -d ${FILE}
+    else
+        zstd -f -d ${FILE}
+    fi
     return $?
 }
 
@@ -74,6 +94,12 @@ do
     then
         echo "File '${FILE_ZST}' already exists."
         check_md5 ${FILE_ZST} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
+    fi
+    FILE_TXT=${DIR_DATA}/${dataset}.txt
+    if [ -f ${FILE_TXT} ];
+    then
+        echo "File '${FILE_TXT}' already exists."
+        check_md5 ${FILE_TXT} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
     fi
 
     download ${dataset} && check_md5 ${FILE_ZST} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue

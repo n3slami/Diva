@@ -214,6 +214,29 @@ inline std::set<ByteString> read_data_binary(const std::string& filename) {
     return data;
 }
 
+inline std::set<ByteString> read_quotes_data_binary(const std::string& dirname) {
+    std::vector<ByteString> data;
+    const std::string quotes_str = "quotes";
+    std::vector<std::filesystem::path> quotes_files;
+    for (const auto& entry : std::filesystem::directory_iterator(dirname)) {
+        const std::string filename = entry.path().filename();
+        if (std::equal(quotes_str.begin(), quotes_str.end(), filename.begin()))
+            quotes_files.push_back(entry.path());
+    }
+    for (const std::filesystem::path& file : quotes_files) {
+        std::fstream in(file, std::ios::in);
+        std::string s;
+        while (in >> s) {
+            if (s == "P" || s == "L") {
+                in >> s;
+                data.push_back(ByteString(reinterpret_cast<const uint8_t *>(s.c_str()), s.size()));
+            }
+        }
+        in.close();
+    }
+    return {data.begin(), data.end()};
+}
+
 
 class WorkloadIO {
 public:

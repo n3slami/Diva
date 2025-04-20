@@ -71,6 +71,7 @@ generate_fpr_bench() {
     done
     $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size 1024 -o unif_string
     $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size 1024 -o norm_string
+    $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/quotes -o quotes_string
 }
 
 generate_true_bench() {
@@ -95,6 +96,8 @@ generate_expansion_bench() {
 
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 -e $n_expansions --max-range-size $short -o osm_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 -e $n_expansions --max-range-size $long -o osm_long
 }
 
 generate_delete_bench() {
