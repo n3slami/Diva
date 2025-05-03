@@ -18,13 +18,16 @@
 
 #pragma once
 
+#include <bitset>
 #include <cassert>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <limits>
 #include <ostream>
+#include <queue>
 #include <random>
 #include <set>
 #include <vector>
@@ -214,27 +217,84 @@ inline std::set<ByteString> read_data_binary(const std::string& filename) {
     return data;
 }
 
-inline std::set<ByteString> read_quotes_data_binary(const std::string& dirname) {
-    std::vector<ByteString> data;
-    const std::string quotes_str = "quotes";
-    std::vector<std::filesystem::path> quotes_files;
-    for (const auto& entry : std::filesystem::directory_iterator(dirname)) {
-        const std::string filename = entry.path().filename();
-        if (std::equal(quotes_str.begin(), quotes_str.end(), filename.begin()))
-            quotes_files.push_back(entry.path());
+constexpr uint32_t byte_range = 256;
+static uint32_t freq[byte_range][byte_range][byte_range];
+static uint32_t ht_code[byte_range][byte_range][byte_range], ht_len[byte_range][byte_range][byte_range];
+static void recurse_ht_encoding(uint32_t a, uint32_t b, uint32_t l, uint32_t r) {
+    uint32_t non_zero = 0, total_freq = 0;
+    for (uint32_t i = l; i < r; i++) {
+        non_zero += freq[a][b][i] > 0;
+        total_freq += freq[a][b][i];
     }
-    for (const std::filesystem::path& file : quotes_files) {
-        std::fstream in(file, std::ios::in);
-        std::string s;
-        while (in >> s) {
-            if (s == "P" || s == "L") {
-                in >> s;
-                data.push_back(ByteString(reinterpret_cast<const uint8_t *>(s.c_str()), s.size()));
+    if (non_zero <= 1)
+        return;
+    uint32_t running_sum = 0, running_non_zero = 0, mid;
+    for (mid = l; mid < r; mid++) {
+        running_sum += freq[a][b][mid];
+        running_non_zero += freq[a][b][mid] > 0;
+        if (running_sum > total_freq / 2) {
+            mid += running_non_zero == 1;
+            break;
+        }
+    }
+    for (uint32_t i = l; i < r; i++) {
+        if (freq[a][b][i] > 0) {
+            ht_code[a][b][i] = (ht_code[a][b][i] << 1) | static_cast<uint32_t>(i >= mid);
+            ht_len[a][b][i]++;
+        }
+    }
+    recurse_ht_encoding(a, b, l, mid);
+    recurse_ht_encoding(a, b, mid, r);
+}
+
+static void compute_ht_encoding() {
+    memset(ht_code, 0, sizeof(ht_code));
+    memset(ht_len, 0, sizeof(ht_len));
+    for (uint32_t a = 0; a < byte_range; a++) {
+        for (uint32_t b = 0; b < byte_range; b++)
+            recurse_ht_encoding(a, b, 0, byte_range);
+    }
+}
+
+static std::vector<ByteString> compress_data(std::vector<std::string> data) {
+    memset(freq, 0, sizeof(freq));
+    std::vector<ByteString> res;
+    for (std::string& s : data) { 
+        uint8_t bytes[3] = {0, 0, 0};
+        uint32_t bytes_ind = 0;
+        for (uint32_t i = 0; i < s.size(); i++) {
+            bytes[bytes_ind++] = s[i];
+            bytes_ind %= 3;
+            freq[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]]++;
+        }
+    }
+    compute_ht_encoding();
+    for (uint32_t i = 0; i < data.size(); i++) {
+        if (i < data.size() - 1 && std::mismatch(data[i].begin(), data[i].end(), data[i + 1].begin()).first == data[i].end())
+            continue;
+        std::string& s = data[i];
+        uint8_t bytes[3] = {0, 0, 0}, compressed_key[1024];
+        uint32_t bytes_ind = 0;
+        memset(compressed_key, 0, sizeof(compressed_key));
+        uint64_t buf = 0, buf_filled_bits = 0, ind = 0;
+        for (uint32_t j = 0; j < s.size(); j++) {
+            bytes[bytes_ind++] = s[j];
+            bytes_ind %= 3;
+            const uint64_t code_frag = ht_code[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]];
+            const uint32_t code_frag_len = ht_len[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]];
+            buf |= code_frag << (64 - buf_filled_bits - code_frag_len);
+            buf_filled_bits += code_frag_len;
+            while (buf_filled_bits >= 8) {
+                compressed_key[ind++] = static_cast<uint8_t>((buf >> (64 - 8)) & 0xFF);
+                buf <<= 8;
+                buf_filled_bits -= 8;
             }
         }
-        in.close();
+        if (buf_filled_bits > 0)
+            compressed_key[ind++] = static_cast<uint8_t>((buf >> (64 - 8)) & 0xFF);
+        res.emplace_back(compressed_key, ind);
     }
-    return {data.begin(), data.end()};
+    return res;
 }
 
 
@@ -293,8 +353,15 @@ public:
 
 
     void Bulk(InputKeys<ByteString>& keys) {
-        if (!std::is_sorted(keys.begin(), keys.end()))
+        if (!std::is_sorted(keys.begin(), keys.end())) {
+            for (uint32_t i = 1; i < keys.size(); i++) {
+                if (keys[i] < keys[i - 1]) {
+                    std::cout << "welp i=" << i << " --- " << keys[i - 1] << ' ' << keys[i] << std::endl;
+                    break;
+                }
+            }
             throw std::runtime_error("Keys are not sorted");
+        }
         const uint8_t opcode = static_cast<uint8_t>(opcode::Bulk);
         io_.write(reinterpret_cast<const char *>(&opcode), sizeof(opcode));
         uint32_t key_count = keys.size();

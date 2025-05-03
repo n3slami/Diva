@@ -19,6 +19,7 @@
 #pragma once
 
 #include <algorithm>
+#include <bitset>
 #include <cassert>
 #include <chrono>
 #include <cstdint>

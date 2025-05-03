@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #
-# This file is part of --- <>.
-# Copyright (C) 2024 ---.
+# This file is part of Diva <https://github.com/n3slami/Diva>.
+# Copyright (C) 2025 Navid Eslami.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ generate_fpr_bench() {
     done
     $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size 1024 -o unif_string
     $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size 1024 -o norm_string
-    $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/quotes -o quotes_string
+    $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -o enwiki_string
 }
 
 generate_true_bench() {
@@ -96,8 +96,10 @@ generate_expansion_bench() {
 
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
     $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 -e $n_expansions --max-range-size $short -o osm_short
-    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 -e $n_expansions --max-range-size $long -o osm_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64  --qdist real -e $n_expansions --max-range-size $short -o books_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64  --qdist real -e $n_expansions --max-range-size $long -o books_long
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $short -o osm_short
+    $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $long -o osm_long
 }
 
 generate_delete_bench() {
@@ -125,6 +127,22 @@ generate_wiredtiger_bench() {
     short=$(echo 2 ^ 10 | bc)
     n_expansions=6
     $WORKLOAD_GEN_PATH -t wiredtiger --qdist unif -e $n_expansions --max-range-size $short -o unif_short
+}
+
+generate_mixed_bench() {
+    i=0
+    norm_mu=$(echo 2 ^ 63 | bc)
+    norm_std=$(echo 2 ^ 50 | bc)
+    norm_byte=2
+    while [ $i -le 24 ]
+    do
+        range_size=$(echo 2 ^ $i | bc)
+        $WORKLOAD_GEN_PATH -t mixed-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
+        #$WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
+        $WORKLOAD_GEN_PATH -t mixed-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
+        #$WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
+        i=$(($i + 4))
+    done
 }
 
 mkdir -p $OUT_PATH/corr_bench && cd $OUT_PATH/corr_bench || exit 1
@@ -175,5 +193,13 @@ if ! generate_wiredtiger_bench ; then
     exit 1
 fi
 echo "[!!] wiredtiger_bench generated"
+
+mkdir -p $OUT_PATH/mixed_bench && cd $OUT_PATH/mixed_bench || exit 1
+if ! generate_mixed_bench ; then
+    echo "[!!] mixed_bench generation failed"
+    exit 1
+fi
+echo "[!!] mixed_bench generated"
+
 
 echo "[!!] success, all workloads generated"

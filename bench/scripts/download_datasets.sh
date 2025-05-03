@@ -16,15 +16,7 @@ declare -A urls
 urls["books_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/A6HDNT"
 urls["fb_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/EATHF7"
 urls["osm_cellids_200M_uint64"]="https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/8FX9BV"
-urls["quotes_2008-08"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-08.txt.gz"
-urls["quotes_2008-09"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-09.txt.gz"
-urls["quotes_2008-10"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-10.txt.gz"
-urls["quotes_2008-11"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-11.txt.gz"
-urls["quotes_2008-12"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2008-12.txt.gz"
-urls["quotes_2009-01"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-01.txt.gz"
-urls["quotes_2009-02"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-02.txt.gz"
-urls["quotes_2009-03"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-03.txt.gz"
-urls["quotes_2009-04"]="https://snap.stanford.edu/data/bigdata/memetracker9/quotes_2009-04.txt.gz"
+urls["enwiki"]="https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-all-titles-in-ns0.gz"
 
 # Set md5 for compressed files
 declare -A md5zst
@@ -51,21 +43,21 @@ check_md5() {
 
 download() {
     DATASET=$1
-    if [[ "$FILE" =~ q* ]]; then
+    if [[ "$FILE" =~ "enwiki" ]]; then
         FILE="${DIR_DATA}/${DATASET}.txt.gz"
     else
         FILE="${DIR_DATA}/${DATASET}.zst"
     fi
     URL=${urls[${DATASET}]}
-    echo "Downloading '${DATASET}'... welp ${FILE}"
-    wget -q --progress=bar -O ${FILE} ${URL}
+    echo "Downloading '${DATASET}'..."
+    wget --progress=bar -O ${FILE} ${URL}
     return $?
 }
 
 decompress() {
     FILE=$1
     echo "Decompressing '${FILE}'..."
-    if [[ "$FILE" =~ q* ]]; then
+    if [[ "$FILE" == "enwiki" ]]; then
         gzip -d ${FILE}
     else
         zstd -f -d ${FILE}
@@ -74,34 +66,34 @@ decompress() {
 }
 
 # Create data directory
-if [ ! -d "${DIR_DATA}" ];
-then
+if [ ! -d "${DIR_DATA}" ]; then
     mkdir -p "${DIR_DATA}";
 fi
 
 # Download datasets
-for dataset in ${!urls[@]};
-do
+for dataset in ${!urls[@]}; do
     FILE_BIN=${DIR_DATA}/${dataset}
-    if [ -f ${FILE_BIN} ];
-    then
+    if [ -f ${FILE_BIN} ]; then
         echo "File '${FILE_BIN}' already exists."
         check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
     fi
 
     FILE_ZST=${DIR_DATA}/${dataset}.zst
-    if [ -f ${FILE_ZST} ];
-    then
+    if [ -f ${FILE_ZST} ]; then
         echo "File '${FILE_ZST}' already exists."
         check_md5 ${FILE_ZST} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
     fi
+
     FILE_TXT=${DIR_DATA}/${dataset}.txt
-    if [ -f ${FILE_TXT} ];
-    then
+    if [ -f ${FILE_TXT} ]; then
         echo "File '${FILE_TXT}' already exists."
-        check_md5 ${FILE_TXT} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
+        continue
     fi
 
-    download ${dataset} && check_md5 ${FILE_ZST} ${md5zst[${dataset}]} && decompress ${FILE_ZST} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
+    if [[ "${dataset}" == "enwiki" ]]; then
+        FILE=$FILE_TXT
+    fi
+
+    download ${dataset} && check_md5 ${FILE} ${md5zst[${dataset}]} && decompress ${FILE} && check_md5 ${FILE_BIN} ${md5bin[${dataset}]} && continue
     echo "Download failed. Please try again."
 done

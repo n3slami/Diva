@@ -1,6 +1,6 @@
 /*
- * This file is part of Grafite <https://github.com/marcocosta97/grafite>.
- * Copyright (C) 2023 Marco Costa.
+ * This file is part of Diva <https://github.com/n3slami/Diva>.
+ * Copyright (C) 2025 Navid Eslami.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -82,6 +82,37 @@ bool create_dir_recursive(const std::string_view& dir_name) {
     }
     return true;
 }
+
+
+inline std::vector<ByteString> read_enwiki_data_txt(const std::string& filename) {
+    std::vector<std::string> data;
+    std::fstream in(filename, std::ios::in);
+    std::string line;
+    uint32_t cnt = 0;
+    while (std::getline(in, line)) {
+        bool skip = line.size() < 3;
+        for (char c : line)
+            skip |= (!isalnum(c));
+        if (!skip) {
+            uint32_t pos = 0;
+            while (true) {
+                auto new_pos = line.find("_", pos);
+                if (new_pos == std::string::npos) {
+                    data.push_back(line.substr(pos + 1, line.size() - pos - 1));
+                    break;
+                }
+                data.push_back(line.substr(pos + 1, new_pos - pos - 1));
+                pos = new_pos;
+            }
+        }
+    }
+    in.close();
+    std::sort(data.begin(), data.end());
+    data.resize(std::unique(data.begin(), data.end()) - data.begin());
+
+    return compress_data(data);
+}
+
 
 std::set<uint64_t> generate_int_keys_uniform(uint64_t n_keys, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
@@ -370,19 +401,25 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
 
     std::vector<uint64_t> key_lens = parser.get<std::vector<uint64_t>>("--string-lens");
     std::set<ByteString> keys;
-    if (key_dist == "unif")
+    std::vector<ByteString> keys_vec;
+    if (key_dist == "unif") {
         keys = generate_string_keys_uniform(n_keys, key_lens, rng);
-    else if (key_dist == "norm")
+        keys_vec = {keys.begin(), keys.end()};
+    }
+    else if (key_dist == "norm") {
         keys = generate_string_keys_normal(n_keys, key_lens, key_dist_mu, key_dist_std,
                                            key_norm_byte, rng);
-    else {
-        const std::string quotes_str = "quotes";
-        if (std::equal(quotes_str.rbegin(), quotes_str.rend(), key_file.rbegin()))
-            keys = read_quotes_data_binary(key_file.substr(0, key_file.size() - quotes_str.size()));
-        else 
-            keys = read_data_binary<ByteString>(key_file);
+        keys_vec = {keys.begin(), keys.end()};
     }
-    std::vector<ByteString> keys_vec {keys.begin(), keys.end()};
+    else {
+        const std::string enwiki_str = "enwiki.txt";
+        if (std::equal(enwiki_str.rbegin(), enwiki_str.rend(), key_file.rbegin()))
+            keys_vec = read_enwiki_data_txt(key_file);
+        else {
+            keys = read_data_binary<ByteString>(key_file);
+            keys_vec = {keys.begin(), keys.end()};
+        }
+    }
 
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     if (key_dist == "unif" || key_dist == "norm") {
@@ -436,12 +473,10 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
         wio.Flush();
     }
     else {
-        std::vector<bool> used_for_queries;
-        used_for_queries.resize(keys_vec.size());
-        std::fill(used_for_queries.begin(), used_for_queries.end(), false);
+        std::vector<bool> used_for_queries(keys_vec.size(), false);
         std::vector<std::pair<ByteString, ByteString>> queries;
         while (queries.size() < n_queries) {
-            uint32_t picked = rng() % (keys_vec.size() - 1);
+            const uint32_t picked = rng() % (keys_vec.size() - 1);
             if (used_for_queries[picked] || used_for_queries[picked + 1])
                 continue;
             queries.push_back({keys_vec[picked], keys_vec[picked + 1]});
@@ -529,20 +564,23 @@ void expansion_bench(argparse::ArgumentParser& parser) {
 
     std::vector<std::pair<uint64_t, uint64_t>> real_queries;
     if (query_dist == "real") {
-        while (real_queries.size() < n_queries * (n_expansions + 1)) {
-            const uint32_t picked = rng() % keys_vec.size();
-            if (keys.find(keys_vec[picked]) == keys.end())
+        std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+        for (uint32_t i = 0; real_queries.size() < n_queries * (n_expansions + 1); i = (i + 1) % keys_vec.size()) {
+            if (keys.find(keys_vec[i]) == keys.end())
                 continue;
             const uint64_t query_size = query_size_dist(rng);
-            const uint64_t l_key = keys_vec[picked];
+            const uint64_t l_key = keys_vec[i];
             if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
                 continue;
             const uint64_t r_key = l_key + query_size - 1;
-            auto it = std::upper_bound(keys_vec.begin(), keys_vec.end(), l_key);
-            if (it == keys_vec.end() || *it <= r_key)
+            auto it = keys.upper_bound(l_key);
+            if (it != keys.end() && *it <= r_key)
                 continue;
+            keys.erase(l_key);
             real_queries.emplace_back(l_key, r_key);
+            print_progress(1.0 * real_queries.size() / ((n_expansions + 1) * n_queries));
         }
+        std::cerr << "welp keys.size()=" << keys.size() << std::endl;
         keys_vec = std::vector<uint64_t>(keys.begin(), keys.end());
         n_keys -= n_queries * (n_expansions + 1);
     }
@@ -611,9 +649,11 @@ void expansion_bench(argparse::ArgumentParser& parser) {
             }
         }
         else if (query_dist == "real") {
-            for (uint32_t i = 0; i < n_queries / 4; i++) {
+            std::cerr << "welp, we're real I guess" << std::endl;
+            for (uint32_t i = 0; i < n_queries; i++) {
                 const auto [l, r] = real_queries[i];
                 wio.Query(l, r, false);
+                print_progress(1.00 * i / n_queries);
             }
         }
         else 
@@ -687,9 +727,11 @@ void expansion_bench(argparse::ArgumentParser& parser) {
             }
         }
         else if (query_dist == "real") {
+            std::cerr << "welp, we're real I guess: l=" << (expansion + 1) * n_queries / 4 << " r=" << (expansion + 2) * n_queries / 4 << std::endl;
             for (uint32_t i = (expansion + 1) * n_queries / 4; i < (expansion + 2) * n_queries / 4; i++) {
                 const auto [l, r] = real_queries[i];
                 wio.Query(l, r, false);
+                print_progress(1.0 * (i - (expansion + 1) * n_queries / 4) / (n_queries / 4));
             }
         }
         else 
@@ -997,6 +1039,106 @@ void wiredtiger_bench(argparse::ArgumentParser& parser) {
 }
 
 
+void mixed_int_bench(argparse::ArgumentParser& parser) {
+    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
+    uint32_t kdist_ind = 0, qdist_ind = 0;
+    auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
+    auto [query_dist, query_dist_mu, query_dist_std] = get_qdist(parser, qdist_ind);
+
+    const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
+    const uint64_t seed = parser.get<uint64_t>("--seed");
+    std::mt19937_64 rng(seed);
+
+    std::set<uint64_t> keys;
+    if (key_dist == "unif")
+        keys = generate_int_keys_uniform(n_keys, rng);
+    else if (key_dist == "norm")
+        keys = generate_int_keys_normal(n_keys, key_dist_mu, key_dist_std, rng);
+    else
+        keys = read_data_binary<uint64_t>(key_file);
+    std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+    std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+    keys_vec.resize(n_keys);
+    std::sort(keys_vec.begin(), keys_vec.end());
+    keys = std::set<uint64_t>(keys_vec.begin(), keys_vec.end());
+
+    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
+    const double positive_frac = parser.get<double>("--mix-positive-frac");
+    std::vector<std::tuple<uint64_t, uint64_t, bool>> queries;
+    std::cout << "Generating queries..." << std::endl;
+    std::uniform_int_distribution<uint64_t> picker(0, n_keys - 1);
+    while (queries.size() < n_queries * positive_frac) {
+        const uint32_t picked = picker(rng);
+        const uint64_t query_size = query_size_dist(rng);
+        const uint64_t offset = rng() % query_size;
+        if (offset > keys_vec[picked])
+            continue;
+        const uint64_t l_key = keys_vec[picked] - offset;
+        if (std::numeric_limits<uint64_t>::max() - l_key + 1 < query_size)
+            continue;
+        const uint64_t r_key = l_key + query_size - 1;
+        queries.emplace_back(l_key, r_key, true);
+        print_progress(1.0 * queries.size() / n_queries);
+    }
+
+    if (query_dist == "unif") {
+        std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+        while (queries.size() < n_queries) {
+            const uint64_t query_size = query_size_dist(rng);
+            uint64_t l_key = dist(rng);
+            if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                continue;
+            uint64_t r_key = l_key + query_size - 1;
+            if (vector_range_query(keys_vec, l_key, r_key))
+                continue;
+            queries.emplace_back(l_key, r_key, false);
+            print_progress(1.0 * queries.size() / n_queries);
+        }
+    }
+    else if (query_dist == "norm") {
+        std::normal_distribution<long double> dist(query_dist_mu, query_dist_std);
+        while (queries.size() < n_queries) {
+            const uint64_t query_size = query_size_dist(rng);
+            uint64_t l_key = static_cast<uint64_t>(dist(rng));
+            if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                continue;
+            uint64_t r_key = l_key + query_size - 1;
+            if (vector_range_query(keys_vec, l_key, r_key))
+                continue;
+            queries.emplace_back(l_key, r_key, false);
+            print_progress(1.0 * queries.size() / n_queries);
+        }
+    }
+    else if (query_dist == "real") {
+        std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+        for (uint32_t i = 0; queries.size() < n_queries; i = (i + 1) % keys_vec.size()) {
+            if (keys.find(keys_vec[i]) == keys.end())
+                continue;
+            const uint64_t query_size = query_size_dist(rng);
+            const uint64_t l_key = keys_vec[i];
+            if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                continue;
+            const uint64_t r_key = l_key + query_size - 1;
+            auto it = keys.upper_bound(l_key);
+            if (it == keys.end() || *it <= r_key)
+                continue;
+            keys.erase(l_key);
+            queries.emplace_back(l_key, r_key, false);
+            print_progress(1.0 * queries.size() / n_queries);
+        }
+        std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+    }
+    else 
+        throw std::runtime_error("Invalid query distribution type for this benchmark");
+    wio.Bulk(keys_vec);
+    wio.Timer('q');
+    std::shuffle(queries.begin(), queries.end(), rng);
+    for (auto [l, r, res] : queries)
+        wio.Query(l, r, res);
+    wio.Timer('q');
+    wio.Flush();
+}
+
 std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> benches = {
     {"correlated", correlated_bench},
     {"standard-int", standard_int_bench},
@@ -1006,6 +1148,7 @@ std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> 
     {"delete", delete_bench},
     {"construction", construction_bench},
     {"wiredtiger", wiredtiger_bench},
+    {"mixed-int", mixed_int_bench},
 };
 
 int main(int argc, char const *argv[]) {
@@ -1103,6 +1246,12 @@ int main(int argc, char const *argv[]) {
             .help("Correlation degree for correlated workloads")
             .required()
             .default_value(0.1)
+            .scan<'g', double>();
+
+    parser.add_argument("--mix-positive-frac")
+            .help("Fraction of positive queries in the mixed workload")
+            .required()
+            .default_value(0.5)
             .scan<'g', double>();
 
     parser.add_argument("--seed")

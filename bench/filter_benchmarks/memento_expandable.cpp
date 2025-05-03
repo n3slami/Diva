@@ -140,7 +140,7 @@ inline void insert(QF *f, uint64_t key) {
     uint64_t prefix = key >> f->metadata->memento_bits;
     uint64_t memento = key & ((1ULL << f->metadata->memento_bits) - 1);
     const int res = qf_insert_single(f, prefix, memento, QF_NO_LOCK);
-    assert(res);
+    assert(res >= 0);
 }
 
 inline void del(QF *f, uint64_t key) {
