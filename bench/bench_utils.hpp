@@ -307,7 +307,7 @@ public:
         Query,
         Timer,
         ResetDB,
-        Flush
+        Flush,
     };
 
     enum class iomode {

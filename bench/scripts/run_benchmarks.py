@@ -154,13 +154,36 @@ def wiredtiger_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
                                   filter, bpk - remove_amount, wiredtiger=True)
 
+def mixed_bench():
+    filters = ["diva", "diva_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    filters = ["rosetta"]
+    memory_footprints = [10, 12, 14, 16, 18, 20]
+    DEFAULT_MEMORY_FOOTPRINT = 16
+    MEDIAN_RANGE_SIZE = 2 ** 7
+    workload_subdir = "mixed_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if workload.is_file():
+            if workload.name.endswith("_12"):
+                for filter, bpk in itertools.product(filters, memory_footprints):
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+            else:
+                for filter in filters:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, DEFAULT_MEMORY_FOOTPRINT, 
+                                      MEDIAN_RANGE_SIZE if filter in RANGE_FIXED_FILTERS else None)
+
 RUNNERS = {"fpr": fpr_bench,
            "fpr_string": fpr_string_bench,
            "true": true_bench,
            "construction": construction_bench,
            "expansion": expansion_bench,
            "delete": delete_bench,
-           "wiredtiger": wiredtiger_bench}
+           "wiredtiger": wiredtiger_bench,
+           "mixed": mixed_bench}
 
 
 if __name__ == "__main__":

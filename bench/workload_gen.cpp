@@ -1126,7 +1126,7 @@ void mixed_int_bench(argparse::ArgumentParser& parser) {
             queries.emplace_back(l_key, r_key, false);
             print_progress(1.0 * queries.size() / n_queries);
         }
-        std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+        keys_vec = {keys.begin(), keys.end()};
     }
     else 
         throw std::runtime_error("Invalid query distribution type for this benchmark");
