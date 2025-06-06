@@ -33,6 +33,8 @@ logging.getLogger().setLevel(logging.INFO)
 RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
                               "diva": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
+                              "memento_shorter_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento ($2^{7}$ Range)"},
+                              "memento_longer_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "\\textbf{Memento ($2^{10}$ Range)}", "linestyle": ":"},
                               "memento_expandable": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "grafite": {"marker": 'o', "color": "teal", "label": "Grafite"},
                               "base": {"marker": 'x', "color": "dimgray", "zorder": 10, "label": "Baseline"},
@@ -42,6 +44,8 @@ RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "z
                               "proteus": {"marker": 'X', "color": "dimgray", "label": "Proteus"},
                               "proteus_mistuned": {"marker": 'X', "color": "dimgray", "label": "Proteus (Diff. Tune)", "linestyle": ":"},
                               "rosetta": {"marker": 'd', "color": "C4", "label": "Rosetta"},
+                              "rosetta_shorter_range": {"marker": 'd', "color": "C4", "label": "Rosetta ($2^{7}$ Range)"},
+                              "rosetta_longer_range": {"marker": 'd', "color": "C4", "label": "\\textbf{Rosetta ($2^{10}$ Range)}", "linestyle": ":"},
                               "rencoder": {"marker": '>', "color": "C5", "label": "REncoder"}}
 RANGE_FILTERS_HATCHES = {"diva_int": '',
                          "diva": '...',
@@ -62,7 +66,8 @@ DATASET_NAMES = {"unif": r"$\textsc{Uniform}$",
                  "real": r"$\textsc{Real}$", 
                  "books": r"$\textsc{Books}$",
                  "osm": r"$\textsc{OSM}$",
-                 "fb": r"$\textsc{FB}$"}
+                 "fb": r"$\textsc{FB}$",
+                 "enwiki": r"$\textsc{EnWiki}$"}
 RANGE_LENGTH_NAMES = {"point": "Point",
                       "short": "Range ($R=2^{10}$)",
                       "long": "Range ($R=2^{20}$)"}
@@ -85,7 +90,7 @@ def fix_file_contents(contents):
     return contents
 
 
-def plot_fpr(result_dir, output_dir):
+def plot_fpr(result_dir, output_dir, include_longer_range_tune=True):
     TITLE_FONT_SIZE = 9.5
     LEGEND_FONT_SIZE = 7
     YLABEL_FONT_SIZE = 9.5
@@ -99,6 +104,10 @@ def plot_fpr(result_dir, output_dir):
     workloads = ["unif", "norm", "books", "osm"]
     filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
                "proteus", "proteus_mistuned", "rencoder", "snarf", "oasis"]
+    if include_longer_range_tune:
+        filters = ["diva", "diva_int", 
+                   "memento_shorter_range", "memento_longer_range",
+                   "rosetta_shorter_range", "rosetta_longer_range"]
     memory_footprints = [10, 16]
     range_sizes = [0, 4, 8, 12, 16, 20, 24]
     workload_subdir = Path("fpr_bench")
@@ -159,9 +168,11 @@ def plot_fpr(result_dir, output_dir):
     fig.subplots_adjust(hspace=0.1, wspace=0.1)
 
     legend_lines, legend_labels = axes[1][0].get_legend_handles_labels()
-    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.94, 1.55),
-                  fancybox=True, shadow=False, ncol=6, fontsize=LEGEND_FONT_SIZE)
-    fig.savefig(output_dir / "fpr.pdf", bbox_inches='tight', pad_inches=0.01)
+    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-1.475 if include_longer_range_tune else -1.6,
+                                                                                     1.4 if include_longer_range_tune else 1.55),
+                  fancybox=True, shadow=False, ncol=7, fontsize=LEGEND_FONT_SIZE)
+    fig.savefig(output_dir / ("fpr_memento_rosetta_longer_range.pdf" if include_longer_range_tune else "fpr.pdf"),
+                bbox_inches='tight', pad_inches=0.01)
 
 
 def plot_fpr_string(result_dir, output_dir):
@@ -174,7 +185,7 @@ def plot_fpr_string(result_dir, output_dir):
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
     YTICKS_QUERY = [1000, 100, 10, 1]
 
-    workloads = ["unif", "norm"]
+    workloads = ["norm", "enwiki"]
     filters = ["diva", "surf"]
     memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = Path("fpr_bench")
@@ -217,7 +228,7 @@ def plot_fpr_string(result_dir, output_dir):
     for i in range(len(workloads)):
         axes[i][0].set_yscale("log")
         axes[i][0].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
-        axes[i][0].set_yticks(YTICKS)
+        axes[i][0].set_yticks(YTICKS if i == 0 else YTICKS[:3])
         axes[i][0].set_ylim(top=1.9)
         axes[i][1].set_yscale("log")
         axes[i][1].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
@@ -436,18 +447,19 @@ def plot_expansion(result_dir, output_dir):
     XTICK_FONT_SIZE = 9
     XTICKS = [2 ** (i - N_EXPANSIONS) for i in range(N_EXPANSIONS + 1)]
     XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
-    YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
-    YTICKS_MEMORY = [15, 20, 25, 30, 35]
+    YTICKS = [1, 1e-01, 1e-02, 1e-03]
+    YTICKS_MEMORY = [15, 20, 25, 30, 35, 40]
 
     filters = ["diva", "diva_int", "memento_expandable", "rosetta", "rencoder", "snarf"]
     range_sizes = ["short", "long"]
     workload_subdir = Path("expansion_bench")
+    WORKLOAD = "books"
 
     fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, figsize=(WIDTH, HEIGHT))
     plot_data = [{filter: [] for filter in filters} for _ in range(len(range_sizes) + 2)]
     for i, range_size in enumerate(range_sizes):
         for filter in filters:
-            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "diva" in filter else 0)}_unif_{range_size}.json")
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT - (1 if "diva" in filter else 0)}_{WORKLOAD}_{range_size}.json")
             if not file_path.is_file():
                 continue
             with open(file_path, 'r') as result_file:
@@ -499,13 +511,13 @@ def plot_expansion(result_dir, output_dir):
             axes[i][j].set_yscale("log")
         axes[i][j].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs="auto"))
     axes[1][0].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
-    axes[1][0].set_ylim(bottom=13, top=35)
+    axes[1][0].set_ylim(bottom=13, top=40)
     axes[1][0].set_yticks(YTICKS_MEMORY)
 
-    axes[0][0].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[0]], fontsize=XLABEL_FONT_SIZE)
+    axes[0][0].text(0.25, 1.0 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[0]], fontsize=XLABEL_FONT_SIZE)
     axes[0][0].set_ylabel("FPR", fontsize=YLABEL_FONT_SIZE)
 
-    axes[0][1].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[1]], fontsize=XLABEL_FONT_SIZE)
+    axes[0][1].text(0.25, 1.0 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[1]], fontsize=XLABEL_FONT_SIZE)
     axes[0][1].set_yticklabels([])
 
     axes[1][0].set_ylabel("Space [BPK]", fontsize=YLABEL_FONT_SIZE)
@@ -693,6 +705,92 @@ def plot_delete_wiredtiger(result_dir, output_dir):
     fig.savefig(output_dir / "delete_wiredtiger.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
+def plot_mixed(result_dir, output_dir):
+    LEGEND_FONT_SIZE = 8
+    YLABEL_FONT_SIZE = 11.5
+    XLABEL_FONT_SIZE = 11.5
+    XTICK_FONT_SIZE = 9
+    WIDTH = 3.5
+    HEIGHT = 1.5
+    XTICKS = [2 ** i for i in range(0, 25, 4)]
+    XTICK_LABELS = ["$2^{" + str(i) + "}$" for i in range(0, 25, 4)]
+    YTICKS = [1e6, 1e5, 1e4, 1e3, 1e2]
+    XPADDING = 1
+
+    workloads = ["unif", "books"]
+    filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
+               "proteus", "rencoder", "snarf", "oasis"]
+    workload_subdir = Path("mixed_bench")
+
+    fig, axes = plt.subplots(nrows=len(workloads), ncols=2, 
+                             sharey='row', sharex='col', figsize=(WIDTH, len(workloads) * HEIGHT))
+    RANGE_SIZE = 12
+    memory_footprints = [10, 12, 14, 16, 18, 20]
+    plot_data_memory = [{filter: [] for filter in filters},
+                        {filter: [] for filter in filters}]
+    for i, workload in enumerate(workloads):
+        for filter, memory_footprint in itertools.product(filters, memory_footprints):
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{memory_footprint}_{workload}_{RANGE_SIZE}.json")
+            if not file_path.is_file():
+                continue
+            with open(file_path, 'r') as result_file:
+                contents = result_file.read()
+                if len(contents) == 0:
+                    continue
+                json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+                result = json.loads(json_string)
+                plot_data_memory[i][filter].append((result[-1]["bpk"] - (1 if "diva" in filter else 0),
+                                                    result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
+
+    range_sizes = [0, 4, 8, 12, 16, 20, 24]
+    MEMORY_FOOTPRINT = 16
+    plot_data_range_size = [{filter: [] for filter in filters},
+                            {filter: [] for filter in filters}]
+    for i, workload in enumerate(workloads):
+        for filter, range_size in itertools.product(filters, range_sizes):
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{MEMORY_FOOTPRINT}_{workload}_{range_size}.json")
+            if not file_path.is_file():
+                continue
+            with open(file_path, 'r') as result_file:
+                contents = result_file.read()
+                if len(contents) == 0:
+                    continue
+                json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+                result = json.loads(json_string)
+                plot_data_range_size[i][filter].append((2 ** range_size, result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
+
+    for i in range(len(workloads)):
+        for filter in filters:
+            axes[i][0].plot(*zip(*plot_data_memory[i][filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+            axes[i][1].plot(*zip(*plot_data_range_size[i][filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    axes[0][0].set_ylabel(DATASET_NAMES["unif"], fontsize=YLABEL_FONT_SIZE)
+    axes[1][0].set_ylabel(DATASET_NAMES["books"], fontsize=YLABEL_FONT_SIZE)
+    axes[1][0].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
+    axes[1][1].set_xlabel("Range Size", fontsize=XLABEL_FONT_SIZE)
+    for i in range(len(workloads)):
+        axes[i][0].text(9.5, 2.5e5, RANGE_LENGTH_TAGS["short"], fontsize=XLABEL_FONT_SIZE)
+        axes[i][1].text(1, 2.5e5, "16 BPK", fontsize=XLABEL_FONT_SIZE)
+        axes[i][0].set_xticks(memory_footprints)
+        axes[i][0].set_xlim(memory_footprints[0] - XPADDING, memory_footprints[-1] + XPADDING)
+
+    for ax in axes.flatten():
+        ax.set_yscale('log')
+        ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+        ax.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
+        ax.set_yticks(YTICKS)
+    for i in range(len(workloads)):
+        axes[i][1].set_xscale("log")
+        axes[i][1].minorticks_off()
+        axes[i][1].set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
+    fig.subplots_adjust(wspace=0.1)
+
+    legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
+    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(1.025, 0.75),
+                      fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
+    fig.savefig(output_dir / "mixed.pdf", bbox_inches='tight', pad_inches=0.01)
+
+
 PLOTTERS = {"fpr": plot_fpr,
             "fpr_string": plot_fpr_string,
             "fpr_memory": plot_fpr_memory,
@@ -701,7 +799,8 @@ PLOTTERS = {"fpr": plot_fpr,
             "expansion": plot_expansion,
             "delete": plot_delete,
             "wiredtiger": plot_wiredtiger,
-            "delete_wiredtiger": plot_delete_wiredtiger}
+            "delete_wiredtiger": plot_delete_wiredtiger,
+            "mixed": plot_mixed}
 
 
 if __name__ == "__main__":
