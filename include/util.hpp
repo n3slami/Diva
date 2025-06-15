@@ -269,7 +269,7 @@ inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r,
 // Synchronization and Locking Primitives
 typedef uint32_t lock_t;
 static constexpr lock_t rwlock_no_access = 0;
-static constexpr lock_t rwlock_write_bit = 1ULL << (sizeof(lock_t) - 1);
+static constexpr lock_t rwlock_write_bit = 1ULL << (8 * sizeof(lock_t) - 1);
 
 
 __attribute__((always_inline))
@@ -338,7 +338,7 @@ inline void rwlock_lock_write(std::atomic<lock_t>& lock) {
 
 __attribute__((always_inline))
 inline void rwlock_unlock_write(std::atomic<lock_t>& lock) {
-  lock.fetch_sub(rwlock_write_bit, std::memory_order::memory_order_release);
+    lock.fetch_sub(rwlock_write_bit, std::memory_order::memory_order_release);
 }
 
 

@@ -346,7 +346,7 @@ struct kvmap_api {
   // put (aka put/upsert): return true on success; false on error
   // mm.in() controls how things move into the kvmap; the default mm make a copy with malloc()
   // mm.free() controls how old kv get disposed when replaced
-  bool        (* put)     (void * const ref, struct kv * const kv);
+  bool        (* put)     (void * const ref, struct kv * const kv, bool has_lock, bool has_next_lock);
   // get: search and return a kv if found, or NULL if not
   // with the default mm: malloc() if out == NULL; otherwise, use out as buffer
   // with custom kvmap_mm: mm.out() controls buffer; use with caution
@@ -356,7 +356,7 @@ struct kvmap_api {
   bool        (* probe)   (void * const ref, const struct kref * const key);
   // del: return true on something deleted, false on not found
   // mm.free() controls how old kv get disposed when replaced
-  bool        (* del)     (void * const ref, const struct kref * const key);
+  bool        (* del)     (void * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
   // inp: inplace operation if key exists; otherwise return false; uf() is always executed even with NULL key
   // inpr/inpw acquires r/w locks respectively.
   // Note that in inpw() you can only change the value.
@@ -377,7 +377,7 @@ struct kvmap_api {
   // - creating and use more than one iter based on a ref can cause deadlocks
   void *      (* iter_create)   (void * const ref);
   // move the cursor to the first key >= search-key;
-  void        (* iter_seek)     (void * const iter, const struct kref * const key);
+  void        (* iter_seek)     (void * const iter, const struct kref * const key, bool write);
   // check if the cursor points to a valid key
   bool        (* iter_valid)    (void * const iter);
   // return the current key; copy to out if (out != NULL)
@@ -392,11 +392,11 @@ struct kvmap_api {
   u64         (* iter_retain)   (void * const iter);
   void        (* iter_release)  (void * const iter, const u64 opaque);
   // skip one element
-  void        (* iter_skip1)    (void * const iter);
+  void        (* iter_skip1)    (void * const iter, bool write, bool unlock);
   // skip nr elements
-  void        (* iter_skip)     (void * const iter, const u32 nr);
+  void        (* iter_skip)     (void * const iter, const u32 nr, bool write, bool unlock);
   // skip one element in reverse
-  void        (* iter_skip1_rev)    (void * const iter);
+  bool        (* iter_skip1_rev)    (void * const iter, bool write, bool unlock);
   // iter_next == iter_peek + iter_skip1
   struct kv * (* iter_next)     (void * const iter, struct kv * const out);
   // perform inplace opeation if the current key is valid; return false if no current key
@@ -404,9 +404,9 @@ struct kvmap_api {
   bool        (* iter_inp)      (void * const iter, kv_inp_func uf, void * const priv);
   // invalidate the iter to release any resources or locks
   // afterward, must call seek() again before accessing data
-  void        (* iter_park)     (void * const iter);
+  void        (* iter_park)     (void * const iter, bool write);
   // destroy iter
-  void        (* iter_destroy)  (void * const iter);
+  void        (* iter_destroy)  (void * const iter, bool write);
 
   // misc:
   // create refs for maps if required; always use use kvmap_ref() and kvmap_unref()

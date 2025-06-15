@@ -914,7 +914,7 @@ kvmap_kv_probe(const struct kvmap_api * const api, void * const ref,
 kvmap_kv_put(const struct kvmap_api * const api, void * const ref,
     struct kv * const kv)
 {
-  return api->put(ref, kv);
+  return api->put(ref, kv, false, false);
 }
 
   inline bool
@@ -922,7 +922,7 @@ kvmap_kv_del(const struct kvmap_api * const api, void * const ref,
     const struct kv * const key)
 {
   const struct kref kref = kv_kref(key);
-  return api->del(ref, &kref);
+  return api->del(ref, &kref, false, false);
 }
 
   inline bool
@@ -967,7 +967,7 @@ kvmap_kv_iter_seek(const struct kvmap_api * const api, void * const iter,
     const struct kv * const key)
 {
   const struct kref kref = kv_kref(key);
-  api->iter_seek(iter, &kref);
+  api->iter_seek(iter, &kref, false);
 }
 // }}} kvmap_kv_op
 
@@ -996,7 +996,7 @@ kvmap_raw_del(const struct kvmap_api * const api, void * const ref,
 {
   const struct kref kref = {.ptr = ptr, .len = len,
     .hash32 = api->hashkey ? kv_crc32c(ptr, len) : 0};
-  return api->del(ref, &kref);
+  return api->del(ref, &kref, false, false);
 }
 
   inline bool
@@ -1023,7 +1023,7 @@ kvmap_raw_iter_seek(const struct kvmap_api * const api, void * const iter,
 {
   const struct kref kref = {.ptr = ptr, .len = len,
     .hash32 = api->hashkey ? kv_crc32c(ptr, len) : 0};
-  api->iter_seek(iter, &kref);
+  api->iter_seek(iter, &kref, false);
 }
 // }}}} kvmap_raw_op
 
@@ -1033,16 +1033,16 @@ kvmap_dump_keys(const struct kvmap_api * const api, void * const map, const int 
 {
   void * const ref = kvmap_ref(api, map);
   void * const iter = api->iter_create(ref);
-  api->iter_seek(iter, kref_null());
+  api->iter_seek(iter, kref_null(), false);
   u64 i = 0;
   while (api->iter_valid(iter)) {
     struct kvref kvref;
     api->iter_kvref(iter, &kvref);
     dprintf(fd, "%010lu [%3u] %.*s [%u]\n", i, kvref.hdr.klen, kvref.hdr.klen, kvref.kptr, kvref.hdr.vlen);
     i++;
-    api->iter_skip1(iter);
+    api->iter_skip1(iter, false, true);
   }
-  api->iter_destroy(iter);
+  api->iter_destroy(iter, false);
   kvmap_unref(api, ref);
   return i;
 }
@@ -1095,7 +1095,7 @@ kvmap_kv64_put(const struct kvmap_api * const api, void * const ref,
   if (api->hashkey)
     kv_update_hash(&kv.kv);
 
-  return api->put(ref, &kv.kv);
+  return api->put(ref, &kv.kv, false, false);
 }
 
   inline bool
@@ -1106,7 +1106,7 @@ kvmap_kv64_del(const struct kvmap_api * const api, void * const ref,
   struct kref kref;
   keybuf.key_be = __builtin_bswap64(key);
   kref_ref_hash32(&kref, keybuf.kv.kv, sizeof(keybuf.key_be));
-  return api->del(ref, &kref);
+  return api->del(ref, &kref, false, false);
 }
 
   inline void
@@ -1117,7 +1117,7 @@ kvmap_kv64_iter_seek(const struct kvmap_api * const api, void * const iter,
   struct kref kref;
   keybuf.key_be = __builtin_bswap64(key);
   kref_ref_hash32(&kref, keybuf.kv.kv, sizeof(keybuf.key_be));
-  api->iter_seek(iter, &kref);
+  api->iter_seek(iter, &kref, false);
 }
 
   inline bool

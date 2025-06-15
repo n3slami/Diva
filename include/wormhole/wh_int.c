@@ -54,8 +54,9 @@ static_assert(sizeof(struct wormmeta) == 32, "sizeof(wormmeta) != 32");
 struct wormkv64 { u64 key; void * ptr; }; // u64 keys (whu64)
 
 struct store_sim_hack {
-  uint32_t a;
-  uint64_t b;
+  u32 status;
+  au32 lock;
+  u64 ptr;
 };
 
 struct wormleaf_int {
@@ -74,7 +75,7 @@ struct wormleaf_int {
   struct int_store_pair {
       u8 key_size;
       u64 key;
-      u8 store[sizeof(struct store_sim_hack)];
+      void *payload_ptr;
   } kvs[WH_KPN]; 
 };
 
@@ -1639,7 +1640,8 @@ wormleaf_int_insert(struct wormleaf_int * const leaf, const struct kv * const ne
   const u32 nr0 = leaf->nr_keys;
   leaf->kvs[nr0].key_size = new->klen;
   leaf->kvs[nr0].key = (*((u64 *) new->kv)) & BITMASK(new->klen * 8);
-  memcpy(leaf->kvs[nr0].store, new->kv + new->klen, new->vlen);
+  leaf->kvs[nr0].payload_ptr = malloc(new->vlen);
+  memcpy(leaf->kvs[nr0].payload_ptr, new->kv + new->klen, new->vlen);
   leaf->nr_keys++;
 
   // optimize for seq insertion
@@ -1680,6 +1682,7 @@ wormleaf_int_insert_isp(struct wormleaf_int * const leaf, const struct int_store
 wormleaf_int_remove(struct wormleaf_int * const leaf, const u32 pos)
 {
   // ss
+  free(leaf->kvs[pos].payload_ptr);
   leaf->kvs[pos] = leaf->kvs[leaf->nr_keys - 1];
   if (leaf->nr_sorted > pos)
     leaf->nr_sorted = pos;
@@ -1704,7 +1707,8 @@ wormleaf_int_update(struct wormleaf_int * const leaf, const u32 ih, const struct
   debug_assert(new->hash == kv_crc32c_extend(kv_crc32c(new->kv, new->klen)));
   leaf->kvs[ih].key_size = new->klen;
   leaf->kvs[ih].key = (*((u64 *) new->kv)) & BITMASK(new->klen * 8);
-  memcpy(leaf->kvs[ih].store, new->kv + new->klen, new->vlen);
+  leaf->kvs[ih].payload_ptr = malloc(new->vlen);
+  memcpy(leaf->kvs[ih].payload_ptr, new->kv + new->klen, new->vlen);
 }
 // }}} leaf-write
 
@@ -1781,7 +1785,8 @@ wormhole_split_leaf_move1(struct wormleaf_int * const leaf1, struct wormleaf_int
   struct int_store_pair new_isp;
   new_isp.key_size = new->klen;
   new_isp.key = (*((u64 *) new->kv)) & BITMASK(8 * new->klen);
-  memcpy(new_isp.store, new->kv + new->klen, new->vlen);
+  new_isp.payload_ptr = malloc(new->vlen);
+  memcpy(new_isp.payload_ptr, new->kv + new->klen, new->vlen);
   struct int_store_pair es[WH_KPN];
 
   if (cut <= is1) { // new_isp goes to leaf2
@@ -1840,9 +1845,9 @@ wormhole_isp_split_alloc_anchor(const struct int_store_pair * const key1, const 
 
   struct kv * const anchor = wormhole_alloc_akey(alen);
   if (anchor) {
-    u8 buf[key2->key_size + sizeof(key2->store)];
+    u8 buf[key2->key_size + sizeof(key2->payload_ptr)];
     memcpy(buf, &key2->key, key2->key_size);
-    memcpy(buf + key2->key_size, key2->store, sizeof(key2->store));
+    memcpy(buf + key2->key_size, key2->payload_ptr, sizeof(key2->payload_ptr));
     kv_refill(anchor, buf, alen, NULL, 0);
   }
   return anchor;
@@ -1856,7 +1861,8 @@ wormhole_split_leaf(struct wormhole_int * const map, struct wormleaf_int * const
   struct int_store_pair new_isp;
   new_isp.key_size = new->klen;
   new_isp.key = (*((u64 *) new->kv)) & BITMASK(8 * new->klen);
-  memcpy(new_isp.store, new->kv + new->klen, new->vlen);
+  new_isp.payload_ptr = malloc(new->vlen);
+  memcpy(new_isp.payload_ptr, new->kv + new->klen, new->vlen);
 
   wormleaf_int_sync_sorted(leaf1);
   struct kref kref_new;
@@ -1955,8 +1961,8 @@ wormhole_int_get(struct wormref_int * const ref, const struct kref * const key, 
   struct int_store_pair * const res = leaf->kvs + i;
   out->klen = res->key_size;
   memcpy(out->kv, &res->key, out->klen);
-  out->vlen = sizeof(res->store);
-  memcpy(out->kv + out->klen, res->store, out->vlen);
+  out->vlen = sizeof(res->payload_ptr);
+  memcpy(out->kv + out->klen, res->payload_ptr, out->vlen);
 
   wormleaf_int_unlock_read(leaf);
   return out;
@@ -1982,8 +1988,8 @@ whunsafe_int_get(struct wormhole_int * const map, const struct kref * const key,
   struct int_store_pair * const res = leaf->kvs + i;
   out->klen = res->key_size;
   memcpy(out->kv, &res->key, out->klen);
-  out->vlen = sizeof(res->store);
-  memcpy(out->kv + out->klen, res->store, out->vlen);
+  out->vlen = sizeof(res->payload_ptr);
+  memcpy(out->kv + out->klen, res->payload_ptr, out->vlen);
 
   return out;
 }
@@ -2139,7 +2145,7 @@ wormmeta_split(struct wormhmap * const hmap, struct wormleaf_int * const leaf,
 
 // all locks will be released before returning
   static bool
-wormhole_split_meta(struct wormref_int * const ref, struct wormleaf_int * const leaf2)
+wormhole_split_meta(struct wormref_int * const ref, struct wormleaf_int * const leaf2, bool has_lock, bool has_next_lock)
 {
   struct kv * const mkey = wormhole_alloc_mkey(leaf2->anchor->klen);
   if (unlikely(mkey == NULL))
@@ -2164,8 +2170,13 @@ wormhole_split_meta(struct wormref_int * const ref, struct wormleaf_int * const 
   // link
   struct wormleaf_int * const leaf1 = leaf2->prev;
   leaf1->next = leaf2;
-  if (leaf2->next)
+  if (leaf2->next) {
+    if (!has_next_lock)
+      rwlock_lock_write(&(leaf2->next->leaflock));
     leaf2->next->prev = leaf2;
+    if (!has_next_lock)
+      rwlock_unlock_write(&(leaf2->next->leaflock));
+  }
 
   // update versions
   const u64 v1 = wormhmap_version_load(hmap0) + 1;
@@ -2180,7 +2191,8 @@ wormhole_split_meta(struct wormref_int * const ref, struct wormleaf_int * const 
   // switch hmap
   wormhmap_store(map, hmap1);
 
-  wormleaf_int_unlock_write(leaf1);
+  if (!has_lock)
+      wormleaf_int_unlock_write(leaf1);
   wormleaf_int_unlock_write(leaf2);
 
   qsbr_wait(map->qsbr, v1);
@@ -2198,7 +2210,7 @@ wormhole_split_meta(struct wormref_int * const ref, struct wormleaf_int * const 
 // leaf1->lock (write) is already taken
   static bool
 wormhole_split_insert(struct wormref_int * const ref, struct wormleaf_int * const leaf1,
-    struct kv * const new)
+    struct kv * const new, bool has_lock, bool has_next_lock)
 {
   struct wormleaf_int * const leaf2 = wormhole_split_leaf(ref->map, leaf1, new);
   if (unlikely(leaf2 == NULL)) {
@@ -2207,11 +2219,12 @@ wormhole_split_insert(struct wormref_int * const ref, struct wormleaf_int * cons
   }
 
   rwlock_lock_write(&(leaf2->leaflock));
-  const bool rsm = wormhole_split_meta(ref, leaf2);
+  const bool rsm = wormhole_split_meta(ref, leaf2, has_lock, has_next_lock);
   if (unlikely(!rsm)) {
     // undo insertion & merge; free leaf2
     wormleaf_split_undo(ref->map, leaf1, leaf2, new);
-    wormleaf_int_unlock_write(leaf1);
+    if (!has_lock)
+        wormleaf_int_unlock_write(leaf1);
   }
   return rsm;
 }
@@ -2421,41 +2434,43 @@ whunsafe_int_meta_leaf_merge(struct wormhole_int * const map, struct wormleaf_in
 
 // put {{{
   bool
-wormhole_int_put(struct wormref_int * const ref, struct kv * const kv, bool lock)
+wormhole_int_put(struct wormref_int * const ref, struct kv * const kv, bool has_lock, bool has_next_lock)
 {
   struct wormhole_int * const map = ref->map;
   if (unlikely(kv == NULL))
     return false;
   const struct kref kref = kv_kref(kv);
 
-  struct wormleaf_int * const leaf = lock ? wormhole_jump_leaf_write(ref, &kref)
-                                          : wormhole_jump_leaf(ref, &kref);
+  struct wormleaf_int * const leaf = has_lock ? wormhole_jump_leaf_write_has_lock(ref, &kref)
+                                              : wormhole_jump_leaf_write(ref, &kref);
   // update
   const u32 im = wormleaf_int_search_eq(leaf, &kref);
   if (im < WH_KPN) {
     wormleaf_int_update(leaf, im, kv);
-    wormleaf_int_unlock_write(leaf);
+    if (!has_lock)
+        wormleaf_int_unlock_write(leaf);
     return true;
   }
 
   // insert
   if (likely(leaf->nr_keys < WH_KPN)) { // just insert
     wormleaf_int_insert(leaf, kv);
-    wormleaf_int_unlock_write(leaf);
+    if (!has_lock)
+        wormleaf_int_unlock_write(leaf);
     return true;
   }
 
   // split_insert changes hmap
   // all locks should be released in wormhole_split_insert()
-  const bool rsi = wormhole_split_insert(ref, leaf, kv);
+  const bool rsi = wormhole_split_insert(ref, leaf, kv, has_lock, has_next_lock);
   return rsi;
 }
 
   bool
-whsafe_int_put(struct wormref_int * const ref, struct kv * const kv)
+whsafe_int_put(struct wormref_int * const ref, struct kv * const kv, bool has_lock, bool has_next_lock)
 {
   wormhole_int_resume(ref);
-  const bool r = wormhole_int_put(ref, kv);
+  const bool r = wormhole_int_put(ref, kv, has_lock, has_next_lock);
   wormhole_int_park(ref);
   return r;
 }
@@ -2822,8 +2837,8 @@ wormhole_int_iter_peek(struct wormhole_int_iter * const iter, struct kv * const 
   if (res) {
     out->klen = res->key_size;
     memcpy(out->kv, &res->key, out->klen);
-    out->vlen = sizeof(res->store);
-    memcpy(out->kv + out->klen, res->store, out->vlen);
+    out->vlen = sizeof(res->payload_ptr);
+    memcpy(out->kv + out->klen, res->payload_ptr, out->vlen);
     return out;
   }
   return NULL;
@@ -2852,14 +2867,14 @@ wormhole_int_iter_skip1(struct wormhole_int_iter * const iter, bool write, bool 
 }
 
   void
-wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write)
+wormhole_int_iter_skip(struct wormhole_int_iter * const iter, const u32 nr, bool write, bool unlock)
 {
   u32 todo = nr;
   while (todo && wormhole_int_iter_valid(iter)) {
     const u32 cap = iter->leaf->nr_sorted - iter->is;
     const u32 nskip = (cap < todo) ? cap : todo;
     iter->is += nskip;
-    wormhole_int_iter_fix(iter, write, true);
+    wormhole_int_iter_fix(iter, write, unlock);
     todo -= nskip;
   }
 }
@@ -2896,12 +2911,12 @@ wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const 
 wormhole_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * const priv)
 {
   struct int_store_pair * const kv = wormhole_int_iter_current(iter);
-  uint8_t buf[sizeof(struct kv) + kv->key_size + sizeof(kv->store)];
+  uint8_t buf[sizeof(struct kv) + kv->key_size + sizeof(kv->payload_ptr)];
   struct kv * res = (struct kv *) buf;
   res->klen = kv->key_size;
   memcpy(res->kv, &kv->key, res->klen);
-  res->vlen = sizeof(kv->store);
-  memcpy(res->kv + kv->key_size, kv->store, res->vlen);
+  res->vlen = sizeof(struct store_sim_hack);
+  memcpy(res->kv + kv->key_size, kv->payload_ptr, res->vlen);
 
   uf(res, priv); // call uf even if (kv == NULL)
   return kv != NULL;
@@ -3182,7 +3197,7 @@ wh_int_create(void)
 {
   // kvmap_mm_ndf (kv.h) will let the caller allocate the kv when inserting
   // This can avoid a memcpy if the caller does not have the data in a struct kv
-  return wormhole_int_create(&kvmap_mm_ndf);
+  return wormhole_int_create(&kvmap_mm_dup);
 }
 
   struct wormref_int *
@@ -3226,7 +3241,7 @@ wh_int_destroy(struct wormhole_int * const map)
 // Do set/put with explicit kv buffers
   bool
 wh_int_put(struct wormref_int * const ref, const void * const kbuf, const u32 klen,
-    const void * const vbuf, const u32 vlen)
+    const void * const vbuf, const u32 vlen, bool has_lock, bool has_next_lock)
 {
   struct kv * const newkv = kv_create(kbuf, klen, vbuf, vlen);
 
@@ -3236,7 +3251,7 @@ wh_int_put(struct wormref_int * const ref, const void * const kbuf, const u32 kl
   }
   // must use with kvmap_mm_ndf (see below)
   // the newkv will be saved in the Wormhole and freed by Wormhole when upon deletion
-  bool res = wh_api->put(ref, newkv);
+  bool res = wh_api->put(ref, newkv, has_lock, has_next_lock);
   free(newkv);
   return res;
 }
@@ -3401,8 +3416,8 @@ wh_int_iter_peek_ref(struct wormhole_int_iter * const iter,
 {
     *kbuf_out = &(iter->leaf->kvs[iter->is].key);
     *klen_out = iter->leaf->kvs[iter->is].key_size;
-    *vbuf_out = &(iter->leaf->kvs[iter->is].store);
-    *vlen_out = sizeof(iter->leaf->kvs[iter->is].store);
+    *vbuf_out = iter->leaf->kvs[iter->is].payload_ptr;
+    *vlen_out = sizeof(iter->leaf->kvs[iter->is].payload_ptr);
 }
 
   void
@@ -3430,15 +3445,15 @@ wh_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * co
 }
 
   void
-wh_int_iter_park(struct wormhole_int_iter * const iter)
+wh_int_iter_park(struct wormhole_int_iter * const iter, bool write)
 {
-  wh_api->iter_park(iter);
+  wh_api->iter_park(iter, write);
 }
 
   void
-wh_int_iter_destroy(struct wormhole_int_iter * const iter)
+wh_int_iter_destroy(struct wormhole_int_iter * const iter, bool write)
 {
-  wh_api->iter_destroy(iter);
+  wh_api->iter_destroy(iter, write);
 }
 // }}} wh
 

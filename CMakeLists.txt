@@ -11,17 +11,18 @@ set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 else()
-    set(USE_MULTI_THREADED OFF)
+    add_definitions(-DDEBUG)
+    #set(USE_MULTI_THREADED OFF)
 endif ()
 
-set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
+set(BITHACKING_COMPILE_FLAGS -march=native)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
                                ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh.h)
 set_target_properties(WormholeLib PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_options(WormholeLib PUBLIC ${BITHACKING_COMPILE_FLAGS} -pthread -fno-stack-protector -flto
                                           -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memcmp
-                                          -fmax-errors=3 -shared -fPIC)
+                                          -fmax-errors=3 -shared -fPIC) # -fsanitize=thread)
 target_compile_definitions(WormholeLib PUBLIC __x86_64__ NDEBUG)
 target_include_directories(
     WormholeLib
@@ -47,8 +48,9 @@ target_include_directories(
 add_library(DivaLib STATIC ./include/diva.hpp)
 set_target_properties(DivaLib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(DivaLib PUBLIC ./include)
-target_compile_options(DivaLib PUBLIC ${BITHACKING_COMPILE_FLAGS})
+target_compile_options(DivaLib PUBLIC ${BITHACKING_COMPILE_FLAGS}) # -fsanitize=thread)
 target_link_libraries(DivaLib PRIVATE WormholeLib WormholeIntLib)
+#target_link_options(DivaLib PUBLIC -fsanitize=thread)
 
 if (BUILD_TESTS)
     # enable testing 
