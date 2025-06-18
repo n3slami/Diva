@@ -5,6 +5,7 @@
 
 #include "wormhole/wh.h"
 #include "wormhole/wh_int.h"
+#include <atomic>
 #include <endian.h>
 #include <fstream>
 #include <limits>
@@ -2108,7 +2109,7 @@ public:
 
     template <bool O>
     static void Concurrency() {
-        const uint32_t infix_size = 5;
+        const uint32_t infix_size = 6;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t n_keys = 4000000;
@@ -2135,6 +2136,8 @@ public:
         std::shuffle(string_keys.begin(), string_keys.end(), rng);
         std::sort(string_keys.begin(), string_keys.begin() + n_bulk);
         Diva<O> s(infix_size, string_keys.begin(), string_keys.begin() + n_bulk, seed, load_factor);
+        for (uint32_t i = 0; i < n_bulk; i++)
+            REQUIRE_EQ(s.PointQuery(string_keys[i]), true);
 
         std::vector<std::thread> threads;
 
@@ -2144,8 +2147,7 @@ public:
                             std::mt19937_64 rng(rng_seed + i + 1);
                             for (uint32_t j = n_bulk + i; j < n_keys; j += n_threads) {
                                 s.Insert(string_keys[j], rng());
-                                if (4 < i && i < 8)
-                                    std::cerr << "welp t" << i << " j=" << j << std::endl;
+                                REQUIRE_EQ(s.PointQuery(string_keys[j]), true);
                             }
                         });
             }
@@ -2154,22 +2156,28 @@ public:
         }
 
         SUBCASE("inserts and deletes") {
-            std::vector<bool> deleted(string_keys.size(), false);
+            std::vector<std::atomic<bool>> deleted(string_keys.size());
+            for (uint32_t i = 0; i < string_keys.size(); i++)
+                deleted[i].store(false, std::memory_order_release);
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                             std::mt19937_64 rng(rng_seed + i + 1);
                             uint32_t ti = n_bulk + i;
                             while (ti < n_keys) {
-                                const bool insert = rng() & 1;
+                                const bool insert = (rng() % 2) > 0;
                                 if (insert) {
                                     s.Insert(string_keys[ti], rng());
+                                    REQUIRE_EQ(s.PointQuery(string_keys[ti]), true);
                                     ti += n_threads;
                                 }
                                 else {
-                                    const uint32_t offset = rng() % (ti / n_threads);
+                                    const uint32_t offset = rng() % (ti / n_threads) + 1;
                                     const uint32_t pos = ti - offset * n_threads;
-                                    s.Delete(string_keys[pos]);
-                                    deleted[pos] = true;
+                                    assert(pos <= ti && (ti - pos) % n_threads == 0);
+                                    if (!deleted[pos].load(std::memory_order_acquire)) {
+                                        s.Delete(string_keys[pos]);
+                                        deleted[pos].store(true, std::memory_order_release);
+                                    }
                                 }
                             }
                         });

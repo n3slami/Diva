@@ -43,7 +43,7 @@ wormhole_get(struct wormref * const ref, const struct kref * const key, struct k
 wormhole_probe(struct wormref * const ref, const struct kref * const key);
 
   extern bool
-wormhole_put(struct wormref * const ref, struct kv * const kv, bool has_lock, bool has_next_lock);
+wormhole_put(struct wormref * const ref, struct kv * const kv, void **locked_leaf_addrs);
 
   extern bool
 wormhole_merge(struct wormref * const ref, const struct kref * const kref,
@@ -58,7 +58,7 @@ wormhole_inpw(struct wormref * const ref, const struct kref * const key,
     kv_inp_func uf, void * const priv);
 
   extern bool
-wormhole_del(struct wormref * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
+wormhole_del(struct wormref * const ref, const struct kref * const key, void **locked_leaf_addrs);
 
   extern u64
 wormhole_delr(struct wormref * const ref, const struct kref * const start,
@@ -154,7 +154,7 @@ whsafe_get(struct wormref * const ref, const struct kref * const key, struct kv 
 whsafe_probe(struct wormref * const ref, const struct kref * const key);
 
   extern bool
-whsafe_put(struct wormref * const ref, struct kv * const kv, bool has_lock, bool has_next_lock);
+whsafe_put(struct wormref * const ref, struct kv * const kv, void **locked_leaf_addrs);
 
   extern bool
 whsafe_merge(struct wormref * const ref, const struct kref * const kref,
@@ -169,7 +169,7 @@ whsafe_inpw(struct wormref * const ref, const struct kref * const key,
     kv_inp_func uf, void * const priv);
 
   extern bool
-whsafe_del(struct wormref * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
+whsafe_del(struct wormref * const ref, const struct kref * const key, void **locked_leaf_addrs);
 
   extern u64
 whsafe_delr(struct wormref * const ref, const struct kref * const start,
@@ -284,10 +284,10 @@ wh_destroy(struct wormhole * const map);
 
   extern bool
 wh_put(struct wormref * const ref, const void * const kbuf, const u32 klen,
-    const void * const vbuf, const u32 vlen, bool has_lock, bool has_next_lock);
+    const void * const vbuf, const u32 vlen, void **locked_leaf_addrs);
 
   extern bool
-wh_del(struct wormref * const ref, const void * const kbuf, const u32 klen, bool has_lock, bool has_next_lock);
+wh_del(struct wormref * const ref, const void * const kbuf, const u32 klen, void **locked_leaf_addrs);
 
   extern bool
 wh_probe(struct wormref * const ref, const void * const kbuf, const u32 klen);

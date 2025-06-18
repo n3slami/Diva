@@ -47,7 +47,8 @@ TEST_SUITE("wormhole_int") {
         for (uint64_t key : keys) {
             const uint64_t key_rev = _bswap64(key);
             memcpy(value + 3, &key, sizeof(key));
-            wh_int_put(better_tree, &key_rev, sizeof(key_rev), value, value_size, false, false);
+            void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
+            wh_int_put(better_tree, &key_rev, sizeof(key_rev), value, value_size, dummy_locked_leaf_addrs);
         }
 
         std::sort(keys.begin(), keys.end());

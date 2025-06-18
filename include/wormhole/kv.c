@@ -914,7 +914,8 @@ kvmap_kv_probe(const struct kvmap_api * const api, void * const ref,
 kvmap_kv_put(const struct kvmap_api * const api, void * const ref,
     struct kv * const kv)
 {
-  return api->put(ref, kv, false, false);
+  void *dummy_locked_leaf_addrs[3] = {NULL, NULL, NULL};
+  return api->put(ref, kv, dummy_locked_leaf_addrs);
 }
 
   inline bool
@@ -922,7 +923,8 @@ kvmap_kv_del(const struct kvmap_api * const api, void * const ref,
     const struct kv * const key)
 {
   const struct kref kref = kv_kref(key);
-  return api->del(ref, &kref, false, false);
+  void *dummy_locked_leaf_addrs[3] = {NULL, NULL, NULL};
+  return api->del(ref, &kref, dummy_locked_leaf_addrs);
 }
 
   inline bool
@@ -996,7 +998,8 @@ kvmap_raw_del(const struct kvmap_api * const api, void * const ref,
 {
   const struct kref kref = {.ptr = ptr, .len = len,
     .hash32 = api->hashkey ? kv_crc32c(ptr, len) : 0};
-  return api->del(ref, &kref, false, false);
+  void *dummy_locked_leaf_addrs[3] = {NULL, NULL, NULL};
+  return api->del(ref, &kref, dummy_locked_leaf_addrs);
 }
 
   inline bool
@@ -1095,7 +1098,8 @@ kvmap_kv64_put(const struct kvmap_api * const api, void * const ref,
   if (api->hashkey)
     kv_update_hash(&kv.kv);
 
-  return api->put(ref, &kv.kv, false, false);
+  void *dummy_locked_leaf_addrs[3] = {NULL, NULL, NULL};
+  return api->put(ref, &kv.kv, dummy_locked_leaf_addrs);
 }
 
   inline bool
@@ -1106,7 +1110,8 @@ kvmap_kv64_del(const struct kvmap_api * const api, void * const ref,
   struct kref kref;
   keybuf.key_be = __builtin_bswap64(key);
   kref_ref_hash32(&kref, keybuf.kv.kv, sizeof(keybuf.key_be));
-  return api->del(ref, &kref, false, false);
+  void *dummy_locked_leaf_addrs[3] = {NULL, NULL, NULL};
+  return api->del(ref, &kref, dummy_locked_leaf_addrs);
 }
 
   inline void

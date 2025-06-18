@@ -346,7 +346,7 @@ struct kvmap_api {
   // put (aka put/upsert): return true on success; false on error
   // mm.in() controls how things move into the kvmap; the default mm make a copy with malloc()
   // mm.free() controls how old kv get disposed when replaced
-  bool        (* put)     (void * const ref, struct kv * const kv, bool has_lock, bool has_next_lock);
+  bool        (* put)     (void * const ref, struct kv * const kv, void **locked_leaf_addrs);
   // get: search and return a kv if found, or NULL if not
   // with the default mm: malloc() if out == NULL; otherwise, use out as buffer
   // with custom kvmap_mm: mm.out() controls buffer; use with caution
@@ -356,7 +356,7 @@ struct kvmap_api {
   bool        (* probe)   (void * const ref, const struct kref * const key);
   // del: return true on something deleted, false on not found
   // mm.free() controls how old kv get disposed when replaced
-  bool        (* del)     (void * const ref, const struct kref * const key, bool has_lock, bool has_next_lock);
+  bool        (* del)     (void * const ref, const struct kref * const key, void **locked_leaf_addrs);
   // inp: inplace operation if key exists; otherwise return false; uf() is always executed even with NULL key
   // inpr/inpw acquires r/w locks respectively.
   // Note that in inpw() you can only change the value.
