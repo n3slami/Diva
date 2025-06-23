@@ -266,6 +266,26 @@ inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r,
 }
 
 
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
+                                        uint64_t *out, uint32_t pos_out,
+                                  const uint32_t num_bits_to_copy) {
+    const uint32_t buf_size = 8 * sizeof(uint64_t);
+    const uint32_t pos_in_end = pos_in + num_bits_to_copy;
+    while (pos_in < pos_in_end) {
+        const uint32_t amount_to_move = std::min(pos_in_end - pos_in, std::min((buf_size - pos_in - 1) % buf_size + 1,
+                                                                               (buf_size - pos_out - 1) % buf_size + 1));
+        const uint64_t mask_in = BITMASK(amount_to_move) << (pos_in % buf_size);
+        const uint64_t mask_out = BITMASK(amount_to_move) << (pos_out % buf_size);
+        out[pos_out / buf_size] &= ~mask_out;
+        out[pos_out / buf_size] |= ((in[pos_in / buf_size] & mask_in) >> (pos_in % buf_size)) << (pos_out % buf_size);
+        pos_in += amount_to_move;
+        pos_out += amount_to_move;
+    }
+}
+
+
 // Synchronization and Locking Primitives
 typedef uint32_t lock_t;
 static constexpr lock_t rwlock_no_access = 0;

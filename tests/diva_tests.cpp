@@ -7,7 +7,6 @@
 #include "wormhole/wh_int.h"
 #include <atomic>
 #include <endian.h>
-#include <fstream>
 #include <limits>
 #include <random>
 #include <thread>
@@ -26,8 +25,7 @@
 #include "diva.hpp"
 #include "util.hpp"
 
-const std::string ansi_green = "\033[0;32m";
-const std::string ansi_white = "\033[0;97m";
+namespace diva {
 
 class DivaTests {
 public:
@@ -2146,7 +2144,7 @@ public:
                 threads.emplace_back([&, i] {
                             std::mt19937_64 rng(rng_seed + i + 1);
                             for (uint32_t j = n_bulk + i; j < n_keys; j += n_threads) {
-                                s.Insert(string_keys[j], rng());
+                                s.Insert(string_keys[j], nullptr, rng());
                                 REQUIRE_EQ(s.PointQuery(string_keys[j]), true);
                             }
                         });
@@ -2166,7 +2164,7 @@ public:
                             while (ti < n_keys) {
                                 const bool insert = (rng() % 2) > 0;
                                 if (insert) {
-                                    s.Insert(string_keys[ti], rng());
+                                    s.Insert(string_keys[ti], nullptr, rng());
                                     REQUIRE_EQ(s.PointQuery(string_keys[ti]), true);
                                     ti += n_threads;
                                 }
@@ -2453,3 +2451,4 @@ TEST_SUITE("diva (int optimized)") {
     }
 }
 
+}
