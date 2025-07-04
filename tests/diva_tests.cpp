@@ -2353,7 +2353,7 @@ private:
             if ((occupieds[i / 64] >> (i % 64)) & 1ULL)
                 std::cerr << i << ", ";
         }
-        std::cerr << std::endl << "runends + slots:" << std::endl;;
+        std::cerr << std::endl << "runends + slots:" << std::endl;
         int32_t cnt = 0;
         for (int32_t i = 0; i < s.scaled_sizes_[size_grade]; i++) {
             const uint64_t value = s.GetSlot(store, i);

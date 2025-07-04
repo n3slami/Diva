@@ -286,6 +286,27 @@ inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
 }
 
 
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline bool compare_bitmap_to_bitmap(const uint64_t *a, uint32_t pos_a,
+                                     const uint64_t *b, uint32_t pos_b,
+                                     const uint32_t num_bits_to_compare) {
+    const uint32_t buf_size = 8 * sizeof(uint64_t);
+    const uint32_t pos_a_end = pos_a + num_bits_to_compare;
+    while (pos_a < pos_a_end) {
+        const uint32_t amount_to_compare = std::min(pos_a_end - pos_a, std::min((buf_size - pos_a - 1) % buf_size + 1,
+                                                                                  (buf_size - pos_b - 1) % buf_size + 1));
+        const uint64_t val_a = a[pos_a / buf_size] >> (pos_a % buf_size);
+        const uint64_t val_b = b[pos_b / buf_size] >> (pos_b % buf_size);
+        if ((val_a & BITMASK(amount_to_compare)) != (val_b & BITMASK(amount_to_compare)))
+            return false;
+        pos_a += amount_to_compare;
+        pos_b += amount_to_compare;
+    }
+    return true;
+}
+
+
 // Synchronization and Locking Primitives
 typedef uint32_t lock_t;
 static constexpr lock_t rwlock_no_access = 0;
