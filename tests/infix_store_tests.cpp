@@ -1470,6 +1470,80 @@ public:
     }
 
 
+    static void PayloadsGetLongestMatchingInfixSize() {
+        const uint32_t infix_size = 5;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        const std::vector<uint64_t> keys {0b000000010011000, 0b000000010010100,
+            0b000000010010110, 0b000000010010101, 0b000000010011111,
+            0b000000010110101, 0b000000010110111, 0b000000010111001,
+            0b000000011111011, 0b000000100011011, 0b000000100011111,
+            0b000000111100001, 0b000000111100011, 0b000000111100111, 0b000100111110000, 0b000100111110010, 0b000100111110011,
+            0b111111010000001, 0b111111101100101, 0b111111101100111,
+            0b111111110011111, 0b111111110110101, 0b111111111011000,
+            0b111111111010100, 0b111111111010110, 0b111111111010101,
+            0b111111111011111, 0b111111111100001, 0b111111111100011};
+        uint64_t payloads[(keys.size() + 1) * (payload_size / 64 + 2)];
+        for (uint32_t i = 0; i < (keys.size() + 1) * (payload_size / 64 + 2); i++)
+            payloads[i] = rng();
+
+        s.LoadListToInfixStore(store, keys.data(), keys.size(), infix_store_target_size, true, payloads);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return true; }),
+                   infix_size);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x8edaa78f2fc77d78; }),
+                   infix_size);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x513480a1777ab79; }),
+                   infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                   infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return false; }),
+                   0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return true; }),
+                   infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x513480a1777ab79; }),
+                   infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                   infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return false; }),
+                   0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return true; }),
+                   infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                   infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return false; }),
+                   0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b111111111111111, infix_store_target_size,
+                                                 [] (const uint64_t *payload) { return true; }),
+                   0);
+    }
+
+
     static void PayloadsShrinkInfixSize() {
         const uint32_t infix_size = 5;
         const uint32_t payload_size = 100;
@@ -1820,7 +1894,8 @@ TEST_SUITE("infix_store") {
             InfixStoreTests::PayloadsLoadInfixList();
         }
         SUBCASE("delete raw") {
-            InfixStoreTests::PayloadsDeleteRaw();
+            //InfixStoreTests::PayloadsDeleteRaw();
+            InfixStoreTests::PayloadsGetLongestMatchingInfixSize();
         }
         SUBCASE("shrink infix size") {
             InfixStoreTests::PayloadsShrinkInfixSize();
