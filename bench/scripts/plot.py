@@ -32,6 +32,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
                               "diva": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
+                              "steroids": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "memento_shorter_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento ($2^{7}$ Range)"},
                               "memento_longer_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "\\textbf{Memento ($2^{10}$ Range)}", "linestyle": ":"},
@@ -180,13 +181,13 @@ def plot_fpr_string(result_dir, output_dir):
     LEGEND_FONT_SIZE = 7
     YLABEL_FONT_SIZE = 9.5
     XLABEL_FONT_SIZE = 9.5
-    WIDTH = 3
-    HEIGHT = 3
+    WIDTH = 2.75
+    HEIGHT = 2.75
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
     YTICKS_QUERY = [1000, 100, 10, 1]
 
     workloads = ["norm", "enwiki"]
-    filters = ["diva", "surf"]
+    filters = ["steroids", "surf"]
     memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = Path("fpr_bench")
 
@@ -237,7 +238,7 @@ def plot_fpr_string(result_dir, output_dir):
     fig.subplots_adjust(wspace=0.1)
 
     legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
-    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.75, 1.275),
+    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.72, 1.275),
                       fancybox=True, shadow=False, ncol=5, fontsize=LEGEND_FONT_SIZE)
     fig.savefig(output_dir / "fpr_string.pdf", bbox_inches='tight', pad_inches=0.01)
 
