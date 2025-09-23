@@ -442,6 +442,13 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
 
     rng_.seed(rng_seed_);
     SetupScaleFactors();
+
+    const uint32_t key_len = 100;
+    uint8_t key[key_len];
+    memset(key, 0x00, key_len);
+    AddTreeKey(key, key_len);
+    memset(key, 0xFF, key_len);
+    AddTreeKey(key, key_len);
 }
 
 
@@ -937,13 +944,19 @@ inline bool Diva<int_optimized, payload_type>::RangeQuery(const uint8_t *input_l
     if constexpr (int_optimized) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
-        next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
-        next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+        if (next_key.str != nullptr) {
+            next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
+            next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+        }
     }
 
-    if (prev_key == l_key || next_key <= r_key) {
+    if (prev_key == l_key || (next_key.str != nullptr && next_key <= r_key)) {
         UnlockLeaves(leaves_to_unlock, it_write_lock);
         return true;
+    }
+    else if (next_key.str == nullptr) {
+        UnlockLeaves(leaves_to_unlock, it_write_lock);
+        return false;
     }
     
     InfixStore& infix_store = *infix_store_ptr;
@@ -1033,8 +1046,10 @@ inline bool Diva<int_optimized, payload_type>::PointQuery(const uint8_t *input_k
     if constexpr (int_optimized) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
-        next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
-        next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+        if (next_key.str != nullptr) {
+            next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
+            next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+        }
     }
 
     InfixStore& infix_store = *infix_store_ptr;
@@ -1045,6 +1060,10 @@ inline bool Diva<int_optimized, payload_type>::PointQuery(const uint8_t *input_k
         // Previous key was a partial key and a prefix of the query key
         rwlock_unlock_read(infix_store.rwlock);
         return true;
+    }
+    else if (next_key.str == nullptr) {
+        rwlock_unlock_read(infix_store.rwlock);
+        return false;
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
