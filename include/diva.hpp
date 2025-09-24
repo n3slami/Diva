@@ -73,7 +73,8 @@ class Diva {
     friend class InfixStoreTests;
 
 public:
-    Diva(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor, const uint32_t payload_size=0);
+    Diva(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor, const uint32_t payload_size=0,
+                                                                                      const bool setup_start_end_samples=false);
 
     template <class t_itr>
     Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
@@ -414,7 +415,8 @@ public:
 
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const uint32_t rng_seed,
-                                               const float load_factor, const uint32_t payload_size):
+                                               const float load_factor, const uint32_t payload_size,
+                                               const bool setup_start_end_samples):
             wh_(nullptr),
             better_tree_(nullptr),
             wh_int_(nullptr),
@@ -443,12 +445,14 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
     rng_.seed(rng_seed_);
     SetupScaleFactors();
 
-    const uint32_t key_len = 100;
-    uint8_t key[key_len];
-    memset(key, 0x00, key_len);
-    AddTreeKey(key, key_len);
-    memset(key, 0xFF, key_len);
-    AddTreeKey(key, key_len);
+    if (setup_start_end_samples) {
+        const uint32_t key_len = 100;
+        uint8_t key[key_len];
+        memset(key, 0x00, key_len);
+        AddTreeKey(key, key_len);
+        memset(key, 0xFF, key_len);
+        AddTreeKey(key, key_len);
+    }
 }
 
 
@@ -3886,7 +3890,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
         implicit_part = filter_->NextOccupied(infix_store, implicit_part);
         explicit_part = 0;
     }
-    if (implicit_part > total_implicit) {
+    if (implicit_part >= total_implicit) {
         uint8_t *key_copy = new uint8_t[next_key.length];
         memcpy(key_copy, next_key.str, next_key.length);
         next_to_fetch_ = {key_copy, next_key.length};
@@ -3902,11 +3906,17 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
         const uint64_t recovered_implicit = prev_implicit + implicit_part;
         while (true) {
             const uint64_t slot_value = filter_->GetSlot(infix_store, pos);
+#ifdef DEBUG
+            assert(slot_value);
+#endif // DEBUG
             if (explicit_part > (slot_value | (slot_value - 1))) {
                 pos++;
                 continue;
             }
             const uint32_t explicit_part_length = filter_->infix_size_ - lowbit_pos(slot_value) - 1;
+#ifdef DEBUG
+            assert(explicit_part_length <= filter_->infix_size_);
+#endif // DEBUG
             const uint32_t key_length_bits = shared + ignore + implicit_size + explicit_part_length;
             const uint32_t key_length = (key_length_bits + 7) / 8;
 
@@ -3938,7 +3948,8 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
                 | (slot_value & (BITMASK(explicit_part_length) << (filter_->infix_size_ - explicit_part_length)));
             infix <<= 65 - (implicit_size + filter_->infix_size_);
             infix = __builtin_bswap64(infix >> (bit_pos % 8));
-            for (uint32_t i = 0; i < (implicit_size + explicit_part_length - 1 + 7) / 8; i++) {
+            const uint32_t loop_end_i = (bit_pos % 8 + implicit_size + explicit_part_length - 1 + 7) / 8;
+            for (uint32_t i = 0; i < loop_end_i; i++) {
                 key[bit_pos / 8] |= infix & 0xFF;
                 infix >>= 8;
                 bit_pos += 8 - bit_pos % 8;

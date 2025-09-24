@@ -2343,6 +2343,65 @@ public:
             }
         }
 
+        SUBCASE("empty filter") {
+            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+
+            uint32_t perm[string_keys.size()];
+            for (uint32_t i = 0; i < string_keys.size(); i++)
+                perm[i] = i;
+            std::shuffle(perm, perm + string_keys.size(), rng);
+            
+            for (auto it = s.GetIterator(string_keys[0]); it.IsValid(); it++) {
+                auto [key, key_len_bits] = *it;
+                if constexpr (O)
+                    REQUIRE_EQ(key, BITMASK(sizeof(key) * 8));
+                else
+                    REQUIRE_EQ(key[0], 0xFF);
+                REQUIRE_EQ(key_len_bits, 800);
+            }
+
+            if constexpr (O) {
+                for (uint32_t i = 0; i < string_keys.size(); i++) {
+                    const uint32_t ind = perm[i];
+                    s.Insert(fixed_length_string_keys[ind], payloads_contents[ind]);
+                    bool found = false;
+                    for (auto it = s.GetIterator(fixed_length_string_keys[ind]); it.IsValid(); it++) {
+                        uint64_t it_payload[payload_size / 64 + 2];
+                        it.GetPayload(it_payload);
+                        auto [val, val_len_bits] = *it;
+                        val = __builtin_bswap64(val);
+                        char *str = reinterpret_cast<char *>(&val);
+                        if (memcmp(str, fixed_length_string_keys[ind].c_str(), val_len_bits / 8) > 0)
+                            break;
+                        if (val_len_bits % 8 > 0 
+                                && ((str[val_len_bits / 8] >> (8 - val_len_bits % 8)) != (fixed_length_string_keys[ind][val_len_bits / 8] >> (8 - val_len_bits % 8))))
+                            continue;
+                        found |= compare_bitmap_to_bitmap(payloads_contents[ind], 0, it_payload, 0, payload_size);
+                    }
+                    REQUIRE(found);
+                }
+            }
+            else {
+                for (uint32_t i = 0; i < string_keys.size(); i++) {
+                    const uint32_t ind = perm[i];
+                    s.Insert(string_keys[ind], payloads_contents[ind]);
+                    bool found = false;
+                    for (auto it = s.GetIterator(string_keys[ind]); it.IsValid(); it++) {
+                        uint64_t it_payload[payload_size / 64 + 2];
+                        it.GetPayload(it_payload);
+                        auto [str, str_len_bits] = *it;
+                        if (memcmp(str.c_str(), string_keys[ind].c_str(), str_len_bits / 8) > 0)
+                            break;
+                        if (str_len_bits % 8 > 0 
+                                && ((str[str_len_bits / 8] >> (8 - str_len_bits % 8)) != (string_keys[ind][str_len_bits / 8] >> (8 - str_len_bits % 8))))
+                            continue;
+                        found |= compare_bitmap_to_bitmap(payloads_contents[ind], 0, it_payload, 0, payload_size);
+                    }
+                    REQUIRE(found);
+                }
+            }
+        }
+
         Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size);
 
         SUBCASE("insert") {
