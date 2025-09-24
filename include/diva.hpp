@@ -3910,6 +3910,8 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
             assert(slot_value);
 #endif // DEBUG
             if (explicit_part > (slot_value | (slot_value - 1))) {
+                if (get_bitmap_bit(runends, pos))
+                    break;
                 pos++;
                 continue;
             }
