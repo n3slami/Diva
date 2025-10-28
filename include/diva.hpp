@@ -1809,7 +1809,7 @@ inline Diva<int_optimized, payload_type>::Diva(const char *deser_buf):
         void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
         if constexpr (int_optimized) {
 #ifdef DEBUG
-            assert(key_length == sizeof(uint64_t));
+            assert(1 <= key_length && key_length <= sizeof(uint64_t));
 #endif
             wh_int_put(better_tree_int_, key, key_length, &store, sizeof(store), dummy_locked_leaf_addrs);
         }
@@ -4077,6 +4077,8 @@ IteratorRefetchLowerUpperBounds:
     }
 
     rwlock_unlock_read(infix_store.rwlock);
+    if (keys_.size() == 0)
+        goto IteratorRefetchLowerUpperBounds;
 }
 
 
