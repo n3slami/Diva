@@ -491,6 +491,8 @@ wormleaf_int_alloc(struct wormhole_int * const map, struct wormleaf_int * const 
   static void
 wormleaf_int_free(struct slab * const slab, struct wormleaf_int * const leaf)
 {
+  while (leaf->leaflock.opaque != 0)
+    cpu_pause();
   debug_assert(leaf->leaflock.opaque == 0);
   wormhole_free_akey(leaf->anchor);
   slab_free_safe(slab, leaf);
@@ -1918,8 +1920,6 @@ wormleaf_merge(struct wormleaf_int * const leaf1, struct wormleaf_int * const le
 
   for (u32 i = 0; i < leaf2->nr_keys; i++)
     wormleaf_int_insert_isp(leaf1, leaf2->kvs + i);
-  if (leaf1_sorted)
-    leaf1->nr_sorted += leaf2->nr_sorted;
   return true;
 }
 
@@ -2394,8 +2394,9 @@ wormhole_meta_merge(struct wormref_int * const ref, struct wormleaf_int * const 
 
   wormmeta_merge(hmap0, leaf2);
   // leaf2 is now safe to be removed
-  if (locked_leaf_addrs[0] == leaf2)
-    locked_leaf_addrs[0] = NULL;
+  for (uint32_t i = 0; i < 2; i++)
+    if (locked_leaf_addrs[i] == leaf2)
+      locked_leaf_addrs[i] = NULL;
   if (leaf2->next && locked_leaf_addrs[0] != leaf2->next)
     wormleaf_int_unlock_write(leaf2->next);
   wormleaf_int_unlock_write(leaf2);
@@ -2563,7 +2564,7 @@ wormhole_del_try_merge(struct wormref_int * const ref, struct wormleaf_int * con
 wormhole_int_del(struct wormref_int * const ref, const struct kref * const key, void **locked_leaf_addrs)
 {
   struct wormleaf_int * const leaf = locked_leaf_addrs[0] != NULL ? wormhole_jump_leaf_write_has_lock(ref, key)
-                                                                    : wormhole_jump_leaf_write(ref, key);
+                                                                  : wormhole_jump_leaf_write(ref, key);
   const u32 im = wormleaf_int_search_eq(leaf, key);
   if (im < WH_KPN) { // found
     wormleaf_int_remove(leaf, im);

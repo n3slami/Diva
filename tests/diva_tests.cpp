@@ -1309,6 +1309,47 @@ public:
                 }
             }
         }
+
+        SUBCASE("monte carlo") {
+            const uint32_t n_keys = 20000000;
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+
+            std::vector<uint64_t> keys;
+            for (int32_t i = 0; i < n_keys; i++)
+                keys.push_back(rng());
+            std::sort(keys.begin(), keys.end());
+            std::vector<std::string> string_keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                size_t str_length;
+                if constexpr (O)
+                    str_length = 8;
+                else
+                    str_length = 6 + rng() % 3;
+                const uint64_t value = to_big_endian_order(keys[i]);
+                string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
+            }
+            std::shuffle(string_keys.begin(), string_keys.end(), rng);
+            std::sort(string_keys.begin(), string_keys.begin() + n_keys / 32);
+            Diva<O> s(infix_size, string_keys.begin(), string_keys.begin() + n_keys / 32, seed, load_factor);
+
+            std::vector<bool> deleted(n_keys, false);
+            uint32_t i = n_keys / 32;
+            while (i < n_keys) {
+                if (rng() % 2 == 0) {
+                    s.Insert(string_keys[i]);
+                    REQUIRE(s.PointQuery(string_keys[i]));
+                    i++;
+                }
+                else {
+                    const uint32_t pos = rng() % i;
+                    if (!deleted[pos]) {
+                        s.Delete(string_keys[pos]);
+                        deleted[pos] = true;
+                    }
+                }
+            }
+        }
     }
 
 
@@ -2110,9 +2151,9 @@ public:
         const uint32_t infix_size = 6;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        const uint32_t n_keys = 4000000;
+        const uint32_t n_keys = 20000000;
         const uint32_t n_threads = 32;
-        const uint32_t n_bulk = n_keys / 16;
+        const uint32_t n_bulk = n_keys / n_threads;
 
         const uint32_t rng_seed = 2;
         std::mt19937_64 rng(rng_seed);
@@ -2139,13 +2180,13 @@ public:
 
         std::vector<std::thread> threads;
 
-        SUBCASE("inserts") {
+        SUBCASE("inserts welp") {
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                             std::mt19937_64 rng(rng_seed + i + 1);
                             for (uint32_t j = n_bulk + i; j < n_keys; j += n_threads) {
                                 s.Insert(string_keys[j], nullptr, rng());
-                                REQUIRE_EQ(s.PointQuery(string_keys[j]), true);
+                                REQUIRE(s.PointQuery(string_keys[j]));
                             }
                         });
             }
@@ -2165,13 +2206,13 @@ public:
                                 const bool insert = (rng() % 2) > 0;
                                 if (insert) {
                                     s.Insert(string_keys[ti], nullptr, rng());
-                                    REQUIRE_EQ(s.PointQuery(string_keys[ti]), true);
+                                    REQUIRE(s.PointQuery(string_keys[ti]));
                                     ti += n_threads;
                                 }
                                 else {
-                                    const uint32_t offset = rng() % (ti / n_threads) + 1;
+                                    const uint32_t offset = rng() % ((ti - n_threads) / n_threads) + 1;
                                     const uint32_t pos = ti - offset * n_threads;
-                                    assert(pos <= ti && (ti - pos) % n_threads == 0);
+                                    assert(pos < ti && (ti - pos) % n_threads == 0);
                                     if (!deleted[pos].load(std::memory_order_acquire)) {
                                         s.Delete(string_keys[pos]);
                                         deleted[pos].store(true, std::memory_order_release);
