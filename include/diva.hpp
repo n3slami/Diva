@@ -3831,6 +3831,12 @@ inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, 
 
 template <bool int_optimized, PayloadType payload_type>
 inline std::pair<typename Diva<int_optimized, payload_type>::Iterator::KeyType, uint32_t> Diva<int_optimized, payload_type>::Iterator::operator*() const {
+    if (!IsValid()) {
+        if constexpr (int_optimized)
+            return {0, 0};
+        else 
+            return {nullptr, 0};
+    }
     assert(ind_ < keys_.size());
     if constexpr (int_optimized) {
         uint64_t res = 0;
@@ -3880,6 +3886,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
 
     const bool it_write_lock = false;
     
+IteratorRefetchLowerUpperBounds:
     InfixStore *infix_store_ptr;
     void *leaves_to_unlock[3] = {};
 
@@ -3948,7 +3955,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
         memcpy(key_copy, next_key.str, next_key.length);
         next_to_fetch_ = {key_copy, next_key.length};
         rwlock_unlock_read(infix_store.rwlock);
-        return;
+        goto IteratorRefetchLowerUpperBounds;
     }
 
     const uint32_t rank = filter_->RankOccupieds(infix_store, implicit_part);
@@ -4103,7 +4110,7 @@ inline Diva<int_optimized, payload_type>::Iterator::~Iterator() {
 
 template <bool int_optimized, PayloadType payload_type>
 inline bool Diva<int_optimized, payload_type>::Iterator::IsValid() const {
-    return ind_ < keys_.size() && next_to_fetch_.str;
+    return ind_ < keys_.size() || next_to_fetch_.str;
 }
 
 }
