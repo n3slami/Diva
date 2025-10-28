@@ -4029,9 +4029,9 @@ IteratorRefetchLowerUpperBounds:
         }
 
         // Update `next_to_fetch_`
-        const uint64_t next_implicit = filter_->NextOccupied(infix_store, implicit_part);
-        if (next_implicit < total_implicit) {
-            const uint64_t recovered_implicit = prev_implicit + next_implicit;
+        const uint64_t next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
+        if (next_to_fetch_implicit < total_implicit) {
+            const uint64_t recovered_implicit = prev_implicit + next_to_fetch_implicit;
             const uint32_t key_length_bits = shared + ignore + implicit_size;
             const uint32_t key_length = (key_length_bits + 7) / 8;
 
@@ -4061,7 +4061,8 @@ IteratorRefetchLowerUpperBounds:
             uint32_t bit_pos = shared + ignore + 1;
             uint64_t infix = recovered_implicit << (65 - implicit_size);
             infix = __builtin_bswap64(infix >> (bit_pos % 8));
-            for (uint32_t i = 0; i < (implicit_size - 1 + 7) / 8; i++) {
+            const uint32_t loop_end_i = (bit_pos % 8 + implicit_size - 1 + 7) / 8;
+            for (uint32_t i = 0; i < loop_end_i; i++) {
                 key[bit_pos / 8] |= infix & 0xFF;
                 infix >>= 8;
                 bit_pos += 8 - bit_pos % 8;

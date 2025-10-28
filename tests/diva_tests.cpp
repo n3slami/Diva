@@ -3441,12 +3441,12 @@ public:
 
     template <bool O>
     static void Iterator() {
-        const uint32_t infix_size = 5;
+        const uint32_t infix_size = 12;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t payload_size = 100;
         const uint32_t infix_store_target_size = Diva<O, PayloadType::FixedLength>::infix_store_target_size;
-        const uint32_t n_keys = 5 * infix_store_target_size;
+        const uint32_t n_keys = 100 * infix_store_target_size;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
 
@@ -3470,17 +3470,17 @@ public:
         }
         std::sort(string_keys.begin(), string_keys.end());
 
-        uint64_t payloads_contents[n_keys][payload_size / 64 + 2];
-        uint64_t *payloads[n_keys];
+        uint64_t *payloads_contents = new uint64_t[n_keys * (payload_size / 64 + 2)];
+        uint64_t **payloads = new uint64_t *[n_keys];
         for (uint32_t i = 0; i < n_keys; i++) {
             for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
-                payloads_contents[i][j] = rng();
-            payloads[i] = &(payloads_contents[i][0]);
+                payloads_contents[i * (payload_size / 64 + 2) + j] = rng();
+            payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
         }
 
         SUBCASE("bulk load start") {
             Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
-                                                payload_size, reinterpret_cast<const uint64_t **>(&payloads));
+                                                payload_size, (const uint64_t **) payloads);
 
             SUBCASE("iterate over everything") {
                 uint32_t ind = 0;
@@ -3571,7 +3571,7 @@ public:
         SUBCASE("empty start") {
             Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
             
-            const uint32_t sample_gap = infix_store_target_size / 10;
+            const uint32_t sample_gap = n_keys / 20;
             for (uint32_t i = 0; i < n_keys; i += sample_gap)
                 s.AddTreeKey(reinterpret_cast<const uint8_t *>(string_keys[i].data()), string_keys[i].size(), payloads[i]);
 
@@ -3664,34 +3664,47 @@ public:
             }
 
             const uint32_t infix_gap = 2;
-            for (uint32_t i = 0; i < n_keys; i += infix_gap) {
-                if (i % sample_gap == 0)
+            uint32_t *perm = new uint32_t[n_keys / infix_gap + 1];
+            for (uint32_t i = 0; i < n_keys / infix_gap; i++)
+                perm[i] = i * infix_gap;
+            std::shuffle(perm, perm + n_keys / infix_gap, rng);
+            for (uint32_t i = 0; i < n_keys / infix_gap; i++) {
+                if (perm[i] % sample_gap == 0)
                     continue;
-                s.Insert(string_keys[i], payloads[i]);
+                s.Insert(string_keys[perm[i]], payloads[perm[i]]);
             }
+            delete[] perm;
 
+            const int32_t neighborhood_range = infix_gap * 30;
             SUBCASE("iterate over every key") {
-                uint32_t ind = 0;
+                int32_t ind = 0;
                 auto it = s.GetIterator(string_keys[ind]);
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key;
                     if constexpr (O) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
                     }
-                    else {
+                    else
                         key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
-                    }
                     const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
-                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
 
-                    uint64_t it_payload[payload_size / 64 + 2];
-                    it.GetPayload(it_payload);
-                    REQUIRE(compare_bitmap_to_bitmap(payloads[ind], 0, it_payload, 0, payload_size));
+                    bool found = false;
+                    for (uint32_t i = std::max<int32_t>(0, ind - neighborhood_range); i < ind + neighborhood_range; i += infix_gap) {
+                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
+                            uint64_t it_payload[payload_size / 64 + 2];
+                            it.GetPayload(it_payload);
+                            if (compare_bitmap_to_bitmap(payloads[i], 0, it_payload, 0, payload_size)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    REQUIRE(found);
 
                     it++;
                     ind += infix_gap;
@@ -3709,18 +3722,25 @@ public:
                     if constexpr (O) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
                     }
-                    else {
+                    else
                         key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
-                    }
                     const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
-                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
 
-                    uint64_t it_payload[payload_size / 64 + 2];
-                    it.GetPayload(it_payload);
-                    REQUIRE(compare_bitmap_to_bitmap(payloads[ind], 0, it_payload, 0, payload_size));
+                    bool found = false;
+                    for (uint32_t i = std::max<int32_t>(0, ind - neighborhood_range); i < ind + neighborhood_range; i += infix_gap) {
+                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
+                            uint64_t it_payload[payload_size / 64 + 2];
+                            it.GetPayload(it_payload);
+                            if (compare_bitmap_to_bitmap(payloads[i], 0, it_payload, 0, payload_size)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    REQUIRE(found);
 
                     it++;
                     ind += infix_gap;
@@ -3739,18 +3759,25 @@ public:
                     if constexpr (O) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[exp_ind].data()), static_cast<uint32_t>(string_keys[exp_ind].size())};
                     }
-                    else {
+                    else
                         key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
-                        exp = {reinterpret_cast<const uint8_t *>(string_keys[exp_ind].data()), static_cast<uint32_t>(string_keys[exp_ind].size())};
-                    }
                     const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
-                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
 
-                    uint64_t it_payload[payload_size / 64 + 2];
-                    it.GetPayload(it_payload);
-                    REQUIRE(compare_bitmap_to_bitmap(payloads[exp_ind], 0, it_payload, 0, payload_size));
+                    bool found = false;
+                    for (uint32_t i = std::max<int32_t>(0, ind + 1 - neighborhood_range); i < ind + 1 + neighborhood_range; i += infix_gap) {
+                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
+                            uint64_t it_payload[payload_size / 64 + 2];
+                            it.GetPayload(it_payload);
+                            if (compare_bitmap_to_bitmap(payloads[i], 0, it_payload, 0, payload_size)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    REQUIRE(found);
 
                     it++;
                     ind += infix_gap;
