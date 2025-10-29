@@ -1349,15 +1349,16 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     infix_store.ptr = store_lt.ptr;
     infix_store.rwlock.store(store_lt.rwlock.load(std::memory_order_acquire), std::memory_order_release);
     if (zero_pos != -1) {
-        const uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
+        uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
+        key_extraction -= extraction_gt & (~BITMASK(infix_size_));
         rwlock_lock_write(store_gt.rwlock);
         if constexpr (payload_type == PayloadType::FixedLength) {
-            InsertRawIntoInfixStore(store_gt, key_extraction & BITMASK(infix_size_) | 1, total_implicit_gt, reinterpret_cast<const uint64_t *>(payload));
+            InsertRawIntoInfixStore(store_gt, key_extraction | 1, total_implicit_gt, reinterpret_cast<const uint64_t *>(payload));
             const uint32_t payload_offset = payload_size_ * split_pos;
             SetPayload(store_gt, -1, payload_list, payload_offset);
         }
         else 
-            InsertRawIntoInfixStore(store_gt, key_extraction & BITMASK(infix_size_) | 1, total_implicit_gt);
+            InsertRawIntoInfixStore(store_gt, key_extraction | 1, total_implicit_gt);
         store_gt.SetInvalidBits(7 - (zero_pos - 1) % 8);
         store_gt.SetPartialKey(true);
         rwlock_unlock_write(store_gt.rwlock);
@@ -1491,7 +1492,6 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
     assert(res_ind == res_len);
 #endif
     
-    // Use qsort maybe?
     if constexpr (payload_type == PayloadType::FixedLength) {
         std::pair<uint64_t, uint32_t> sorter[res_ind];
         for (uint32_t i = 0; i < res_ind; i++)
@@ -1499,7 +1499,7 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
         auto comp = [&](std::pair<uint64_t, uint32_t> a, std::pair<uint64_t, uint32_t> b) {
                         return CompareInfixes(a.first, b.first);
                     };
-        std::sort(sorter, sorter + res_ind, comp);
+        std::stable_sort(sorter, sorter + res_ind, comp);
         for (uint32_t i = 0; i < res_ind; i++) {
             res[i] = sorter[i].first;
             const uint32_t pos_in = payload_size_ * sorter[i].second + payload_list_offset;
@@ -1511,7 +1511,7 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
         auto comp = [&](uint64_t a, uint64_t b) {
                         return CompareInfixes(a, b);
                     };
-        std::sort(res, res + res_ind, comp);
+        std::stable_sort(res, res + res_ind, comp);
     }
 
 #ifdef DEBUG
@@ -1608,6 +1608,9 @@ inline uint32_t Diva<int_optimized, payload_type>::Size() const {
                  + sizeof(load_factor_alt_) + sizeof(infix_size_) 
                  + sizeof(rng_seed_) + sizeof(InfixStore::size_grade_bit_count)
                  + sizeof(InfixStore::elem_count_bit_count);
+
+    if constexpr (payload_type == PayloadType::FixedLength)
+        res += sizeof(payload_size_);
 
     const uint8_t *tree_key, *last_tree_key = nullptr;
     uint32_t tree_key_len, last_tree_key_len = 0, dummy;
@@ -1749,9 +1752,14 @@ inline uint32_t Diva<int_optimized, payload_type>::SerializeMetadata(char *out) 
     memcpy(out + res, &load_factor_alt_, sizeof(load_factor_alt_));
     res += sizeof(load_factor_alt_);
 
-    // Infix Size and Random Seed
+    // Infix Size, Payload Size, and Random Seed
     memcpy(out + res, &infix_size_, sizeof(infix_size_));
     res += sizeof(infix_size_);
+
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        memcpy(out + res, &payload_size_, sizeof(payload_size_));
+        res += sizeof(payload_size_);
+    }
 
     memcpy(out + res, &rng_seed_, sizeof(rng_seed_));
     res += sizeof(rng_seed_);
@@ -1865,9 +1873,14 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeMetadata(const cha
     assert(buf_float == load_factor_alt_ && "Mismatched Diva version");
     res += sizeof(load_factor_alt_);
 
-    // Infix Size and Random Seed
+    // Infix Size, Payload Size, and Random Seed
     memcpy(&infix_size_, deser_buf + res, sizeof(infix_size_));
     res += sizeof(infix_size_);
+
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        memcpy(&payload_size_, deser_buf + res, sizeof(payload_size_));
+        res += sizeof(payload_size_);
+    }
 
     memcpy(&rng_seed_, deser_buf + res, sizeof(rng_seed_));
     res += sizeof(rng_seed_);
