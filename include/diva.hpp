@@ -160,6 +160,8 @@ private:
     static constexpr uint32_t scale_implicit_shift = 15;
     static constexpr uint32_t size_scalar_count = 500;
     static constexpr uint32_t size_scalar_shrink_grow_sep = 55; // vs. 55 for load_factor_alt_=0.95
+                                                                //
+    static constexpr uint32_t heap_alloc_threshold = 20000U;
 
     struct InfiniteByteString {
         const uint8_t *str;
@@ -1210,8 +1212,15 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     const uint64_t separator = (extraction | 1ULL) - (prev_extraction & (BITMASK(implicit_size) << infix_size_));
 
     const uint32_t infix_list_len = infix_store.GetElemCount();
-    uint64_t infix_list[infix_list_len + 1];
-    uint64_t payload_list[infix_list_len * payload_size_ / (8 * sizeof(uint64_t)) + 1];
+    uint64_t infix_list_contents[infix_list_len > heap_alloc_threshold ? 1 : infix_list_len + 1];
+    uint64_t payload_list_contents[infix_list_len > heap_alloc_threshold ? 1 : infix_list_len * payload_size_ / (8 * sizeof(uint64_t)) + 1];
+    uint64_t *infix_list = infix_list_contents;
+    uint64_t *payload_list = payload_list_contents;
+    if (infix_list_len > heap_alloc_threshold) {
+        infix_list = new uint64_t[infix_list_len + 1];
+        if constexpr (payload_type == PayloadType::FixedLength)
+            payload_list = new uint64_t[infix_list_len * payload_size_ / (8 * sizeof(uint64_t)) + 1];
+    }
     uint32_t infix_count;
     if constexpr (payload_type == PayloadType::FixedLength)
         infix_count = GetInfixList(infix_store, infix_list, payload_list);
@@ -1256,6 +1265,11 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
             rwlock_unlock_write(infix_store.rwlock);
             UnlockLeaves(leaves_to_unlock, it_write_lock);
             InsertSimple(key, payload);
+            if (infix_list_len > heap_alloc_threshold) {
+                delete[] infix_list;
+                if constexpr (payload_type == PayloadType::FixedLength)
+                    delete[] payload_list;
+            }
             return;
         }
         extraction = ExtractPartialKey(edited_key, shared, ignore, implicit_size, edited_key.GetBit(shared));
@@ -1293,8 +1307,15 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
                                                                       implicit_size,
                                                                       shamt_lt,
                                                                       left_start, left_end);
-    uint64_t left_infix_list[left_list_len];
-    uint64_t left_payload_list[(left_list_len * payload_size_ + 63) / 64 + 1];
+    uint64_t left_infix_list_contents[left_list_len > heap_alloc_threshold ? 1 : left_list_len];
+    uint64_t left_payload_list_contents[left_list_len > heap_alloc_threshold ? 1 : (left_list_len * payload_size_ + 63) / 64 + 1];
+    uint64_t *left_infix_list = left_infix_list_contents;
+    uint64_t *left_payload_list = left_payload_list_contents;
+    if (left_list_len > heap_alloc_threshold) {
+        left_infix_list = new uint64_t[left_list_len];
+        if constexpr (payload_type == PayloadType::FixedLength)
+            left_payload_list = new uint64_t[(left_list_len * payload_size_ + 63) / 64 + 1];
+    }
     if constexpr (payload_type == PayloadType::FixedLength) {
         const uint32_t payload_list_offset = 0;
         UpdateInfixList(infix_list, split_pos, shamt_lt,
@@ -1316,8 +1337,15 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
                                                                         implicit_size,
                                                                         shamt_gt,
                                                                         right_start, right_end);
-    uint64_t right_infix_list[right_list_len];
-    uint64_t right_payload_list[(right_list_len * payload_size_ + 63) / 64 + 1];
+    uint64_t right_infix_list_contents[right_list_len > heap_alloc_threshold ? 1 : right_list_len];
+    uint64_t right_payload_list_contents[right_list_len > heap_alloc_threshold ? 1 : (right_list_len * payload_size_ + 63) / 64 + 1];
+    uint64_t *right_infix_list = right_infix_list_contents;
+    uint64_t *right_payload_list = right_payload_list_contents;
+    if (right_list_len > heap_alloc_threshold) {
+        right_infix_list = new uint64_t[right_list_len];
+        if constexpr (payload_type == PayloadType::FixedLength)
+            right_payload_list = new uint64_t[(right_list_len * payload_size_ + 63) / 64 + 1];
+    }
     if constexpr (payload_type == PayloadType::FixedLength) {
         const uint32_t payload_list_offset = split_pos * payload_size_;
         UpdateInfixList(infix_list + split_pos, infix_list_len - split_pos, shamt_gt,
@@ -1413,6 +1441,21 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     */
 
     // No memory leaks!
+    if (infix_list_len > heap_alloc_threshold) {
+        delete[] infix_list;
+        if constexpr (payload_type == PayloadType::FixedLength)
+            delete[] payload_list;
+    }
+    if (left_list_len > heap_alloc_threshold) {
+        delete[] left_infix_list;
+        if constexpr (payload_type == PayloadType::FixedLength)
+            delete[] left_payload_list;
+    }
+    if (right_list_len > heap_alloc_threshold) {
+        delete[] right_infix_list;
+        if constexpr (payload_type == PayloadType::FixedLength)
+            delete[] right_payload_list;
+    }
     delete[] ptr_to_free;
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 }
@@ -1430,16 +1473,13 @@ inline std::tuple<uint32_t, bool> Diva<int_optimized, payload_type>::GetExpanded
     for (int32_t i = 0; i < list_len; i++) {
         const int32_t new_lowbit_position = lowbit_pos(list[i]) + shamt;
 #ifdef DEBUG
-        assert(implicit_size + infix_size_ > new_lowbit_position);
+        assert(63 > new_lowbit_position);
 #endif
         if (new_lowbit_position >= infix_size_) {
             const uint64_t implicit_part = (list[i] << shamt) >> infix_size_;
-            const uint64_t start = implicit_part - (implicit_part & (-implicit_part));
-            const uint64_t end = implicit_part | (implicit_part - 1);
-#ifdef DEBUG
-            assert(std::min(end, upper_implicit_lim) >= std::max(start, lower_implicit_lim));
-#endif
-            actual_list_len += std::min(end, upper_implicit_lim) - std::max(start, lower_implicit_lim);
+            const uint64_t start = std::max(lower_implicit_lim, implicit_part - (implicit_part & (-implicit_part)));
+            const uint64_t end = std::min(upper_implicit_lim, implicit_part | (implicit_part - 1));
+            actual_list_len += end - start;
             expanded = true;
         }
     }
@@ -1474,8 +1514,13 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
         return;
     }
 
+    const bool should_allocate_on_heap = res_len > heap_alloc_threshold;
+
     uint32_t res_ind = 0;
-    uint32_t payload_ind[res_len];
+    uint32_t payload_ind_contents[should_allocate_on_heap ? 1 : res_len];
+    uint32_t *payload_ind = payload_ind_contents;
+    if (should_allocate_on_heap)
+        payload_ind = new uint32_t[res_len];
     const uint64_t lower_implicit_lim = lower_lim >> infix_size_;
     const uint64_t upper_implicit_lim = upper_lim >> infix_size_;
     for (int32_t i = 0; i < list_len; i++) {
@@ -1483,11 +1528,10 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
         const uint64_t implicit_part = val >> infix_size_;
         const uint64_t explicit_part = val & BITMASK(infix_size_);
         if (explicit_part == 0) {
-#ifdef DEBUG
-            assert(implicit_part > 0);
-#endif
-            const uint64_t start = implicit_part - (implicit_part & (-implicit_part));
-            const uint64_t end = implicit_part | (implicit_part - 1);
+            const uint64_t start = implicit_part != 0 ? implicit_part - (implicit_part & (-implicit_part))
+                                                      : lower_implicit_lim;
+            const uint64_t end = implicit_part != 0 ? implicit_part | (implicit_part - 1)
+                                                    : upper_implicit_lim;
             for (uint64_t j = std::max(start, lower_implicit_lim); j <= std::min(end, upper_implicit_lim); j++) {
                 res[res_ind] = ((j - lower_implicit_lim) << infix_size_) | (1ULL << (infix_size_ - 1));
                 if constexpr (payload_type == PayloadType::FixedLength)
@@ -1507,7 +1551,11 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
 #endif
     
     if constexpr (payload_type == PayloadType::FixedLength) {
-        std::pair<uint64_t, uint32_t> sorter[res_ind];
+        std::pair<uint64_t, uint32_t> sorter_contents[should_allocate_on_heap ? 1 : res_len];
+        std::pair<uint64_t, uint32_t> *sorter = sorter_contents;
+        if (should_allocate_on_heap)
+            sorter = new std::pair<uint64_t, uint32_t>[res_len];
+
         for (uint32_t i = 0; i < res_ind; i++)
             sorter[i] = {res[i], payload_ind[i]};
         auto comp = [&](std::pair<uint64_t, uint32_t> a, std::pair<uint64_t, uint32_t> b) {
@@ -1520,6 +1568,9 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
             const uint32_t pos_out = payload_size_ * i;
             copy_bitmap_to_bitmap(payload_list, pos_in, res_payload, pos_out, payload_size_);
         }
+
+        if (should_allocate_on_heap)
+            delete[] sorter;
     } 
     else {
         auto comp = [&](uint64_t a, uint64_t b) {
@@ -1527,6 +1578,9 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
                     };
         std::stable_sort(res, res + res_ind, comp);
     }
+
+    if (res_len > heap_alloc_threshold)
+        delete[] payload_ind;
 
 #ifdef DEBUG
     for (int32_t i = 0; i < res_ind; i++)
@@ -2075,14 +2129,25 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
 
     uint32_t total_elem_count = store_l->GetElemCount() + store_r->GetElemCount();
-    uint64_t infix_list[total_elem_count + 1];
+    const bool should_allocate_on_heap = total_elem_count > heap_alloc_threshold;
+    uint64_t infix_list_contents[should_allocate_on_heap ? 1 : total_elem_count + 1];
+    uint64_t *infix_list = infix_list_contents;
     uint32_t payload_list_size = 1, right_payload_list_size = 1;
     if constexpr (payload_type == PayloadType::FixedLength) {
         payload_list_size = total_elem_count * ((payload_size_ + 63) / 64);
         right_payload_list_size = store_r->GetElemCount() * ((payload_size_ + 63) / 64);
     }
-    uint64_t payload_list[payload_list_size + 1];
-    uint64_t right_payload_list[right_payload_list_size + 1];
+    uint64_t payload_list_contents[should_allocate_on_heap ? 1 : payload_list_size + 1];
+    uint64_t right_payload_list_contents[should_allocate_on_heap ? 1 : right_payload_list_size + 1];
+    uint64_t *payload_list = payload_list_contents;
+    uint64_t *right_payload_list = right_payload_list_contents;
+    if (should_allocate_on_heap) {
+        infix_list = new uint64_t[total_elem_count + 1];
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            payload_list = new uint64_t[payload_list_size + 1];
+            right_payload_list = new uint64_t[payload_list_size + 1];
+        }
+    }
     GetInfixList(*store_l, infix_list, payload_list);
     GetInfixList(*store_r, infix_list + store_l->GetElemCount(), right_payload_list);
     if constexpr (payload_type == PayloadType::FixedLength) {
@@ -2105,10 +2170,17 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
         if (!CompareInfixes(last_infix_l, first_infix_r)) {
             // Need to sort merge
             if constexpr (payload_type == PayloadType::FixedLength) {
-                std::pair<uint64_t, uint32_t> pair_list[total_elem_count + 1];
+                std::pair<uint64_t, uint32_t> pair_list_contents[should_allocate_on_heap ? 1 : total_elem_count + 1];
+                std::pair<uint64_t, uint32_t> tmp_contents[should_allocate_on_heap ? 1 : total_elem_count + 1];
+                std::pair<uint64_t, uint32_t> *pair_list = pair_list_contents;
+                std::pair<uint64_t, uint32_t> *tmp = tmp_contents;
+                if (should_allocate_on_heap) {
+                    pair_list = new std::pair<uint64_t, uint32_t>[total_elem_count + 1];
+                    tmp = new std::pair<uint64_t, uint32_t>[total_elem_count + 1];
+                }
+
                 for (uint32_t i = 0; i < total_elem_count; i++)
                     pair_list[i] = {infix_list[i], i};
-                std::pair<uint64_t, uint32_t> tmp[total_elem_count + 1];
                 std::merge(pair_list, pair_list + store_l->GetElemCount(),
                            pair_list + store_l->GetElemCount(), pair_list + total_elem_count,
                            tmp, [&] (std::pair<uint64_t, uint32_t> a, std::pair<uint64_t, uint32_t> b) {
@@ -2122,15 +2194,27 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
                     const uint32_t pos_out = payload_size_ * i;
                     copy_bitmap_to_bitmap(payload_list_copy, pos_in, payload_list, pos_out, payload_size_);
                 }
+                
+                if (should_allocate_on_heap) {
+                    delete[] pair_list;
+                    delete[] tmp;
+                }
             }
             else {
-                uint64_t tmp[total_elem_count + 1];
+                uint64_t tmp_contents[should_allocate_on_heap ? 1 : total_elem_count + 1];
+                uint64_t *tmp = tmp_contents;
+                if (should_allocate_on_heap)
+                    tmp = new uint64_t[total_elem_count + 1];
+
                 std::merge(infix_list, infix_list + store_l->GetElemCount(),
                            infix_list + store_l->GetElemCount(), infix_list + total_elem_count,
                            tmp, [&] (uint64_t a, uint64_t b) {
                                 return CompareInfixes(a, b);
                            });
                 memcpy(infix_list, tmp, sizeof(uint64_t) * total_elem_count);
+
+                if (should_allocate_on_heap)
+                    delete[] tmp;
             }
         }
     }
@@ -2159,6 +2243,13 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
     store_l->rwlock.store(store.rwlock.load(std::memory_order_acquire), std::memory_order_release);
     delete[] old_store_l_ptr;
     delete[] store_r->ptr;
+    if (should_allocate_on_heap) {
+        delete[] infix_list;
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            delete[] payload_list;
+            delete[] right_payload_list;
+        }
+    }
 
     const bool has_lock = true;
     if constexpr (int_optimized)
