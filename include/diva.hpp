@@ -1196,8 +1196,10 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     InfixStore& infix_store = *infix_store_ptr;
     rwlock_lock_write(infix_store.rwlock);
 
-    if (infix_store.IsPartialKey() && prev_key.IsPrefixOf(key, infix_store.GetInvalidBits())) {
+    if ((infix_store.IsPartialKey() && prev_key.IsPrefixOf(key, infix_store.GetInvalidBits()))
+            || prev_key == key) {
         // Previous key was a partial key and a prefix of the new boundary key
+        // OR the key being inserted is a duplicate of the previous key
         // Inserting using the simple method...
         rwlock_unlock_write(infix_store.rwlock);
         UnlockLeaves(leaves_to_unlock, it_write_lock);
