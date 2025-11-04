@@ -9,6 +9,7 @@
 #include <endian.h>
 #include <limits>
 #include <random>
+#include <string_view>
 #include <thread>
 #include <x86intrin.h>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -2189,7 +2190,7 @@ public:
 
     template <bool O>
     static void Concurrency() {
-        const uint32_t infix_size = 6;
+        const uint32_t infix_size = 10;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t n_keys = 20000000;
@@ -3758,6 +3759,74 @@ public:
                 AssertDivas(s, reconstructed_s);
 
                 delete[] buf;
+            }
+        }
+
+        SUBCASE("warmup insert split and insert with iterator gets before inserts") {
+            const uint32_t infix_size = 20;
+            const uint32_t key_len = 48;
+            const uint32_t key_len_words = (key_len + sizeof(uint64_t) - 1) / sizeof(uint64_t);
+            const uint32_t payload_len_words = (payload_size + 63) / 64;
+            Diva<O, PayloadType::FixedLength> s(infix_size, seed, 0.95, payload_size, true);
+
+            if constexpr (!O) {
+                const uint32_t n_keys = 100000000;
+                const uint32_t sample_key_threshold = 50000;
+                constexpr bool ascii = true;
+                for (uint32_t i = 0; i < n_keys; i++) {
+                    if (i % 10000 == 0)
+                        std::cerr << i << std::endl;
+                    uint64_t key[key_len_words], payload[payload_len_words];
+                    if constexpr (ascii) {
+                        std::string valid_characters = "";
+                        for (char c = 'A'; c <= 'Z'; c++)
+                            valid_characters += c;
+                        for (char c = 'a'; c <= 'z'; c++)
+                            valid_characters += c;
+                        for (char c = '0'; c <= '9'; c++)
+                            valid_characters += c;
+                        for (uint32_t j = 0; j < key_len_words * 8; j++)
+                            reinterpret_cast<uint8_t *>(key)[j] = valid_characters[rng() % valid_characters.size()];
+                    }
+                    else {
+                        for (uint32_t j = 0; j < key_len_words; j++)
+                            key[j] = rng();
+                    }
+                    std::string_view key_sv = {reinterpret_cast<const char *>(key), key_len};
+                    for (uint32_t j = 0; j < payload_len_words; j++)
+                        payload[j] = rng();
+
+                    // Check for existence
+                    auto it = s.GetIterator(key_sv);
+                    uint32_t cnt = 0;
+                    if (it.IsValid()) {
+                        bool matches = false;
+                        do {
+                            auto [fetch_key, bit_length] = *it;
+                            typename diva::Diva<false, diva::PayloadType::FixedLength>::InfiniteByteString curr_key;
+                            uint64_t it_payload[payload_len_words + 2];
+                            // If the key prefix matches get the payload
+                            if (memcmp(key, fetch_key.data(),
+                                        std::min<uint32_t>(key_len, fetch_key.size() - 1)) == 0) {
+                                matches = true;
+                                if (bit_length < key_len * 8)
+                                    matches = (key[bit_length / 8] & BITMASK(bit_length % 8 == 0 ? 8 : 8 - bit_length % 8)) 
+                                        == fetch_key[bit_length / 8];
+                                if (matches) {
+                                    it.GetPayload(it_payload);
+                                    cnt++;
+                                }
+                            }
+                            else 
+                                matches = false;
+                            it++;
+                        } while(it.IsValid() && matches);
+                    }
+                    REQUIRE_LE(cnt, 100);
+                    REQUIRE_LE(it.keys_.size(), 50);
+
+                    s.Insert(key_sv, payload, i < sample_key_threshold ? 1024 : 0);
+                }
             }
         }
     }
