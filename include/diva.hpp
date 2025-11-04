@@ -3593,12 +3593,21 @@ inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &stor
     // TODO: Optimize further?
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t infix_count = store.GetElemCount();
+    const bool should_allocate_on_heap = infix_count > heap_alloc_threshold;
 
-    uint64_t infix_list[infix_count];
+    uint64_t infix_list_contents[should_allocate_on_heap ? 1 : infix_count];
     uint32_t payload_list_size = 1;
     if constexpr (payload_type == PayloadType::FixedLength)
         payload_list_size = (payload_size_ * (infix_count + 1) + 63) / 64 + 1;
-    uint64_t payload_list[payload_list_size];
+    uint64_t payload_list_contents[should_allocate_on_heap ? 1 : payload_list_size];
+    uint64_t *infix_list = infix_list_contents;
+    uint64_t *payload_list = payload_list_contents;
+    if (infix_count > heap_alloc_threshold) {
+        infix_list = new uint64_t[infix_count];
+        if constexpr (payload_type == PayloadType::FixedLength)
+            payload_list = new uint64_t[payload_list_size];
+    }
+
     if constexpr (payload_type == PayloadType::FixedLength) {
         GetInfixList(store, infix_list, payload_list);
         const uint32_t bit_pos = 64 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1);
@@ -3621,6 +3630,12 @@ inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &stor
     }
     else 
         LoadListToInfixStore(store, infix_list, infix_count, total_implicit, true);
+
+    if (should_allocate_on_heap) {
+        delete[] infix_list;
+        if constexpr (payload_type == PayloadType::FixedLength)
+            delete[] payload_list;
+    }
 }
 
 
@@ -3673,7 +3688,15 @@ inline void Diva<int_optimized, payload_type>::LoadListToInfixStore(InfixStore &
     if (list_len == 0)
         return;
 
-    int32_t l[list_len + 1], r[list_len + 1], ind = 0;
+    const bool should_allocate_on_heap = list_len > heap_alloc_threshold;
+    int32_t l_contents[should_allocate_on_heap ? 1 : list_len + 1];
+    int32_t r_contents[should_allocate_on_heap ? 1 : list_len + 1];
+    int32_t *l = l_contents, *r = r_contents;
+    if (should_allocate_on_heap) {
+        l = new int32_t[list_len + 1];
+        r = new int32_t[list_len + 1];
+    }
+    int32_t ind = 0;
 
     // Make sure everything is in increasing order
     /*
@@ -3757,6 +3780,11 @@ inline void Diva<int_optimized, payload_type>::LoadListToInfixStore(InfixStore &
     }
 #endif // DEBUG
     */
+
+    if (should_allocate_on_heap) {
+        delete[] l;
+        delete[] r;
+    }
 }
 
 
