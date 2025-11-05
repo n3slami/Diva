@@ -28,10 +28,11 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         const uint32_t total_words = (Diva<>::infix_store_target_size 
-                + (s.infix_size_ + 1) * s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep] + 63) / 64;
+                + (s.infix_size_ + 1) * s.scaled_sizes_[s.size_scalar_shrink_grow_sep] + 63) / 64;
         for (int32_t i = 0; i < total_words; i++)
             REQUIRE_EQ(store.ptr[i], 0);
     }
@@ -42,9 +43,10 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_, 
+                                 s.size_scalar_shrink_grow_sep);
 
-        const uint32_t total_slots = s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep];
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
         for (int32_t i = 0; i < total_slots; i++)
             s.SetSlot(store, i, i & BITMASK(s.infix_size_));
         for (int32_t i = 0; i < total_slots; i++)
@@ -161,7 +163,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         uint64_t *runends = store.ptr + 1 + Diva<>::infix_store_target_size / 64;
         runends[0] = 0b1000100010001000100010001000100010001000100010001000100010001000;
@@ -239,7 +242,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
         uint64_t *runends = store.ptr + 1 + Diva<>::infix_store_target_size / 64;
         uint64_t inserts[100];
 
@@ -386,7 +390,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         const uint32_t rng_seed = 20;
         std::mt19937_64 rng(rng_seed);
@@ -497,7 +502,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         const std::vector<uint64_t> keys {0b000000010011000, 0b000000010010100,
             0b000000010010110, 0b000000010010101, 0b000000010011111,
@@ -521,7 +527,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
             0b000000000010101, 0b000000000100001, 0b000000000100011,
@@ -545,7 +552,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         SUBCASE("fetch") {
             const std::vector<uint64_t> keys {0b0000000000000001, 0b0000000000000101,
@@ -594,7 +602,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
 
         const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
             0b000000000010101, 0b000000000100001, 0b000000000101000,
@@ -644,7 +653,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
         
         const uint32_t n_queries = 100000;
         const uint32_t rng_seed = 2;
@@ -715,7 +725,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
         
         const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
             0b000000000010101, 0b000000000100001, 0b000000000101000,
@@ -771,7 +782,8 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[Diva<>::size_scalar_shrink_grow_sep], s.infix_size_);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
         
         const uint32_t n_keys = Diva<>::infix_store_target_size;
         const uint32_t rng_seed = 2;
@@ -835,9 +847,8 @@ public:
         }
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        PayloadDiva::InfixStore store(s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep],
-                                                      s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep,
-                                                      payload_size);
+        PayloadDiva::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                      s.size_scalar_shrink_grow_sep, payload_size);
         
         SUBCASE("allocation") {
             const std::vector<uint32_t> occupieds_pos = {};
@@ -846,7 +857,7 @@ public:
             AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
         }
 
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
         for (int32_t i = 0; i < total_slots; i++) {
             s.SetSlot(store, i, i & BITMASK(s.infix_size_));
             uint64_t payload[payload_size / 64 + 1];
@@ -940,8 +951,8 @@ public:
         std::mt19937_64 rng(rng_seed);
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
         uint64_t *runends = store.ptr + 1 + PayloadDiva::infix_store_target_size / 64;
         uint64_t inserts[100], payloads[100][payload_size / 64 + 2];
         uint64_t read_payload[payload_size / 64 + 2];
@@ -1168,8 +1179,8 @@ public:
         std::mt19937_64 rng(rng_seed);
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
             0b000000000010101, 0b000000000100001, 0b000000000100011,
@@ -1210,8 +1221,8 @@ public:
         std::mt19937_64 rng(rng_seed);
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         uint64_t payloads[(infix_store_target_size + 1) * (payload_size / 64 + 2)];
         for (uint32_t i = 0; i < (infix_store_target_size + 1) * (payload_size / 64 + 2); i++)
@@ -1277,8 +1288,8 @@ public:
         const float load_factor = 0.95;
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         const uint32_t rng_seed = 20;
         std::mt19937_64 rng(rng_seed);
@@ -1478,8 +1489,8 @@ public:
         const float load_factor = 0.95;
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         const uint32_t rng_seed = 20;
         std::mt19937_64 rng(rng_seed);
@@ -1552,8 +1563,8 @@ public:
         const float load_factor = 0.95;
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         const uint32_t rng_seed = 20;
         std::mt19937_64 rng(rng_seed);
@@ -1627,8 +1638,8 @@ public:
         const float load_factor = 0.95;
 
         PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[PayloadDiva::size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, PayloadDiva::size_scalar_shrink_grow_sep, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
 
         const uint32_t rng_seed = 2;
         std::mt19937_64 rng(rng_seed);

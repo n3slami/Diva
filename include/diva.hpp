@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <mutex>
 #include <random>
 #include <string_view>
@@ -25,45 +26,6 @@
 #include "util.hpp"
 #include "wormhole/wh_int.h"
 
-inline uint64_t MurmurHash64A(const void * key, int len, unsigned int seed) {
-	const uint64_t m = 0xc6a4a7935bd1e995;
-	const int r = 47;
-
-	uint64_t h = seed ^ (len * m);
-
-	const uint64_t * data = (const uint64_t *)key;
-	const uint64_t * end = data + (len/8);
-
-	while(data != end) {
-		uint64_t k = *data++;
-
-		k *= m;
-		k ^= k >> r;
-		k *= m;
-
-		h ^= k;
-		h *= m;
-	}
-
-	const unsigned char * data2 = (const unsigned char*)data;
-
-	switch(len & 7) {
-		case 7: h ^= (uint64_t)data2[6] << 48; do {} while (0);  /* fallthrough */
-		case 6: h ^= (uint64_t)data2[5] << 40; do {} while (0);  /* fallthrough */
-		case 5: h ^= (uint64_t)data2[4] << 32; do {} while (0);  /* fallthrough */
-		case 4: h ^= (uint64_t)data2[3] << 24; do {} while (0);  /* fallthrough */
-		case 3: h ^= (uint64_t)data2[2] << 16; do {} while (0);  /* fallthrough */
-		case 2: h ^= (uint64_t)data2[1] << 8; do {} while (0); /* fallthrough */
-		case 1: h ^= (uint64_t)data2[0];
-						h *= m;
-	};
-
-	h ^= h >> r;
-	h *= m;
-	h ^= h >> r;
-
-	return h;
-}
 
 namespace diva {
 
@@ -116,8 +78,8 @@ class Diva {
     friend class InfixStoreTests;
 
 public:
-    Diva(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor, const uint32_t payload_size=0,
-                                                                                      const bool setup_start_end_samples=false);
+    Diva(const uint32_t infix_size, const uint32_t rng_seed, const float load_factor,
+         const uint32_t payload_size=0, const bool setup_start_end_samples=false);
 
     template <class t_itr>
     Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
@@ -159,8 +121,6 @@ private:
     static constexpr uint32_t scale_shift = 15;
     static constexpr uint32_t scale_implicit_shift = 15;
     static constexpr uint32_t size_scalar_count = 500;
-    static constexpr uint32_t size_scalar_shrink_grow_sep = 55; // vs. 55 for load_factor_alt_=0.95
-                                                                //
     static constexpr uint32_t heap_alloc_threshold = 20000U;
 
     struct InfiniteByteString {
@@ -236,7 +196,7 @@ private:
         uint64_t *ptr = nullptr;
 
         InfixStore(const uint32_t slot_count, const uint32_t slot_size,
-                   const uint32_t size_grade=size_scalar_shrink_grow_sep, const uint32_t payload_size=0) {
+                   const uint32_t size_grade, const uint32_t payload_size=0) {
             SetSizeGrade(size_grade);
             const uint32_t word_count = GetPtrWordCount(slot_count, slot_size, payload_size);
             rwlock.store(0, std::memory_order::memory_order_release);
@@ -367,6 +327,7 @@ private:
     uint32_t rng_seed_;
     const float load_factor_ = 0.95;
     const float load_factor_alt_ = 0.95;
+    const uint32_t size_scalar_shrink_grow_sep = std::log(infix_store_target_size / 64) / std::log(1 / load_factor_) + 1;
     uint64_t size_scalars_[size_scalar_count], scaled_sizes_[size_scalar_count], exception_scaled_size_;
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
 
@@ -486,6 +447,8 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
             payload_size_(0),
             rng_seed_(rng_seed),
             load_factor_(load_factor),
+            load_factor_alt_(load_factor),
+            size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
             bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -534,6 +497,8 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
         payload_size_(0),
         rng_seed_(rng_seed),
         load_factor_(load_factor), 
+        load_factor_alt_(load_factor),
+        size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
         bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -577,6 +542,8 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
         payload_size_(0),
         rng_seed_(rng_seed),
         load_factor_(load_factor),
+        load_factor_alt_(load_factor),
+        size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
         bulk_load_streaming_ind_(0) {
     if constexpr (int_optimized) {
         wh_int_ = wh_int_create();
@@ -613,11 +580,18 @@ inline void Diva<int_optimized, payload_type>::SetupScaleFactors() {
     }
     exception_scaled_size_ = static_cast<uint64_t>(scaled_sizes_[0] * load_factor_alt_);
     pw = 1.0 / load_factor_;
-    for (int32_t i = size_scalar_shrink_grow_sep; i < size_scalar_count; i++) {
+    const int32_t loop_end_i = std::min<int32_t>(size_scalar_count,
+                                                 std::log(std::numeric_limits<uint32_t>::max()) / std::log(1 / load_factor_));
+    for (int32_t i = size_scalar_shrink_grow_sep; i < loop_end_i; i++) {
         size_scalars_[i] = static_cast<uint64_t>(pw * (1ULL << scale_shift));
         scaled_sizes_[i] = infix_store_target_size * size_scalars_[i] >> scale_shift;
         pw /= load_factor_;
     }
+    for (int32_t i = loop_end_i; i < size_scalar_count; i++) {
+        size_scalars_[i] = std::numeric_limits<uint64_t>::max();
+        scaled_sizes_[i] = std::numeric_limits<uint64_t>::max();
+    }
+    
     for (int32_t i = 0; i < infix_store_target_size / 2; i++) {
         const double ratio = static_cast<double>(infix_store_target_size) 
                                 / static_cast<double>(i + static_cast<double>(infix_store_target_size) / 2);
@@ -1931,16 +1905,15 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeMetadata(const cha
     assert(buf32 == size_scalar_count && "Mismatched Diva version");
     res += sizeof(size_scalar_count);
 
-    memcpy(&buf32, deser_buf + res, sizeof(size_scalar_shrink_grow_sep));
-    assert(buf32 == size_scalar_shrink_grow_sep && "Mismatched Diva version");
+    memcpy((void *) &size_scalar_shrink_grow_sep, deser_buf + res, sizeof(size_scalar_shrink_grow_sep));
     res += sizeof(size_scalar_shrink_grow_sep);
 
-    memcpy(&buf_float, deser_buf + res, sizeof(load_factor_));
-    assert(buf_float == load_factor_ && "Mismatched Diva version");
+    memcpy((void *) &load_factor_, deser_buf + res, sizeof(load_factor_));
     res += sizeof(load_factor_);
 
-    memcpy(&buf_float, deser_buf + res, sizeof(load_factor_alt_));
-    assert(buf_float == load_factor_alt_ && "Mismatched Diva version");
+    assert(size_scalar_shrink_grow_sep == std::log(infix_store_target_size / 64) / std::log(1 / load_factor_) + 1 && "Corrupted Diva version");
+
+    memcpy((void *) &load_factor_alt_, deser_buf + res, sizeof(load_factor_alt_));
     res += sizeof(load_factor_alt_);
 
     // Infix Size, Payload Size, and Random Seed
@@ -3604,7 +3577,7 @@ inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &stor
     uint64_t payload_list_contents[should_allocate_on_heap ? 1 : payload_list_size];
     uint64_t *infix_list = infix_list_contents;
     uint64_t *payload_list = payload_list_contents;
-    if (infix_count > heap_alloc_threshold) {
+    if (should_allocate_on_heap) {
         infix_list = new uint64_t[infix_count];
         if constexpr (payload_type == PayloadType::FixedLength)
             payload_list = new uint64_t[payload_list_size];

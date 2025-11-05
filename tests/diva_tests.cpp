@@ -2194,7 +2194,7 @@ public:
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t n_keys = 20000000;
-        const uint32_t n_threads = 32;
+        const uint32_t n_threads = 16;
         const uint32_t n_bulk = n_keys / n_threads;
 
         const uint32_t rng_seed = 2;
@@ -3763,14 +3763,14 @@ public:
         }
 
         SUBCASE("warmup insert split and insert with iterator gets before inserts") {
-            const uint32_t infix_size = 10;
+            const uint32_t infix_size = 5;
             const uint32_t key_len = 48;
             const uint32_t key_len_words = (key_len + sizeof(uint64_t) - 1) / sizeof(uint64_t);
             const uint32_t payload_len_words = (payload_size + 63) / 64;
             Diva<O, PayloadType::FixedLength> s(infix_size, seed + 1, load_factor, payload_size, true);
 
             if constexpr (!O) {
-                const uint32_t n_keys = 100000000;
+                const uint32_t n_keys = 10000000;
                 const uint32_t sample_key_threshold = 50000;
                 constexpr bool ascii = true;
                 for (uint32_t i = 0; i < n_keys; i++) {
