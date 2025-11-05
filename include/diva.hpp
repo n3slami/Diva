@@ -93,6 +93,8 @@ public:
 
     Diva(const char *deser_buf);
 
+    ~Diva();
+
     void Insert(uint64_t key, const void *payload=nullptr, uint32_t random_number=0);
     void Insert(std::string_view key, const void *payload=nullptr, uint32_t random_number=0);
     void Insert(const uint8_t *key, const uint32_t key_len, const void *payload=nullptr, uint32_t random_number=0);
@@ -1826,6 +1828,47 @@ inline uint32_t Diva<int_optimized, payload_type>::SerializeInfixStore(char *out
     const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_, payload_size_);
     memcpy(out + sizeof(store.status), store.ptr, word_count * sizeof(uint64_t));
     return sizeof(store.status) + word_count * sizeof(uint64_t);
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::~Diva() {
+    const bool write = true;
+    const bool unlock = true;
+    const uint8_t *tree_key;
+    uint32_t tree_key_len, dummy;
+    InfixStore *store;
+
+    if constexpr (int_optimized) {
+        wormhole_int_iter it_int;
+        it_int.ref = better_tree_int_;
+        it_int.map = better_tree_int_->map;
+        it_int.leaf = nullptr;
+        it_int.is = 0;
+        for (wh_int_iter_seek(&it_int, nullptr, 0, write); wh_int_iter_valid(&it_int); wh_int_iter_skip1(&it_int, write, unlock)) {
+            wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
+                                          reinterpret_cast<void **>(&store), &dummy);
+            delete[] store->ptr;
+        }
+        if (it_int.leaf)
+            wormleaf_int_unlock_write(it_int.leaf);
+        wh_int_destroy(wh_int_);
+    }
+    else {
+        wormhole_iter it;
+        it.ref = better_tree_;
+        it.map = better_tree_->map;
+        it.leaf = nullptr;
+        it.is = 0;
+        for (wh_iter_seek(&it, nullptr, 0, write); wh_iter_valid(&it); wh_iter_skip1(&it, write, unlock)) {
+            wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
+                                  reinterpret_cast<void **>(&store), &dummy);
+            delete[] store->ptr;
+        }
+        if (it.leaf)
+            wormleaf_unlock_write(it.leaf);
+        wh_destroy(wh_);
+    }
 }
 
 
