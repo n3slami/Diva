@@ -109,7 +109,7 @@ public:
     bool PointQuery(std::string_view key) const;
     bool PointQuery(const uint8_t *key, const uint32_t key_len) const;
     void ShrinkInfixSize(const uint32_t new_infix_size);
-    uint32_t Size() const;
+    uint64_t Size() const;
     uint32_t Serialize(char *out) const;
     void BulkLoadStreaming(uint64_t key, const uint64_t *payload=nullptr);
     void BulkLoadStreaming(std::string_view key, const uint64_t *payload=nullptr);
@@ -1646,8 +1646,8 @@ inline void Diva<int_optimized, payload_type>::ShrinkInfixSize(const uint32_t ne
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Size() const {
-    uint32_t res = sizeof(bool) + sizeof(infix_store_target_size) 
+inline uint64_t Diva<int_optimized, payload_type>::Size() const {
+    uint64_t res = sizeof(bool) + sizeof(infix_store_target_size) 
                  + sizeof(base_implicit_size) + sizeof(scale_shift)
                  + sizeof(scale_implicit_shift) + sizeof(size_scalar_count)
                  + sizeof(size_scalar_shrink_grow_sep) + sizeof(load_factor_)
@@ -1675,7 +1675,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Size() const {
             res += sizeof(tree_key_len) + tree_key_len;
             res += sizeof(store->status);
             if (store->ptr != nullptr) {
-                const uint32_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
+                const uint64_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
                 res += word_count * sizeof(uint64_t);
             }
         }
@@ -1700,7 +1700,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Size() const {
             */
             res += sizeof(store->status); // + sizeof(store->ptr);
             if (store->ptr != nullptr) {
-                const uint32_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
+                const uint64_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
                 res += word_count * sizeof(uint64_t);
                 //res += (store->GetElemCount() * (infix_size_ + 1) + infix_store_target_size + 7) / 8;
             }
