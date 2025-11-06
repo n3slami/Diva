@@ -1717,7 +1717,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Size() const {
 
 template <bool int_optimized, PayloadType payload_type>
 inline uint32_t Diva<int_optimized, payload_type>::Serialize(char *out) const {
-    uint32_t res = SerializeMetadata(out);
+    uint64_t res = SerializeMetadata(out);
 
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
@@ -1825,7 +1825,7 @@ template <bool int_optimized, PayloadType payload_type>
 inline uint32_t Diva<int_optimized, payload_type>::SerializeInfixStore(char *out,
                                                                        const Diva<int_optimized, payload_type>::InfixStore& store) const {
     memcpy(out, &store.status, sizeof(store.status));
-    const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_, payload_size_);
+    const uint64_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_, payload_size_);
     memcpy(out + sizeof(store.status), store.ptr, word_count * sizeof(uint64_t));
     return sizeof(store.status) + word_count * sizeof(uint64_t);
 }
