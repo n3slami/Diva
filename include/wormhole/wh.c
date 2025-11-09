@@ -4,6 +4,7 @@
  * All rights reserved. No warranty, explicit or implicit, provided.
  */
 #define _GNU_SOURCE
+#include "kv.h"
 #include "lib.h"
 #include<stdlib.h>
 
@@ -1339,6 +1340,118 @@ wormhole_jump_leaf(const struct wormhmap * const hmap, const struct kref * const
 }
 
   static struct wormleaf *
+wormhole_jump_leaf_pred(const struct wormhmap * const hmap, const struct kref * const key)
+{
+  struct kref lcp = {.ptr = key->ptr};
+  debug_assert(kv_crc32c(key->ptr, key->len) == key->hash32);
+
+  const struct wormmeta *meta = wormhole_meta_lcp(hmap, &lcp, key->len);
+  if (likely(lcp.len < key->len)) { // partial match
+    const u32 id0 = lcp.ptr[lcp.len];
+    const u32 bitmin = wormmeta_bitmin_load(meta);
+    if (bitmin == WH_FO) { // trie leaf
+        return wormmeta_lpath_load(meta);
+    } else if (bitmin > id0) { // no left, don't care about right.
+      struct wormleaf * original_lmost_leaf = wormmeta_lpath_load(meta);
+      u32 l = 0, r = lcp.len, mid, running_hash = KV_CRC32C_SEED;
+      while (r - l > 1) {
+          mid = (l + r) / 2;
+          lcp.len = l;
+          wormhole_kref_inc(&lcp, l, running_hash, mid - l);
+          const struct wormmeta *dude = wormhmap_get_kref(hmap, &lcp);
+          assert(dude != NULL);
+          if (wormmeta_lpath_load(dude) != original_lmost_leaf) {
+              running_hash = lcp.hash32;
+              l = lcp.len;
+          }
+          else 
+              r = lcp.len;
+      }
+      lcp.len = l;
+      lcp.hash32 = running_hash;
+      const u32 smaller_byte = wormmeta_bm_lt(wormhmap_get_kref(hmap, &lcp), lcp.ptr[lcp.len]);
+      struct wormmeta *final_dude = smaller_byte < WH_FO ? wormhmap_get_kref1(hmap, &lcp, smaller_byte) : NULL;
+      return final_dude ? wormmeta_rmost_load(final_dude) : original_lmost_leaf;
+    } else if (wormmeta_bitmax_load(meta) < id0) { // has left sibling but no right sibling
+      return wormmeta_rmost_load(meta);
+    } else { // has both (expensive)
+      struct wormmeta *dude = NULL;
+      while (dude == NULL)
+        dude = wormhmap_get_kref1(hmap, &lcp, (u8)wormmeta_bm_lt(meta, id0));
+      return wormmeta_rmost_load(dude);
+    }
+  } else { // lcp->len == klen
+    return wormmeta_lpath_load(meta);
+  }
+}
+
+
+  static struct wormleaf *
+wormhole_jump_leaf_pred_strict(const struct wormhmap * const hmap, const struct kref * const key)
+{
+  struct kref lcp = {.ptr = key->ptr};
+  debug_assert(kv_crc32c(key->ptr, key->len) == key->hash32);
+
+  const struct wormmeta *meta = wormhole_meta_lcp(hmap, &lcp, key->len);
+  if (likely(lcp.len < key->len)) { // partial match
+    const u32 id0 = lcp.ptr[lcp.len];
+    const u32 bitmin = wormmeta_bitmin_load(meta);
+    if (bitmin == WH_FO) { // trie leaf
+        return wormmeta_lpath_load(meta);
+    } else if (bitmin > id0) { // no left, don't care about right.
+      struct wormleaf * original_lmost_leaf = wormmeta_lpath_load(meta);
+      u32 l = 0, r = lcp.len, mid, running_hash = KV_CRC32C_SEED;
+      while (r - l > 1) {
+          mid = (l + r) / 2;
+          lcp.len = l;
+          wormhole_kref_inc(&lcp, l, running_hash, mid - l);
+          const struct wormmeta *dude = wormhmap_get_kref(hmap, &lcp);
+          assert(dude != NULL);
+          if (wormmeta_lpath_load(dude) != original_lmost_leaf) {
+              running_hash = lcp.hash32;
+              l = lcp.len;
+          }
+          else 
+              r = lcp.len;
+      }
+      lcp.len = l;
+      lcp.hash32 = running_hash;
+      const u32 smaller_byte = wormmeta_bm_lt(wormhmap_get_kref(hmap, &lcp), lcp.ptr[lcp.len]);
+      struct wormmeta *final_dude = smaller_byte < WH_FO ? wormhmap_get_kref1(hmap, &lcp, smaller_byte) : NULL;
+      return final_dude ? wormmeta_rmost_load(final_dude) : original_lmost_leaf;
+    } else if (wormmeta_bitmax_load(meta) < id0) { // has left sibling but no right sibling
+      return wormmeta_rmost_load(meta);
+    } else { // has both (expensive)
+      struct wormmeta *dude = NULL;
+      while (dude == NULL)
+        dude = wormhmap_get_kref1(hmap, &lcp, (u8)wormmeta_bm_lt(meta, id0));
+      return wormmeta_rmost_load(dude);
+    }
+  } else { // lcp->len == klen
+      struct wormleaf * original_lmost_leaf = wormmeta_lpath_load(meta);
+      u32 l = 0, r = lcp.len, mid, running_hash = KV_CRC32C_SEED;
+      while (r - l > 1) {
+          mid = (l + r) / 2;
+          lcp.len = l;
+          wormhole_kref_inc(&lcp, l, running_hash, mid - l);
+          const struct wormmeta *dude = wormhmap_get_kref(hmap, &lcp);
+          assert(dude != NULL);
+          if (wormmeta_lpath_load(dude) != original_lmost_leaf) {
+              running_hash = lcp.hash32;
+              l = lcp.len;
+          }
+          else 
+              r = lcp.len;
+      }
+      lcp.len = l;
+      lcp.hash32 = running_hash;
+      const u32 smaller_byte = wormmeta_bm_lt(wormhmap_get_kref(hmap, &lcp), lcp.ptr[lcp.len]);
+      struct wormmeta *final_dude = smaller_byte < WH_FO ? wormhmap_get_kref1(hmap, &lcp, smaller_byte) : NULL;
+      return final_dude ? wormmeta_rmost_load(final_dude) : original_lmost_leaf;
+  }
+}
+
+  static struct wormleaf *
 wormhole_jump_leaf_read(struct wormref * const ref, const struct kref * const key)
 {
   struct wormhole * const map = ref->map;
@@ -1616,6 +1729,33 @@ wormleaf_seek(const struct wormleaf * const leaf, const struct kref * const key)
   }
 }
 
+  static u32
+wormleaf_seek_pred(const struct wormleaf * const leaf, const struct kref * const key)
+{
+  debug_assert(leaf->nr_sorted == leaf->nr_keys);
+  const u32 ih = wormleaf_match_hs(leaf, key);
+  if (ih < WH_KPN) { // hit
+    return wormleaf_search_is(leaf, (u8)ih);
+  } else { // miss, binary search for gt
+    u32 res = wormleaf_search_ss(leaf, key);
+    return res > 0 ? res - 1 : 0;
+  }
+}
+
+  static u32
+wormleaf_seek_pred_strict(const struct wormleaf * const leaf, const struct kref * const key)
+{
+  debug_assert(leaf->nr_sorted == leaf->nr_keys);
+  const u32 ih = wormleaf_match_hs(leaf, key);
+  if (ih < WH_KPN) { // hit
+    u32 res = wormleaf_search_is(leaf, (u8)ih);
+    return res > 0 ? res - 1 : 0;
+  } else { // miss, binary search for gt
+    u32 res = wormleaf_search_ss(leaf, key);
+    return res > 0 ? res - 1 : 0;
+  }
+}
+
 // same to search_sorted but the target is very likely beyond the end
   static u32
 wormleaf_seek_end(const struct wormleaf * const leaf, const struct kref * const key)
@@ -1730,6 +1870,217 @@ wormleaf_sync_sorted(struct wormleaf * const leaf)
   // merge-sort inplace
   wormleaf_sort_m2(leaf, s, n - s);
   leaf->nr_sorted = n;
+}
+
+  static struct wormleaf *
+wormhole_jump_leaf_pred_read(struct wormref * const ref, const struct kref * const key)
+{
+  struct wormhole * const map = ref->map;
+  const struct kref *kref_in_use = key;
+  struct kref retry_kref;
+  u8 retry_key_buf[200];
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf * const leaf = wormhole_jump_leaf_pred(hmap, kref_in_use);
+#pragma nounroll
+    do {
+      if (rwlock_trylock_read_nr(&(leaf->leaflock), 64)) {
+        if (wormleaf_version_load(leaf) > v) {
+          wormleaf_unlock_read(leaf);
+          break;
+        }
+        spinlock_lock(&(leaf->sortlock));
+        wormleaf_sync_sorted(leaf);
+        spinlock_unlock(&(leaf->sortlock));
+        const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+        int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
+        if (cmp == 0)
+            cmp = (int) key->len - (int) other->klen;
+        if (cmp < 0) {
+            memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+            if (retry_key_buf[leaf->anchor->klen - 1])  {
+                retry_key_buf[leaf->anchor->klen - 1]--;
+                retry_kref.len = leaf->anchor->klen;
+            }
+            else
+                retry_kref.len = leaf->anchor->klen - 1;
+            wormleaf_unlock_read(leaf);
+            kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+            kref_in_use = &retry_kref;
+            break;
+        }
+        return leaf;
+      }
+      // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
+      const u64 v1 = wormhmap_version_load(wormhmap_load(map));
+      if (wormleaf_version_load(leaf) > v)
+        break;
+
+      wormhole_qsbr_update_pause(ref, v1);
+    } while (true);
+  } while (true);
+}
+
+  static struct wormleaf *
+wormhole_jump_leaf_pred_write(struct wormref * const ref, const struct kref * const key)
+{
+  struct wormhole * const map = ref->map;
+  const struct kref *kref_in_use = key;
+  struct kref retry_kref;
+  u8 retry_key_buf[200];
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf * const leaf = wormhole_jump_leaf_pred(hmap, kref_in_use);
+#pragma nounroll
+    do {
+      if (rwlock_trylock_write_nr(&(leaf->leaflock), 64)) {
+        if (wormleaf_version_load(leaf) > v) {
+          wormleaf_unlock_write(leaf);
+          break;
+        }
+        spinlock_lock(&(leaf->sortlock));
+        wormleaf_sync_sorted(leaf);
+        spinlock_unlock(&(leaf->sortlock));
+        const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+        int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
+        if (cmp == 0)
+            cmp = (int) key->len - (int) other->klen;
+        if (cmp < 0) {
+            memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+            if (retry_key_buf[leaf->anchor->klen - 1])  {
+                retry_key_buf[leaf->anchor->klen - 1]--;
+                retry_kref.len = leaf->anchor->klen;
+            }
+            else
+                retry_kref.len = leaf->anchor->klen - 1;
+            wormleaf_unlock_write(leaf);
+            kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+            kref_in_use = &retry_kref;
+            break;
+        }
+        return leaf;
+      }
+      // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
+      const u64 v1 = wormhmap_version_load(wormhmap_load(map));
+      if (wormleaf_version_load(leaf) > v)
+        break;
+
+      wormhole_qsbr_update_pause(ref, v1);
+    } while (true);
+  } while (true);
+}
+
+  static struct wormleaf *
+wormhole_jump_leaf_pred_read_strict(struct wormref * const ref, const struct kref * const key)
+{
+  struct wormhole * const map = ref->map;
+  const struct kref *kref_in_use = key;
+  struct kref retry_kref;
+  u8 retry_key_buf[200];
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf * const leaf = wormhole_jump_leaf_pred_strict(hmap, kref_in_use);
+#pragma nounroll
+    do {
+      if (rwlock_trylock_read_nr(&(leaf->leaflock), 64)) {
+        if (wormleaf_version_load(leaf) <= v) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+          const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+          int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
+          if (cmp == 0)
+              cmp = (int) key->len - (int) other->klen;
+          if (cmp <= 0) {
+              memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+              if (retry_key_buf[leaf->anchor->klen - 1])  {
+                  retry_key_buf[leaf->anchor->klen - 1]--;
+                  retry_kref.len = leaf->anchor->klen;
+              }
+              else
+                  retry_kref.len = leaf->anchor->klen - 1;
+              kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+              kref_in_use = &retry_kref;
+              wormleaf_unlock_read(leaf);
+              break;
+          }
+
+          return leaf;
+        }
+        wormleaf_unlock_read(leaf);
+        break;
+      }
+      // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
+      const u64 v1 = wormhmap_version_load(wormhmap_load(map));
+      if (wormleaf_version_load(leaf) > v)
+        break;
+
+      wormhole_qsbr_update_pause(ref, v1);
+    } while (true);
+  } while (true);
+}
+
+  static struct wormleaf *
+wormhole_jump_leaf_pred_write_strict(struct wormref * const ref, const struct kref * const key)
+{
+  struct wormhole * const map = ref->map;
+  const struct kref *kref_in_use = key;
+  struct kref retry_kref;
+  u8 retry_key_buf[200];
+#pragma nounroll
+  do {
+    const struct wormhmap * const hmap = wormhmap_load(map);
+    const u64 v = wormhmap_version_load(hmap);
+    qsbr_update(&ref->qref, v);
+    struct wormleaf * const leaf = wormhole_jump_leaf_pred_strict(hmap, kref_in_use);
+#pragma nounroll
+    do {
+      if (rwlock_trylock_write_nr(&(leaf->leaflock), 64)) {
+        if (wormleaf_version_load(leaf) <= v) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+          const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+          const u32 len = key->len < other->klen ? key->len : other->klen;
+          int cmp = memcmp(key->ptr, other->kv, (size_t) len);
+          if (cmp == 0)
+              cmp = (int) key->len - (int) other->klen;
+          if (cmp <= 0) {
+              memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+              if (retry_key_buf[leaf->anchor->klen - 1])  {
+                  retry_key_buf[leaf->anchor->klen - 1]--;
+                  retry_kref.len = leaf->anchor->klen;
+              }
+              else
+                  retry_kref.len = leaf->anchor->klen - 1;
+              kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+              kref_in_use = &retry_kref;
+              wormleaf_unlock_write(leaf);
+              break;
+          }
+
+          return leaf;
+        }
+        wormleaf_unlock_write(leaf);
+        break;
+      }
+      // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
+      const u64 v1 = wormhmap_version_load(wormhmap_load(map));
+      if (wormleaf_version_load(leaf) > v)
+        break;
+
+      wormhole_qsbr_update_pause(ref, v1);
+    } while (true);
+  } while (true);
 }
 
 // shift a sequence of entries on hs and update the corresponding ss values
@@ -3231,11 +3582,66 @@ wormhole_iter_seek(struct wormhole_iter * const iter, const struct kref * const 
 }
 
   void
+wormhole_iter_seek_pred(struct wormhole_iter * const iter, const struct kref * const key, const bool write)
+{
+  debug_assert(key);
+  if (iter->leaf) {
+    if (write)
+        wormleaf_unlock_write(iter->leaf);
+    else
+        wormleaf_unlock_read(iter->leaf);
+  }
+
+  struct wormleaf * const leaf = write ? wormhole_jump_leaf_pred_write(iter->ref, key) 
+                                       : wormhole_jump_leaf_pred_read(iter->ref, key);
+  wormhole_iter_leaf_sync_sorted(leaf);
+
+  iter->leaf = leaf;
+  iter->is = wormleaf_seek_pred(leaf, key);
+  //wormhole_iter_fix(iter, write, true);
+}
+
+  void
+wormhole_iter_seek_pred_strict(struct wormhole_iter * const iter, const struct kref * const key, const bool write)
+{
+  debug_assert(key);
+  if (iter->leaf) {
+    if (write)
+        wormleaf_unlock_write(iter->leaf);
+    else
+        wormleaf_unlock_read(iter->leaf);
+  }
+
+  struct wormleaf * const leaf = write ? wormhole_jump_leaf_pred_write_strict(iter->ref, key) 
+                                       : wormhole_jump_leaf_pred_read_strict(iter->ref, key);
+  wormhole_iter_leaf_sync_sorted(leaf);
+
+  iter->leaf = leaf;
+  iter->is = wormleaf_seek_pred_strict(leaf, key);
+  //wormhole_iter_fix(iter, write, true);
+}
+
+  void
 whsafe_iter_seek(struct wormhole_iter * const iter, const struct kref * const key, bool write)
 {
   wormhole_resume(iter->ref);
   wormhole_iter_seek(iter, key, write);
 }
+
+  void
+whsafe_iter_seek_pred(struct wormhole_iter * const iter, const struct kref * const key, bool write)
+{
+  wormhole_resume(iter->ref);
+  wormhole_iter_seek_pred(iter, key, write);
+}
+
+  void
+whsafe_iter_seek_pred_strict(struct wormhole_iter * const iter, const struct kref * const key, bool write)
+{
+  wormhole_resume(iter->ref);
+  wormhole_iter_seek_pred_strict(iter, key, write);
+}
+
 
   bool
 wormhole_iter_valid(struct wormhole_iter * const iter)
@@ -3616,6 +4022,8 @@ const struct kvmap_api kvmap_api_wormhole = {
   .delr = (void *)wormhole_delr,
   .iter_create = (void *)wormhole_iter_create,
   .iter_seek = (void *)wormhole_iter_seek,
+  .iter_seek_pred = (void *)wormhole_iter_seek_pred,
+  .iter_seek_pred_strict = (void *)wormhole_iter_seek_pred_strict,
   .iter_valid = (void *)wormhole_iter_valid,
   .iter_peek = (void *)wormhole_iter_peek,
   .iter_kref = (void *)wormhole_iter_kref,
@@ -3651,6 +4059,8 @@ const struct kvmap_api kvmap_api_whsafe = {
   .delr = (void *)whsafe_delr,
   .iter_create = (void *)wormhole_iter_create,
   .iter_seek = (void *)whsafe_iter_seek,
+  .iter_seek_pred = (void *)whsafe_iter_seek_pred,
+  .iter_seek_pred_strict = (void *)whsafe_iter_seek_pred_strict,
   .iter_valid = (void *)wormhole_iter_valid,
   .iter_peek = (void *)wormhole_iter_peek,
   .iter_kref = (void *)wormhole_iter_kref,
@@ -3895,6 +4305,23 @@ wh_iter_seek(struct wormhole_iter * const iter, const void * const kbuf, const u
   kref_ref_hash32(&kref, kbuf, klen);
   wh_api->iter_seek(iter, &kref, write);
 }
+
+  void
+wh_iter_seek_pred(struct wormhole_iter * const iter, const void * const kbuf, const u32 klen, bool write)
+{
+  struct kref kref;
+  kref_ref_hash32(&kref, kbuf, klen);
+  wh_api->iter_seek_pred(iter, &kref, write);
+}
+
+  void
+wh_iter_seek_pred_strict(struct wormhole_iter * const iter, const void * const kbuf, const u32 klen, bool write)
+{
+  struct kref kref;
+  kref_ref_hash32(&kref, kbuf, klen);
+  wh_api->iter_seek_pred_strict(iter, &kref, write);
+}
+
 
   bool
 wh_iter_valid(struct wormhole_iter * const iter)

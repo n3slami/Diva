@@ -3,9 +3,9 @@
  *
  * All rights reserved. No warranty, explicit or implicit, provided.
  */
-#define _GNU_SOURCE
 
 // headers {{{
+#define _GNU_SOURCE
 #include "lib.h"
 #include "ctypes.h"
 #include <assert.h>

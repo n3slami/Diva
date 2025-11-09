@@ -4178,6 +4178,85 @@ public:
                 REQUIRE(!it.IsValid());
             }
         }
+
+        SUBCASE("concurrency with payloads") {
+            const uint32_t infix_size = 10;
+            const uint32_t seed = 2;
+            const float load_factor = 0.95;
+            const uint32_t n_keys = 30000000;
+            const uint32_t n_threads = 8;
+            const uint32_t n_bulk = n_keys / n_threads;
+
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+
+            std::vector<std::string_view> string_keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                size_t str_length;
+                if constexpr (O)
+                    str_length = 8;
+                else
+                    str_length = 40 + rng() % 3;
+                char *str = new char[48];
+                for (uint32_t i = 0; i < str_length; i++)
+                    str[i] = std::max(1UL, rng());
+                string_keys.emplace_back(reinterpret_cast<const char *>(str), str_length);
+            }
+            std::shuffle(string_keys.begin(), string_keys.end(), rng);
+            std::sort(string_keys.begin(), string_keys.begin() + n_bulk);
+            uint64_t *payloads_contents = new uint64_t[n_keys * (payload_size / 64 + 2)];
+            uint64_t **payloads = new uint64_t *[n_keys];
+            for (uint32_t i = 0; i < n_keys; i++) {
+                for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
+                    payloads_contents[i * (payload_size / 64 + 2) + j] = rng();
+                payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
+            }
+
+            Diva<O, PayloadType::FixedLength> s(infix_size,
+                                                string_keys.begin(),
+                                                string_keys.begin() + n_bulk,
+                                                seed,
+                                                load_factor,
+                                                payload_size,
+                                                (const uint64_t **) payloads);
+
+            std::vector<std::thread> threads;
+            std::vector<std::atomic<bool>> deleted(string_keys.size());
+            for (uint32_t i = 0; i < string_keys.size(); i++)
+                deleted[i].store(false, std::memory_order_release);
+            for (uint32_t i = 0; i < n_threads; i++) {
+                threads.emplace_back([&, i] {
+                            std::mt19937_64 rng(rng_seed + i + 1);
+                            uint32_t ti = n_bulk + i;
+                            while (ti < n_keys) {
+                                const bool insert = (rng() % 2) > 0;
+                                if (insert) {
+                                    auto it = s.GetIterator(string_keys[ti]);
+                                    s.Insert(string_keys[ti], payloads[ti], rng());
+                                    REQUIRE(s.PointQuery(string_keys[ti]));
+                                    ti += n_threads;
+                                }
+                                else {
+                                    const uint32_t offset = rng() % ((ti - n_threads) / n_threads) + 1;
+                                    const uint32_t pos = ti - offset * n_threads;
+                                    assert(pos < ti && (ti - pos) % n_threads == 0);
+                                    if (!deleted[pos].load(std::memory_order_acquire)) {
+                                        auto it = s.GetIterator(string_keys[pos]);
+                                        s.Delete(string_keys[pos],
+                                                [&](const void *ptr) {
+                                                    return compare_bitmap_to_bitmap(reinterpret_cast<const uint64_t *>(ptr), 0,
+                                                                                    payloads[pos], 0,
+                                                                                    payload_size);
+                                                });
+                                        deleted[pos].store(true, std::memory_order_release);
+                                    }
+                                }
+                            }
+                        });
+            }
+            for (auto& t : threads)
+                t.join();
+        }
     }
 
 

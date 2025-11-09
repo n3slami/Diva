@@ -83,6 +83,12 @@ wormhole_iter_create(struct wormref * const ref);
   extern void
 wormhole_iter_seek(struct wormhole_iter * const iter, const struct kref * const key, bool write);
 
+  extern void
+wormhole_iter_seek_pred(struct wormhole_iter * const iter, const struct kref * const key, bool write);
+
+  extern void
+wormhole_iter_seek_pred_strict(struct wormhole_iter * const iter, const struct kref * const key, bool write);
+
   extern bool
 wormhole_iter_valid(struct wormhole_iter * const iter);
 
@@ -317,6 +323,12 @@ wh_iter_create(struct wormref * const ref);
 
   extern void
 wh_iter_seek(struct wormhole_iter * const iter, const void * const kbuf, const u32 klen, bool write);
+
+  extern void
+wh_iter_seek_pred(struct wormhole_iter * const iter, const void * const kbuf, const u32 klen, bool write);
+
+  extern void
+wh_iter_seek_pred_strict(struct wormhole_iter * const iter, const void * const kbuf, const u32 klen, bool write);
 
   extern bool
 wh_iter_valid(struct wormhole_iter * const iter);

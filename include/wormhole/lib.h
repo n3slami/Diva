@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include<stdlib.h>
+
 // includes {{{
 // C headers
 #include <errno.h>

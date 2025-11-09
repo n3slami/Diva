@@ -204,7 +204,7 @@ inline auto to_big_endian_order(uint16_t const &key) {
 };
 
 
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     const int32_t l_src_bit_pos = l;
     int32_t r_src_bit_pos = r;
@@ -235,7 +235,7 @@ inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r
 }
 
 
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     int32_t l_src_bit_pos = l;
     const int32_t r_src_bit_pos = r;
@@ -267,7 +267,7 @@ inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r,
 
 
 // Assumes word-aligned buffers
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
                                         uint64_t *out, uint32_t pos_out,
                                   const uint32_t num_bits_to_copy) {
@@ -287,7 +287,7 @@ inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
 
 
 // Assumes word-aligned buffers
-__attribute__((always_inline))
+//__attribute__((always_inline))
 inline bool compare_bitmap_to_bitmap(const uint64_t *a, uint32_t pos_a,
                                      const uint64_t *b, uint32_t pos_b,
                                      const uint32_t num_bits_to_compare) {
@@ -308,7 +308,7 @@ inline bool compare_bitmap_to_bitmap(const uint64_t *a, uint32_t pos_a,
 
 
 // Synchronization and Locking Primitives
-typedef uint32_t lock_t;
+typedef uint8_t lock_t;         // Should change the dang wormhole to allow for longer locks
 static constexpr lock_t rwlock_no_access = 0;
 static constexpr lock_t rwlock_write_bit = 1ULL << (8 * sizeof(lock_t) - 1);
 

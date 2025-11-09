@@ -3,15 +3,15 @@
  *
  * All rights reserved. No warranty, explicit or implicit, provided.
  */
-#define _GNU_SOURCE
 
 #define BITMASK(nbits)                                    \
   ((nbits) == 64 ? 0xffffffffffffffff : ((1ull << nbits) - 1))
 
 // headers {{{
+#define _GNU_SOURCE
+#include "lib.h"
 #include <assert.h> // static_assert
 #include "kv.h"
-#include "lib.h"
 #include "ctypes.h"
 #include "wh_int.h"
 #include <x86intrin.h>
@@ -55,7 +55,7 @@ struct wormkv64 { u64 key; void * ptr; }; // u64 keys (whu64)
 
 struct store_sim_hack {
   u32 status;
-  au32 lock;
+  au8 lock;
   u64 ptr;
 };
 

@@ -4,7 +4,6 @@
  * All rights reserved. No warranty, explicit or implicit, provided.
  */
 #include <x86intrin.h>
-#define _GNU_SOURCE
 
 // headers {{{
 #include <assert.h> // static_assert

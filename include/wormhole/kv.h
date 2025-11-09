@@ -378,6 +378,10 @@ struct kvmap_api {
   void *      (* iter_create)   (void * const ref);
   // move the cursor to the first key >= search-key;
   void        (* iter_seek)     (void * const iter, const struct kref * const key, bool write);
+  // move the cursor to the first key <= search-key;
+  void        (* iter_seek_pred)     (void * const iter, const struct kref * const key, bool write);
+  // move the cursor to the first key < search-key;
+  void        (* iter_seek_pred_strict)     (void * const iter, const struct kref * const key, bool write);
   // check if the cursor points to a valid key
   bool        (* iter_valid)    (void * const iter);
   // return the current key; copy to out if (out != NULL)
