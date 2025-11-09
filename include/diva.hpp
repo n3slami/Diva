@@ -289,6 +289,7 @@ private:
         bool operator!=(const Iterator& rhs) const;
 
         void GetPayload(uint64_t *out) const;
+        void SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove);
         bool IsValid() const;
 
     private:
@@ -299,13 +300,18 @@ private:
         std::vector<uint8_t> keys_contents_;
         std::vector<uint64_t> bit_counts_, payloads_;
         uint32_t ind_ = 0;
+        std::function<bool(const uint64_t *)> should_remove_;
 
-        Iterator(Diva<int_optimized, payload_type> *parent, std::string_view start);
-        Iterator(Diva<int_optimized, payload_type> *parent, const uint8_t *start, uint32_t start_len);
-        Iterator(Diva<int_optimized, payload_type> *parent, uint64_t start);
+        Iterator(Diva<int_optimized, payload_type> *parent, std::string_view start,
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
+        Iterator(Diva<int_optimized, payload_type> *parent, const uint8_t *start, uint32_t start_len,
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
+        Iterator(Diva<int_optimized, payload_type> *parent, uint64_t start,
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
         ~Iterator();
 
         void Fetch();
+        void FetchDelete();
 
         void AddKeyToResults(const uint8_t *str, const uint32_t len) {
             const uint32_t old_keys_contents_size = keys_contents_.size();
@@ -432,9 +438,10 @@ private:
     uint32_t DeserializeInfixStore(const char *deser_buf, InfixStore& store) const;
 
 public:
-    Iterator GetIterator(std::string_view start);
-    Iterator GetIterator(const uint8_t *start, const uint32_t start_len);
-    Iterator GetIterator(uint64_t start);
+    Iterator GetIterator(std::string_view start, std::function<bool(const uint64_t *)> should_remove=nullptr);
+    Iterator GetIterator(const uint8_t *start, const uint32_t start_len,
+                         std::function<bool(const uint64_t *)> should_remove=nullptr);
+    Iterator GetIterator(uint64_t start, std::function<bool(const uint64_t *)> should_remove=nullptr);
 };
 
 
@@ -3980,28 +3987,52 @@ inline uint32_t Diva<int_optimized, payload_type>::GetInfixList(const InfixStore
 
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *parent,
-                                                             std::string_view start):
-        filter_(parent) {
+                                                             std::string_view start,
+                                                             std::function<bool(const uint64_t *)> should_remove):
+        filter_(parent),
+        should_remove_(should_remove) {
     SetNextToFetch(reinterpret_cast<const uint8_t *>(start.data()), start.size());
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        if (should_remove_) {
+            FetchDelete();
+            return;
+        }
+    }
     Fetch();
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *parent,
-                                                             const uint8_t *start, uint32_t start_len):
-        filter_(parent) {
+                                                             const uint8_t *start, uint32_t start_len,
+                                                             std::function<bool(const uint64_t *)> should_remove):
+        filter_(parent),
+        should_remove_(should_remove) {
     SetNextToFetch(start, start_len);
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        if (should_remove_) {
+            FetchDelete();
+            return;
+        }
+    }
     Fetch();
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *filter,
-                                                             uint64_t start):
-        filter_(filter) {
+                                                             uint64_t start,
+                                                             std::function<bool(const uint64_t *)> should_remove):
+        filter_(filter),
+        should_remove_(should_remove) {
     start = to_big_endian_order(start);
     SetNextToFetch(reinterpret_cast<const uint8_t *>(&start), sizeof(start));
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        if (should_remove_) {
+            FetchDelete();
+            return;
+        }
+    }
     Fetch();
 }
 
@@ -4019,16 +4050,18 @@ inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized,
     bit_counts_ = other.bit_counts_;
     payloads_ = other.payloads_;
     ind_ = other.ind_;
+    should_remove_ = other.should_remove_;
     return *this;
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Iterator::Iterator(const Iterator& other):
-        filter_{other.filter_},
-        bit_counts_{other.bit_counts_},
-        payloads_{other.payloads_},
-        ind_{other.ind_} {
+        filter_(other.filter_),
+        bit_counts_(other.bit_counts_),
+        payloads_(other.payloads_),
+        ind_(other.ind_),
+        should_remove_(other.should_remove_) {
     SetNextToFetch(other.next_to_fetch_.str, other.next_to_fetch_.length);
     keys_ = other.keys_;
     keys_contents_.reserve(1ULL << 12);
@@ -4038,6 +4071,12 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(const Iterator& oth
 
 template <bool int_optimized, PayloadType payload_type>
 inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized, payload_type>::Iterator::operator++() {
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        if (should_remove_) {
+            FetchDelete();
+            return *this;
+        }
+    }
     ind_++;
     if (ind_ >= keys_.size() && next_to_fetch_.str != nullptr)
         Fetch();
@@ -4103,6 +4142,10 @@ inline void Diva<int_optimized, payload_type>::Iterator::GetPayload(uint64_t *ou
     copy_bitmap_to_bitmap(payloads_.data(), filter_->payload_size_ * ind_, out, 0, filter_->payload_size_);
 }
 
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Iterator::SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove) {
+    should_remove_ = should_remove;
+}
 
 template <bool int_optimized, PayloadType payload_type>
 inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
@@ -4216,151 +4259,290 @@ IteratorRefetchLowerUpperBounds:
     uint64_t next_to_fetch_implicit = implicit_part;
     uint64_t next_to_fetch_explicit = std::max(explicit_part + 1,
                                                filter_->GetSlot(infix_store, pos) & (filter_->GetSlot(infix_store, pos) - 1));
-    if (pos <= runend_pos) {
-        const uint64_t recovered_implicit = prev_implicit + implicit_part;
-        while (true) {
-            const uint64_t slot_value = filter_->GetSlot(infix_store, pos);
+    const uint64_t recovered_implicit = prev_implicit + implicit_part;
+    while (true) {
+        const uint64_t slot_value = filter_->GetSlot(infix_store, pos);
 #ifdef DEBUG
-            assert(slot_value);
+        assert(slot_value);
 #endif // DEBUG
-            if (explicit_part > (slot_value | (slot_value - 1))) {
-                if (get_bitmap_bit(runends, pos)) {
-                    next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
-                    next_to_fetch_explicit = 0;
-                    break;
-                }
-                pos++;
-                continue;
-            }
-            const uint64_t slot_value_without_age_counter = slot_value & (slot_value - 1);
-            if (keys_.size() > 0 && next_to_fetch_explicit < slot_value_without_age_counter) {
-                next_to_fetch_explicit = slot_value_without_age_counter;
-                break;
-            }
-
-            const uint32_t explicit_part_length = filter_->infix_size_ - lowbit_pos(slot_value) - 1;
-#ifdef DEBUG
-            assert(explicit_part_length <= filter_->infix_size_);
-#endif // DEBUG
-            const uint32_t key_length_bits = shared + ignore + implicit_size + explicit_part_length;
-            const uint32_t key_length = (key_length_bits + 7) / 8;
-
-            uint8_t key[key_length];
-            memset(key, 0, key_length);
-            memcpy(key, prev_key.str, (shared + 7) / 8);
-            key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
-            if (recovered_implicit >> (implicit_size - 1))
-                key[shared / 8] |= 1ULL << (7 - shared % 8);
-            else if (ignore > 0) {
-                uint32_t bit_pos = shared + 1;
-                uint32_t pos_rem = 8 - bit_pos % 8;
-                if (pos_rem < ignore) {
-                    key[bit_pos / 8] |= BITMASK(pos_rem);
-                    uint32_t tmp_ignore = ignore - pos_rem;
-                    bit_pos += pos_rem;
-                    if (tmp_ignore >= 8) {
-                        memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
-                        bit_pos += tmp_ignore - tmp_ignore % 8;
-                        tmp_ignore %= 8;
-                    }
-                    key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
-                }
-                else
-                    key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
-            }
-            uint32_t bit_pos = shared + ignore + 1;
-            uint64_t infix = (recovered_implicit << filter_->infix_size_) 
-                | (slot_value & (BITMASK(explicit_part_length) << (filter_->infix_size_ - explicit_part_length)));
-            infix <<= 65 - (implicit_size + filter_->infix_size_);
-            infix = __builtin_bswap64(infix >> (bit_pos % 8));
-            const uint32_t loop_end_i = (bit_pos % 8 + implicit_size + explicit_part_length - 1 + 7) / 8;
-            for (uint32_t i = 0; i < loop_end_i; i++) {
-                key[bit_pos / 8] |= infix & 0xFF;
-                infix >>= 8;
-                bit_pos += 8 - bit_pos % 8;
-            }
-
-            AddKeyToResults(key, key_length);
-            bit_counts_.push_back(key_length_bits);
-            if constexpr (payload_type == PayloadType::FixedLength) {
-                payloads_.resize((filter_->payload_size_ * keys_.size() + 63) / 64 + 1);
-                filter_->GetPayload(infix_store, pos, payloads_.data(), filter_->payload_size_ * (keys_.size() - 1));
-            }
+        if (explicit_part > (slot_value | (slot_value - 1))) {
             if (get_bitmap_bit(runends, pos)) {
                 next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
                 next_to_fetch_explicit = 0;
                 break;
             }
             pos++;
+            continue;
+        }
+        const uint64_t slot_value_without_age_counter = slot_value & (slot_value - 1);
+        if (keys_.size() > 0 && next_to_fetch_explicit < slot_value_without_age_counter) {
+            next_to_fetch_explicit = slot_value_without_age_counter;
+            break;
         }
 
-        // Update `next_to_fetch_`
-        if (next_to_fetch_implicit < total_implicit) {
-            const uint32_t extraction_size = implicit_size + filter_->infix_size_;
-            const uint64_t recovered_extraction = ((prev_implicit + next_to_fetch_implicit) << filter_->infix_size_)
-                                                    | next_to_fetch_explicit;
-            const uint32_t key_length_bits = shared + ignore + extraction_size;
-            const uint32_t key_length = (key_length_bits + 7) / 8;
+        const uint32_t explicit_part_length = filter_->infix_size_ - lowbit_pos(slot_value) - 1;
+#ifdef DEBUG
+        assert(explicit_part_length <= filter_->infix_size_);
+#endif // DEBUG
+        const uint32_t key_length_bits = shared + ignore + implicit_size + explicit_part_length;
+        const uint32_t key_length = (key_length_bits + 7) / 8;
 
-            uint8_t key[key_length];
-            memset(key, 0, key_length);
-            memcpy(key, prev_key.str, (shared + 7) / 8);
-            key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
-            if (recovered_extraction >> (extraction_size - 1))
-                key[shared / 8] |= 1ULL << (7 - shared % 8);
-            else if (ignore > 0) {
-                uint32_t bit_pos = shared + 1;
-                uint32_t pos_rem = 8 - bit_pos % 8;
-                if (pos_rem < ignore) {
-                    key[bit_pos / 8] |= BITMASK(pos_rem);
-                    uint32_t tmp_ignore = ignore - pos_rem;
-                    bit_pos += pos_rem;
-                    if (tmp_ignore >= 8) {
-                        memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
-                        bit_pos += tmp_ignore - tmp_ignore % 8;
-                        tmp_ignore %= 8;
-                    }
-                    key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
+        uint8_t key[key_length];
+        memset(key, 0, key_length);
+        memcpy(key, prev_key.str, (shared + 7) / 8);
+        key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
+        if (recovered_implicit >> (implicit_size - 1))
+            key[shared / 8] |= 1ULL << (7 - shared % 8);
+        else if (ignore > 0) {
+            uint32_t bit_pos = shared + 1;
+            uint32_t pos_rem = 8 - bit_pos % 8;
+            if (pos_rem < ignore) {
+                key[bit_pos / 8] |= BITMASK(pos_rem);
+                uint32_t tmp_ignore = ignore - pos_rem;
+                bit_pos += pos_rem;
+                if (tmp_ignore >= 8) {
+                    memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
+                    bit_pos += tmp_ignore - tmp_ignore % 8;
+                    tmp_ignore %= 8;
                 }
-                else
-                    key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
+                key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
             }
-            uint32_t bit_pos = shared + ignore + 1;
-            uint64_t infix = recovered_extraction << (65 - extraction_size);
-            infix = __builtin_bswap64(infix >> (bit_pos % 8));
-            const uint32_t loop_end_i = (bit_pos % 8 + extraction_size - 1 + 7) / 8;
-            for (uint32_t i = 0; i < loop_end_i; i++) {
-                key[bit_pos / 8] |= infix & 0xFF;
-                infix >>= 8;
-                bit_pos += 8 - bit_pos % 8;
-            }
-            SetNextToFetch(key, key_length);
+            else
+                key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
         }
-        else
-            SetNextToFetch(next_key.str, next_key.length);
+        uint32_t bit_pos = shared + ignore + 1;
+        uint64_t infix = (recovered_implicit << filter_->infix_size_) 
+            | (slot_value & (BITMASK(explicit_part_length) << (filter_->infix_size_ - explicit_part_length)));
+        infix <<= 65 - (implicit_size + filter_->infix_size_);
+        infix = __builtin_bswap64(infix >> (bit_pos % 8));
+        const uint32_t loop_end_i = (bit_pos % 8 + implicit_size + explicit_part_length - 1 + 7) / 8;
+        for (uint32_t i = 0; i < loop_end_i; i++) {
+            key[bit_pos / 8] |= infix & 0xFF;
+            infix >>= 8;
+            bit_pos += 8 - bit_pos % 8;
+        }
+
+        AddKeyToResults(key, key_length);
+        bit_counts_.push_back(key_length_bits);
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            payloads_.resize((filter_->payload_size_ * keys_.size() + 63) / 64 + 1);
+            filter_->GetPayload(infix_store, pos, payloads_.data(), filter_->payload_size_ * (keys_.size() - 1));
+        }
+        if (get_bitmap_bit(runends, pos)) {
+            next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
+            next_to_fetch_explicit = 0;
+            break;
+        }
+        pos++;
     }
 
-    rwlock_unlock_read(infix_store.rwlock);
+    rwlock_unlock_read(infix_store.rwlock);     // Done with `infix_store`
+
+    // Update `next_to_fetch_`
+    if (next_to_fetch_implicit < total_implicit) {
+        const uint32_t extraction_size = implicit_size + filter_->infix_size_;
+        const uint64_t recovered_extraction = ((prev_implicit + next_to_fetch_implicit) << filter_->infix_size_)
+                                                | next_to_fetch_explicit;
+        const uint32_t key_length_bits = shared + ignore + extraction_size;
+        const uint32_t key_length = (key_length_bits + 7) / 8;
+
+        uint8_t key[key_length];
+        memset(key, 0, key_length);
+        memcpy(key, prev_key.str, (shared + 7) / 8);
+        key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
+        if (recovered_extraction >> (extraction_size - 1))
+            key[shared / 8] |= 1ULL << (7 - shared % 8);
+        else if (ignore > 0) {
+            uint32_t bit_pos = shared + 1;
+            uint32_t pos_rem = 8 - bit_pos % 8;
+            if (pos_rem < ignore) {
+                key[bit_pos / 8] |= BITMASK(pos_rem);
+                uint32_t tmp_ignore = ignore - pos_rem;
+                bit_pos += pos_rem;
+                if (tmp_ignore >= 8) {
+                    memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
+                    bit_pos += tmp_ignore - tmp_ignore % 8;
+                    tmp_ignore %= 8;
+                }
+                key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
+            }
+            else
+                key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
+        }
+        uint32_t bit_pos = shared + ignore + 1;
+        uint64_t infix = recovered_extraction << (65 - extraction_size);
+        infix = __builtin_bswap64(infix >> (bit_pos % 8));
+        const uint32_t loop_end_i = (bit_pos % 8 + extraction_size - 1 + 7) / 8;
+        for (uint32_t i = 0; i < loop_end_i; i++) {
+            key[bit_pos / 8] |= infix & 0xFF;
+            infix >>= 8;
+            bit_pos += 8 - bit_pos % 8;
+        }
+        SetNextToFetch(key, key_length);
+    }
+    else
+        SetNextToFetch(next_key.str, next_key.length);
+
     if (keys_.size() == 0)
         goto IteratorRefetchLowerUpperBounds;
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(std::string_view start) {
-    return Iterator(this, start);
+inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
+    ind_ = 0;
+    keys_.clear();
+    keys_contents_.clear();
+    bit_counts_.clear();
+    payloads_.clear();
+
+    const bool it_write_lock = true;
+    
+    InfixStore *infix_store_ptr;
+    void *leaves_to_unlock[3] = {};
+
+    InfiniteByteString next_key {};
+    InfiniteByteString prev_key {};
+
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    filter_->GetLowerUpperBounds(next_to_fetch_, it_write_lock, leaves_to_unlock, it, it_int,
+                                 prev_key, next_key, infix_store_ptr);
+    if (next_key.str == nullptr) {
+        filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
+        next_to_fetch_ = {nullptr, 0};
+        return;
+    }
+
+    uint64_t prev_key_word, next_key_word;
+    if constexpr (int_optimized) {
+        prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
+        prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
+        next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
+        next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+    }
+
+    InfixStore& infix_store = *infix_store_ptr;
+    if (next_to_fetch_ <= prev_key || (infix_store.IsPartialKey() && prev_key.IsPrefixOf(next_to_fetch_, infix_store.GetInvalidBits()))) {
+        // Previous key was a partial key and a prefix of the query key
+        uint64_t payload[(filter_->payload_size_ + 63) / 64 + 1];
+        filter_->GetPayload(*infix_store_ptr, -1, payload);
+        if (should_remove_(payload)) {
+            filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
+            filter_->DeleteMerge(prev_key);
+            return;
+        }
+    }
+    rwlock_lock_write(infix_store.rwlock);
+    filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
+
+    auto [shared, ignore, implicit_size] = filter_->GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    const uint64_t extraction = filter_->ExtractPartialKey(next_to_fetch_, shared, ignore, implicit_size, next_to_fetch_.GetBit(shared));
+    const uint64_t prev_implicit = filter_->ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> filter_->infix_size_;
+    const uint64_t next_implicit = filter_->ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> filter_->infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    uint64_t implicit_part = (extraction >> filter_->infix_size_) - prev_implicit;
+
+    // Done with the current `next_to_fetch_`
+    // Get infixes and payloads from Infix Store
+    const uint64_t implicit_scalar = filter_->implicit_scalars_[total_implicit - infix_store_target_size / 2];
+
+    const uint64_t *occupieds = infix_store.ptr + 1;
+    const uint64_t *runends = infix_store.ptr + 1 + infix_store_target_size / 64;
+
+    if (!get_bitmap_bit(occupieds, implicit_part))
+        implicit_part = filter_->NextOccupied(infix_store, implicit_part);
+    if (implicit_part >= total_implicit) {
+        SetNextToFetch(next_key.str, next_key.length);
+        rwlock_unlock_write(infix_store.rwlock);
+        return;
+    }
+
+    const uint32_t rank = filter_->RankOccupieds(infix_store, implicit_part);
+    const uint32_t runend_pos = filter_->SelectRunends(infix_store, rank);
+    const uint32_t runstart_pos = std::max(filter_->PreviousRunend(infix_store, runend_pos),
+                                           filter_->FindEmptySlotBefore(infix_store, runend_pos)) + 1;
+    std::vector<uint64_t> deletees;
+    deletees.reserve(runend_pos - runstart_pos + 1);
+    for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
+        uint64_t payload[(filter_->payload_size_ + 63) / 64 + 1];
+        filter_->GetPayload(infix_store, pos, payload);
+        if (should_remove_(payload)) {
+            const uint64_t infix = (implicit_part << filter_->infix_size_) 
+                                    | filter_->GetSlot(infix_store, pos);
+            deletees.push_back(infix);
+        }
+    }
+    for (int32_t i = deletees.size() - 1; i >= 0; i--)
+        filter_->DeleteRawFromInfixStore(infix_store, deletees[i], total_implicit, should_remove_);
+
+
+    // Update `next_to_fetch_`
+    const uint64_t next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
+    rwlock_unlock_write(infix_store.rwlock);    // Done with `infix_store`
+    if (next_to_fetch_implicit < total_implicit) {
+        const uint32_t extraction_size = implicit_size + filter_->infix_size_;
+        const uint64_t recovered_extraction = (prev_implicit + next_to_fetch_implicit) << filter_->infix_size_;
+        const uint32_t key_length_bits = shared + ignore + extraction_size;
+        const uint32_t key_length = (key_length_bits + 7) / 8;
+
+        uint8_t key[key_length];
+        memset(key, 0, key_length);
+        memcpy(key, prev_key.str, (shared + 7) / 8);
+        key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
+        if (recovered_extraction >> (extraction_size - 1))
+            key[shared / 8] |= 1ULL << (7 - shared % 8);
+        else if (ignore > 0) {
+            uint32_t bit_pos = shared + 1;
+            uint32_t pos_rem = 8 - bit_pos % 8;
+            if (pos_rem < ignore) {
+                key[bit_pos / 8] |= BITMASK(pos_rem);
+                uint32_t tmp_ignore = ignore - pos_rem;
+                bit_pos += pos_rem;
+                if (tmp_ignore >= 8) {
+                    memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
+                    bit_pos += tmp_ignore - tmp_ignore % 8;
+                    tmp_ignore %= 8;
+                }
+                key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
+            }
+            else
+                key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
+        }
+        uint32_t bit_pos = shared + ignore + 1;
+        uint64_t infix = recovered_extraction << (65 - extraction_size);
+        infix = __builtin_bswap64(infix >> (bit_pos % 8));
+        const uint32_t loop_end_i = (bit_pos % 8 + extraction_size - 1 + 7) / 8;
+        for (uint32_t i = 0; i < loop_end_i; i++) {
+            key[bit_pos / 8] |= infix & 0xFF;
+            infix >>= 8;
+            bit_pos += 8 - bit_pos % 8;
+        }
+        SetNextToFetch(key, key_length);
+    }
+    else
+        SetNextToFetch(next_key.str, next_key.length);
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(const uint8_t *start, const uint32_t start_len) {
-    return Iterator(this, start, start_len);
+inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(std::string_view start,
+                                                                                std::function<bool(const uint64_t *)> should_remove) {
+    return Iterator(this, start, should_remove);
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(uint64_t start) {
-    return Iterator(this, start);
+inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(const uint8_t *start, const uint32_t start_len,
+                                                                                                        std::function<bool(const uint64_t *)> should_remove) {
+    return Iterator(this, start, start_len, should_remove);
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(uint64_t start,
+                                                                            std::function<bool(const uint64_t *)> should_remove) {
+    return Iterator(this, start, should_remove);
 }
 
 template <bool int_optimized, PayloadType payload_type>

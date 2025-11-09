@@ -4255,6 +4255,86 @@ public:
             for (auto& t : threads)
                 t.join();
         }
+
+
+        SUBCASE("concurrently iterating and deleting with payloads") {
+            const uint32_t infix_size = 10;
+            const uint32_t seed = 2;
+            const float load_factor = 0.95;
+            const uint32_t n_keys = 30000000;
+            const uint32_t n_threads = 8;
+            const uint32_t n_bulk = n_keys / n_threads;
+            const uint64_t delete_threshold = 10000000;
+
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+
+            std::vector<std::string_view> string_keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                size_t str_length;
+                if constexpr (O)
+                    str_length = 8;
+                else
+                    str_length = 40 + rng() % 3;
+                char *str = new char[48];
+                for (uint32_t i = 0; i < str_length; i++)
+                    str[i] = std::max(1UL, rng());
+                string_keys.emplace_back(reinterpret_cast<const char *>(str), str_length);
+            }
+            std::shuffle(string_keys.begin(), string_keys.end(), rng);
+            std::sort(string_keys.begin(), string_keys.begin() + n_bulk);
+            uint64_t *payloads_contents = new uint64_t[n_keys * (payload_size / 64 + 2)];
+            uint64_t **payloads = new uint64_t *[n_keys];
+            for (uint32_t i = 0; i < n_keys; i++) {
+                for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
+                    payloads_contents[i * (payload_size / 64 + 2) + j] = rng();
+                payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
+            }
+
+            Diva<O, PayloadType::FixedLength> s(infix_size,
+                                                string_keys.begin(),
+                                                string_keys.begin() + n_bulk,
+                                                seed,
+                                                load_factor,
+                                                payload_size,
+                                                (const uint64_t **) payloads);
+
+            std::vector<std::thread> threads;
+            std::atomic<uint32_t> n_entries = 0;
+            for (uint32_t i = 0; i < n_threads; i++) {
+                threads.emplace_back([&, i] {
+                        if (i > 0) {
+                            for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
+                                payloads[ti][0] = n_entries.load(std::memory_order_acquire);
+                                s.Insert(string_keys[ti], payloads[ti], rng());
+                                REQUIRE(s.PointQuery(string_keys[ti]));
+                                n_entries.fetch_add(1, std::memory_order_release);
+                            }
+                        }
+                        else {
+                            while (n_entries.load(std::memory_order_acquire) < delete_threshold)
+                                cpu_pause();
+                            uint8_t key[200] = {};
+                            key[199] = 1;
+                            auto it = s.GetIterator(key, 200, [=](const uint64_t *payload) {
+                                                                   return payload[0] <= delete_threshold;
+                                                               });
+                            while (it.IsValid())
+                                it++;
+                        }
+                    });
+            }
+            for (auto& t : threads)
+                t.join();
+
+            // Make sure there are no entries that should've been deleted
+            uint8_t key[200] = {};
+            for (auto it = s.GetIterator(key, 200); it.IsValid(); it++) {
+                uint64_t payload[(payload_size + 63) / 64 + 1];
+                it.GetPayload(payload);
+                REQUIRE(payload[0] > delete_threshold);
+            }
+        }
     }
 
 

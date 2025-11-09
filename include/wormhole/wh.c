@@ -1749,6 +1749,7 @@ wormleaf_seek_pred_strict(const struct wormleaf * const leaf, const struct kref 
   const u32 ih = wormleaf_match_hs(leaf, key);
   if (ih < WH_KPN) { // hit
     u32 res = wormleaf_search_is(leaf, (u8)ih);
+    assert(res > 0);
     return res > 0 ? res - 1 : 0;
   } else { // miss, binary search for gt
     u32 res = wormleaf_search_ss(leaf, key);
@@ -1992,32 +1993,31 @@ wormhole_jump_leaf_pred_read_strict(struct wormref * const ref, const struct kre
 #pragma nounroll
     do {
       if (rwlock_trylock_read_nr(&(leaf->leaflock), 64)) {
-        if (wormleaf_version_load(leaf) <= v) {
-          spinlock_lock(&(leaf->sortlock));
-          wormleaf_sync_sorted(leaf);
-          spinlock_unlock(&(leaf->sortlock));
-          const struct kv *other = wormleaf_kv_at_is(leaf, 0);
-          int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
-          if (cmp == 0)
-              cmp = (int) key->len - (int) other->klen;
-          if (cmp <= 0) {
-              memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
-              if (retry_key_buf[leaf->anchor->klen - 1])  {
-                  retry_key_buf[leaf->anchor->klen - 1]--;
-                  retry_kref.len = leaf->anchor->klen;
-              }
-              else
-                  retry_kref.len = leaf->anchor->klen - 1;
-              kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
-              kref_in_use = &retry_kref;
-              wormleaf_unlock_read(leaf);
-              break;
-          }
-
-          return leaf;
+        if (wormleaf_version_load(leaf) > v) {
+          wormleaf_unlock_read(leaf);
+          break;
         }
-        wormleaf_unlock_read(leaf);
-        break;
+        spinlock_lock(&(leaf->sortlock));
+        wormleaf_sync_sorted(leaf);
+        spinlock_unlock(&(leaf->sortlock));
+        const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+        int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
+        if (cmp == 0)
+            cmp = (int) key->len - (int) other->klen;
+        if (cmp <= 0) {
+            memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+            if (retry_key_buf[leaf->anchor->klen - 1])  {
+                retry_key_buf[leaf->anchor->klen - 1]--;
+                retry_kref.len = leaf->anchor->klen;
+            }
+            else
+                retry_kref.len = leaf->anchor->klen - 1;
+            wormleaf_unlock_read(leaf);
+            kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+            kref_in_use = &retry_kref;
+            break;
+        }
+        return leaf;
       }
       // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
       const u64 v1 = wormhmap_version_load(wormhmap_load(map));
@@ -2045,33 +2045,31 @@ wormhole_jump_leaf_pred_write_strict(struct wormref * const ref, const struct kr
 #pragma nounroll
     do {
       if (rwlock_trylock_write_nr(&(leaf->leaflock), 64)) {
-        if (wormleaf_version_load(leaf) <= v) {
-          spinlock_lock(&(leaf->sortlock));
-          wormleaf_sync_sorted(leaf);
-          spinlock_unlock(&(leaf->sortlock));
-          const struct kv *other = wormleaf_kv_at_is(leaf, 0);
-          const u32 len = key->len < other->klen ? key->len : other->klen;
-          int cmp = memcmp(key->ptr, other->kv, (size_t) len);
-          if (cmp == 0)
-              cmp = (int) key->len - (int) other->klen;
-          if (cmp <= 0) {
-              memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
-              if (retry_key_buf[leaf->anchor->klen - 1])  {
-                  retry_key_buf[leaf->anchor->klen - 1]--;
-                  retry_kref.len = leaf->anchor->klen;
-              }
-              else
-                  retry_kref.len = leaf->anchor->klen - 1;
-              kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
-              kref_in_use = &retry_kref;
-              wormleaf_unlock_write(leaf);
-              break;
-          }
-
-          return leaf;
+        if (wormleaf_version_load(leaf) > v) {
+          wormleaf_unlock_write(leaf);
+          break;
         }
-        wormleaf_unlock_write(leaf);
-        break;
+        spinlock_lock(&(leaf->sortlock));
+        wormleaf_sync_sorted(leaf);
+        spinlock_unlock(&(leaf->sortlock));
+        const struct kv *other = wormleaf_kv_at_is(leaf, 0);
+        int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
+        if (cmp == 0)
+            cmp = (int) key->len - (int) other->klen;
+        if (cmp <= 0) {
+            memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
+            if (retry_key_buf[leaf->anchor->klen - 1])  {
+                retry_key_buf[leaf->anchor->klen - 1]--;
+                retry_kref.len = leaf->anchor->klen;
+            }
+            else
+                retry_kref.len = leaf->anchor->klen - 1;
+            wormleaf_unlock_write(leaf);
+            kref_ref_hash32(&retry_kref, retry_key_buf, retry_kref.len);
+            kref_in_use = &retry_kref;
+            break;
+        }
+        return leaf;
       }
       // v1 is loaded before lv; if lv <= v, can update v1 without redo jump
       const u64 v1 = wormhmap_version_load(wormhmap_load(map));
