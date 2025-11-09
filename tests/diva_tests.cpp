@@ -3774,8 +3774,6 @@ public:
                 const uint32_t sample_key_threshold = 50000;
                 constexpr bool ascii = true;
                 for (uint32_t i = 0; i < n_keys; i++) {
-                    if (i % 10000 == 0)
-                        std::cerr << i << std::endl;
                     uint64_t key[key_len_words], payload[payload_len_words];
                     if constexpr (ascii) {
                         std::string valid_characters = "";

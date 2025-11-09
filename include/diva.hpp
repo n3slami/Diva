@@ -1998,7 +1998,9 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeMetadata(const cha
     memcpy((void *) &load_factor_, deser_buf + res, sizeof(load_factor_));
     res += sizeof(load_factor_);
 
-    assert(size_scalar_shrink_grow_sep == std::log(infix_store_target_size / 64) / std::log(1 / load_factor_) + 1 && "Corrupted Diva version");
+    assert(size_scalar_shrink_grow_sep == static_cast<uint32_t>(std::log(infix_store_target_size / 64) 
+                                                                / std::log(1 / load_factor_) + 1)
+            && "Corrupted Diva version");
 
     memcpy((void *) &load_factor_alt_, deser_buf + res, sizeof(load_factor_alt_));
     res += sizeof(load_factor_alt_);

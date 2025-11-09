@@ -55,7 +55,7 @@ struct wormkv64 { u64 key; void * ptr; }; // u64 keys (whu64)
 
 struct store_sim_hack {
   u32 status;
-  au8 lock;
+  au32 lock;
   u64 ptr;
 };
 
