@@ -4443,85 +4443,35 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     uint64_t implicit_part = (extraction >> filter_->infix_size_) - prev_implicit;
 
-    // Done with the current `next_to_fetch_`
-    // Get infixes and payloads from Infix Store
     const uint64_t implicit_scalar = filter_->implicit_scalars_[total_implicit - infix_store_target_size / 2];
 
     const uint64_t *occupieds = infix_store.ptr + 1;
     const uint64_t *runends = infix_store.ptr + 1 + infix_store_target_size / 64;
-
     if (!get_bitmap_bit(occupieds, implicit_part))
         implicit_part = filter_->NextOccupied(infix_store, implicit_part);
-    if (implicit_part >= total_implicit) {
-        SetNextToFetch(next_key.str, next_key.length);
-        rwlock_unlock_write(infix_store.rwlock);
-        return;
-    }
-
-    const uint32_t rank = filter_->RankOccupieds(infix_store, implicit_part);
-    const uint32_t runend_pos = filter_->SelectRunends(infix_store, rank);
-    const uint32_t runstart_pos = std::max(filter_->PreviousRunend(infix_store, runend_pos),
-                                           filter_->FindEmptySlotBefore(infix_store, runend_pos)) + 1;
-    std::vector<uint64_t> deletees;
-    deletees.reserve(runend_pos - runstart_pos + 1);
-    for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
-        uint64_t payload[(filter_->payload_size_ + 63) / 64 + 1];
-        filter_->GetPayload(infix_store, pos, payload);
-        if (should_remove_(payload)) {
-            const uint64_t infix = (implicit_part << filter_->infix_size_) 
-                                    | filter_->GetSlot(infix_store, pos);
-            deletees.push_back(infix);
-        }
-    }
-    for (int32_t i = deletees.size() - 1; i >= 0; i--)
-        filter_->DeleteRawFromInfixStore(infix_store, deletees[i], total_implicit, should_remove_);
-
-
-    // Update `next_to_fetch_`
-    const uint64_t next_to_fetch_implicit = filter_->NextOccupied(infix_store, implicit_part);
-    rwlock_unlock_write(infix_store.rwlock);    // Done with `infix_store`
-    if (next_to_fetch_implicit < total_implicit) {
-        const uint32_t extraction_size = implicit_size + filter_->infix_size_;
-        const uint64_t recovered_extraction = (prev_implicit + next_to_fetch_implicit) << filter_->infix_size_;
-        const uint32_t key_length_bits = shared + ignore + extraction_size;
-        const uint32_t key_length = (key_length_bits + 7) / 8;
-
-        uint8_t key[key_length];
-        memset(key, 0, key_length);
-        memcpy(key, prev_key.str, (shared + 7) / 8);
-        key[shared / 8] &= BITMASK(shared % 8) << (8 - shared % 8);
-        if (recovered_extraction >> (extraction_size - 1))
-            key[shared / 8] |= 1ULL << (7 - shared % 8);
-        else if (ignore > 0) {
-            uint32_t bit_pos = shared + 1;
-            uint32_t pos_rem = 8 - bit_pos % 8;
-            if (pos_rem < ignore) {
-                key[bit_pos / 8] |= BITMASK(pos_rem);
-                uint32_t tmp_ignore = ignore - pos_rem;
-                bit_pos += pos_rem;
-                if (tmp_ignore >= 8) {
-                    memset(key + bit_pos / 8, 0xFF, tmp_ignore / 8);
-                    bit_pos += tmp_ignore - tmp_ignore % 8;
-                    tmp_ignore %= 8;
-                }
-                key[bit_pos / 8] |= BITMASK(tmp_ignore) << (8 - tmp_ignore);
+    while (implicit_part < total_implicit) {
+        const uint32_t rank = filter_->RankOccupieds(infix_store, implicit_part);
+        const uint32_t runend_pos = filter_->SelectRunends(infix_store, rank);
+        const uint32_t runstart_pos = std::max(filter_->PreviousRunend(infix_store, runend_pos),
+                                               filter_->FindEmptySlotBefore(infix_store, runend_pos)) + 1;
+        std::vector<uint64_t> deletees;
+        deletees.reserve(runend_pos - runstart_pos + 1);
+        for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
+            uint64_t payload[(filter_->payload_size_ + 63) / 64 + 1];
+            filter_->GetPayload(infix_store, pos, payload);
+            if (should_remove_(payload)) {
+                const uint64_t infix = (implicit_part << filter_->infix_size_) 
+                                        | filter_->GetSlot(infix_store, pos);
+                deletees.push_back(infix);
             }
-            else
-                key[bit_pos / 8] |= BITMASK(ignore) << (8 - bit_pos % 8 - ignore);
         }
-        uint32_t bit_pos = shared + ignore + 1;
-        uint64_t infix = recovered_extraction << (65 - extraction_size);
-        infix = __builtin_bswap64(infix >> (bit_pos % 8));
-        const uint32_t loop_end_i = (bit_pos % 8 + extraction_size - 1 + 7) / 8;
-        for (uint32_t i = 0; i < loop_end_i; i++) {
-            key[bit_pos / 8] |= infix & 0xFF;
-            infix >>= 8;
-            bit_pos += 8 - bit_pos % 8;
-        }
-        SetNextToFetch(key, key_length);
+        for (int32_t i = deletees.size() - 1; i >= 0; i--)
+            filter_->DeleteRawFromInfixStore(infix_store, deletees[i], total_implicit, should_remove_);
+
+        implicit_part = filter_->NextOccupied(infix_store, implicit_part);
     }
-    else
-        SetNextToFetch(next_key.str, next_key.length);
+    rwlock_unlock_write(infix_store.rwlock);
+    SetNextToFetch(next_key.str, next_key.length);
 }
 
 

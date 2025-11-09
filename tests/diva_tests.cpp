@@ -4264,7 +4264,7 @@ public:
             const uint32_t n_keys = 30000000;
             const uint32_t n_threads = 8;
             const uint32_t n_bulk = n_keys / n_threads;
-            const uint64_t delete_threshold = 10000000;
+            const uint64_t delete_threshold = 1000000;
 
             const uint32_t rng_seed = 2;
             std::mt19937_64 rng(rng_seed);
