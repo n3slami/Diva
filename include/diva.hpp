@@ -365,112 +365,112 @@ private:
         friend class InfixTests;
 
     public: 
+        class TrieIterator {
+            friend class Diva<int_optimized, payload_type>;
+            friend class InfixTests;
+
+        public:
+            const uint64_t *buf;
+            uint32_t num_prefix_keys_read = 0;
+            uint32_t num_keys_read = 0;
+            uint32_t bit_pos = 0;
+            std::vector<std::pair<int32_t, int32_t>> depth_branch = {{-1, 0b11}};
+
+            TrieIterator(const void *buf);
+            TrieIterator(const Infix *infix);
+            TrieIterator(const Infix& infix);
+            TrieIterator(const TrieIterator& other);
+            TrieIterator& operator=(const TrieIterator& other);
+
+            void SkipSubtree(bool has_prefix_keys);
+            void Advance(bool has_prefix_keys);
+            bool AtLeaf();
+            bool AtPrefixKey(bool has_prefix_keys);
+
+        private:
+            static constexpr uint32_t depth_reserve_size = 100;
+        };
+
         uint64_t infix;
         std::vector<uint64_t> *trie = nullptr;
         std::vector<uint64_t> *trie_suffixes = nullptr;
 
         Infix(const uint64_t infix):
                 infix(infix) { }
-
-        Infix(const uint64_t infix, const uint64_t *ptr, uint32_t bit_offset):
-                infix(infix) {
-            ReadFromPtr(ptr, bit_offset);
-        }
-
+        Infix(const uint64_t infix, const InfixStore& infix_store,
+              uint32_t slot_pos, uint32_t slot_size);
         Infix(const Infix& other);
-
-        ~Infix() {
-            if (trie)
-                delete trie;
-            if (trie_suffixes)
-                delete trie_suffixes;
-        }
+        ~Infix();
 
         Infix& operator=(const Infix& other);
+        bool operator<(const Infix& rhs) const {
+            return CompareInfixes(infix, rhs.infix);
+        }
+        bool operator<=(const Infix& rhs) const {
+            return CompareInfixes(infix, rhs.infix) || infix == rhs.infix;
+        }
         bool operator==(const Infix& rhs) const;
         bool operator!=(const Infix& rhs) const {
             return !(*this == rhs);
         }
 
         void BuildTrie(const InfiniteByteString *keys, uint32_t key_count,
-                       uint32_t key_start_bit, const uint32_t slot_size);
+                       uint32_t key_start_bit, uint32_t slot_size);
         void InsertTrie(const InfiniteByteString key, uint32_t key_start_bit,
-                        const uint32_t slot_size);
+                        uint32_t slot_size);
         void AdaptTrie(const InfiniteByteString key, uint32_t key_start_bit,
-                       const uint32_t slot_size);
+                       uint32_t adapt_length, uint32_t slot_size);
+        void DeleteTrie(const InfiniteByteString key, uint32_t key_start_bit,
+                        uint32_t slot_size);
         int32_t QueryTrie(const InfiniteByteString l_key, const InfiniteByteString r_key, 
-                          uint32_t key_start_bit, const uint32_t slot_size);
-        void WriteToPtr(uint64_t *ptr, uint32_t ptr_bit_offset);
-        void ReadFromPtr(const uint64_t *ptr, uint32_t ptr_bit_offset);
-        uint32_t GetNumTrieBitsFromPtr(const uint64_t *ptr, uint32_t ptr_bit_offset);
-        uint32_t GetNumTrieSlotsFromPtr(const uint64_t *ptr, uint32_t ptr_bit_offset, uint32_t slot_size) {
-            int32_t num_bits = GetNumTrieBitsFromPtr(ptr, ptr_bit_offset);
+                          uint32_t key_start_bit, uint32_t slot_size);
+        void SerializeToInfixStore(InfixStore& ptr, uint32_t slot_pos, uint32_t slot_size);
+        void DeserializeFromInfixStore(const InfixStore& infix_store, uint32_t slot_pos, uint32_t slot_size);
+        uint32_t GetNumTrieBitsFromInfixStore(const InfixStore& infix_store,
+                                              uint32_t slot_pos, uint32_t slot_size);
+        uint32_t GetNumTrieSlotsFromInfixStore(const InfixStore& infix_store,
+                                               uint32_t slot_pos, uint32_t slot_size) {
+            int32_t num_bits = GetNumTrieBitsFromInfixStore(infix_store, slot_pos, slot_size);
             return (num_bits + slot_size - 1) / slot_size;
-            
-            // Maybe a loop is faster?
-            uint32_t res;
-            for (res = 0; num_bits > 0; num_bits -= slot_size)
-                res++;
-            return res;
         }
+        uint32_t GetActualSuffixLen(uint32_t slot_size);
+        uint32_t GetNumBits(uint32_t slot_size);
+        uint32_t GetNumSlots(uint32_t slot_size) {
+            return (GetNumBits(slot_size) + slot_size - 1) / slot_size;
+        }
+
+        std::vector<Infix> Split(const InfiniteByteString key);
+        std::vector<Infix> TakePrefixBits(uint32_t num_bits);
+        void Merge(const Infix& other);
 
     private:
         static constexpr uint32_t has_prefix_keys_bit_pos = 63;
-        static constexpr uint32_t call_depth_bit_pos = 48;
-        static constexpr uint32_t n_keys_bit_pos = 32;
+        static constexpr uint32_t n_prefix_keys_bit_pos = 48;
+        static constexpr uint32_t n_suffixes_bit_pos = 32;
         static constexpr uint32_t varlen_counter_encoding_fragment_length = 3;
         static constexpr uint32_t varlen_counter_encoding_base = BITMASK(varlen_counter_encoding_fragment_length);
 
-        bool HasPrefixKeys() {
-            assert(!trie->empty());
-            return (*trie)[0] >> has_prefix_keys_bit_pos;
-        }
-        void SetHasPrefixKeys(bool has_prefix_keys) {
-            assert(!trie->empty());
-            (*trie)[0] &= BITMASK(has_prefix_keys_bit_pos);
-            (*trie)[0] |= static_cast<uint64_t>(has_prefix_keys) << has_prefix_keys_bit_pos;
-        }
-        void IncrementCallDepth() {
-            assert(!trie->empty());
-            (*trie)[0] += 1ULL << call_depth_bit_pos;
-        }
-        void DecrementCallDepth() {
-            assert(!trie->empty());
-            (*trie)[0] -= 1ULL << call_depth_bit_pos;
-        }
-        uint32_t GetCallDepth() {
-            assert(!trie->empty());
-            return ((*trie)[0] >> call_depth_bit_pos) & BITMASK(has_prefix_keys_bit_pos - call_depth_bit_pos);
-        }
-        void IncrementNumKeys() {
-            assert(!trie->empty());
-            (*trie)[0] += 1ULL << n_keys_bit_pos;
-        }
-        void DecrementNumKeys() {
-            assert(!trie->empty());
-            (*trie)[0] -= 1ULL << n_keys_bit_pos;
-        }
-        uint32_t GetNumKeys() {
-            assert(!trie->empty());
-            return ((*trie)[0] >> n_keys_bit_pos) & BITMASK(call_depth_bit_pos - n_keys_bit_pos);
-        }
-        uint32_t GetNumTrieBits() {
-            assert(!trie->empty());
-            return (*trie)[0] & BITMASK(n_keys_bit_pos);
-        }
-        void UpdateNumTrieBits(int32_t delta) {
-            assert(!trie->empty());
-            (*trie)[0] += delta;
-        }
-        void AddBitsToTrie(const uint64_t bits, uint32_t bit_count);
+        bool HasPrefixKeys();
+        void SetHasPrefixKeys(bool has_prefix_keys);
+        void UpdateNumPrefixKeys(int64_t delta);
+        uint32_t GetNumPrefixKeys();
+        void UpdateNumSuffixes(int64_t delta);
+        uint32_t GetNumSuffixes();
+        uint32_t GetNumTrieBits();
+        void UpdateNumTrieBits(int64_t delta);
+
+        void AddBitsToTrie(uint64_t bits, uint32_t bit_count);
         void AddBitsToTrie(const void *bits, uint32_t bit_count, uint32_t bit_offset=0);
-        void AddCounterToTrie(const uint64_t counter);
+        void AddCounterToTrie(uint64_t counter);
         void AddSuffixToTrie(const void *bits, uint32_t bit_count, 
                              uint32_t bit_offset, uint32_t bits_len_bytes);
         uint32_t GetSharedPrefixLen(const InfiniteByteString key_1,
                                     const InfiniteByteString key_2,
                                     uint32_t key_start_bit);
         void SwitchTrieEncoding(bool has_duplicates);
+
+        void BuildTrieRecurse(const InfiniteByteString *keys, uint32_t key_count,
+                              uint32_t key_start_bit, uint32_t slot_size);
     };
 
     uint32_t infix_size_;
@@ -623,7 +623,7 @@ private:
                                const InfiniteByteString left_key, const InfiniteByteString right_key,
                                uint64_t *infix_list, const uint32_t infix_list_len);
 
-    bool CompareInfixes(uint64_t a, uint64_t b) const;
+    static bool CompareInfixes(uint64_t a, uint64_t b);
 
     uint32_t SerializeMetadata(char *out) const;
     uint64_t SerializeInfixStore(char *out, const InfixStore& store) const;
@@ -2365,7 +2365,7 @@ inline void Diva<int_optimized, payload_type>::DeleteRange(const uint8_t *input_
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::CompareInfixes(uint64_t a, uint64_t b) const {
+inline bool Diva<int_optimized, payload_type>::CompareInfixes(uint64_t a, uint64_t b) {
     const uint64_t a_lb = a & -a;
     a -= a_lb;
     const uint64_t b_lb = b & -b;
@@ -4743,6 +4743,9 @@ inline uint32_t Diva<int_optimized, payload_type>::GetInfixList(const InfixStore
 }
 
 
+/*****************************************************************************
+ **                                 Iterator                                **
+ *****************************************************************************/
 template <bool int_optimized, PayloadType payload_type>
 inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *parent,
                                                              std::string_view start, std::string_view end,
@@ -5329,8 +5332,18 @@ inline bool Diva<int_optimized, payload_type>::Iterator::IsValid() const {
 }
 
 
+/*****************************************************************************
+ **                                  Infix                                  **
+ *****************************************************************************/
 template <bool int_optimized, PayloadType payload_type>
-Diva<int_optimized, payload_type>::Infix::Infix(const Infix& other):
+inline Diva<int_optimized, payload_type>::Infix::Infix(const uint64_t infix, const InfixStore& infix_store, 
+      uint32_t slot_pos, uint32_t slot_size):
+        infix(infix) {
+    DeserializeFromInfixStore(infix_store, slot_pos, slot_size);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::Infix::Infix(const Infix& other):
         infix(other.infix) {
     if (other.trie) {
         trie = new std::vector<uint64_t>();
@@ -5344,7 +5357,17 @@ Diva<int_optimized, payload_type>::Infix::Infix(const Infix& other):
 
 
 template <bool int_optimized, PayloadType payload_type>
-typename Diva<int_optimized, payload_type>::Infix& Diva<int_optimized, payload_type>::Infix::operator=(const Infix& other) {
+inline Diva<int_optimized, payload_type>::Infix::~Infix() {
+    if (trie)
+        delete trie;
+    if (trie_suffixes)
+        delete trie_suffixes;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline typename Diva<int_optimized, payload_type>::Infix&
+Diva<int_optimized, payload_type>::Infix::operator=(const Infix& other) {
     infix = other.infix;
     if (other.trie) {
         if (trie == nullptr)
@@ -5360,7 +5383,7 @@ typename Diva<int_optimized, payload_type>::Infix& Diva<int_optimized, payload_t
 
 
 template <bool int_optimized, PayloadType payload_type>
-bool Diva<int_optimized, payload_type>::Infix::operator==(const Infix& rhs) const {
+inline bool Diva<int_optimized, payload_type>::Infix::operator==(const Infix& rhs) const {
     if (infix != rhs.infix || trie->size() != rhs.trie->size() || trie_suffixes->size() != rhs.trie_suffixes->size())
         return false;
     return (memcmp(trie->data(), rhs.trie->data(), trie->size()) == 0) 
@@ -5369,43 +5392,83 @@ bool Diva<int_optimized, payload_type>::Infix::operator==(const Infix& rhs) cons
 
 
 template <bool int_optimized, PayloadType payload_type>
-//__attribute__((always_inline))
-void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const uint64_t bits,
-                                                             uint32_t bit_count) {
+inline bool Diva<int_optimized, payload_type>::Infix::HasPrefixKeys() {
     assert(!trie->empty());
-    assert(bit_count <= 64);
-    uint64_t at = GetNumTrieBits();
-    at += 64;
-    (*trie)[at / 64] |= bits << (at % 64);
+    return (*trie)[0] >> has_prefix_keys_bit_pos;
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::SetHasPrefixKeys(bool has_prefix_keys) {
+    assert(!trie->empty());
+    (*trie)[0] &= BITMASK(has_prefix_keys_bit_pos);
+    (*trie)[0] |= static_cast<uint64_t>(has_prefix_keys) << has_prefix_keys_bit_pos;
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::UpdateNumPrefixKeys(int64_t delta) {
+    assert(!trie->empty());
+    (*trie)[0] += delta << n_prefix_keys_bit_pos;
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumPrefixKeys() {
+    assert(!trie->empty());
+    return ((*trie)[0] >> n_prefix_keys_bit_pos) & BITMASK(has_prefix_keys_bit_pos - n_prefix_keys_bit_pos);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::UpdateNumSuffixes(int64_t delta) {
+    assert(!trie->empty());
+    (*trie)[0] += delta << n_suffixes_bit_pos;
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumSuffixes() {
+    assert(!trie->empty());
+    return ((*trie)[0] >> n_suffixes_bit_pos) & BITMASK(n_prefix_keys_bit_pos - n_suffixes_bit_pos);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumTrieBits() {
+    assert(!trie->empty());
+    return (*trie)[0] & BITMASK(n_suffixes_bit_pos);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::UpdateNumTrieBits(int64_t delta) {
+    assert(!trie->empty());
+    (*trie)[0] += delta;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+//__attribute__((always_inline))
+inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(uint64_t bits,
+                                                                    uint32_t bit_count) {
+    uint64_t at = GetNumTrieBits() + 64;
     if (at + bit_count >= 64 * trie->size())
-        trie->push_back(bits >> (64 * trie->size() - at));
+        trie->push_back(0);
+    write_bits_to_bitmap(trie->data(), at, bits, bit_count);
     UpdateNumTrieBits(bit_count);
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
 //__attribute__((always_inline))
-void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const void *bits,
-                                                             uint32_t bit_count,
-                                                             uint32_t bit_offset) {
-    for (int32_t bits_left = bit_count; bits_left > 0; bits_left -= 64) {
-        const uint32_t bit_count_to_write = std::min(64 - bits_left % 64, bits_left);
-        const uint32_t byte_count_to_write = (bit_count_to_write + 7) / 8;
-        uint64_t data = 0;
-        if (bits) {
-            memcpy(&data, reinterpret_cast<const uint8_t *>(bits) + bit_offset / 8,
-                   std::min<uint32_t>(sizeof(data), byte_count_to_write));
-            data = __builtin_bswap64(data) >> (8 * sizeof(data) - bit_count_to_write - bit_offset % 8);
-            data &= BITMASK(bit_count_to_write);
-        }
-        AddBitsToTrie(data, bit_count_to_write);
-        bit_offset += bit_count_to_write;
-    }
+inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const void *bits,
+                                                                    uint32_t bit_count,
+                                                                    uint32_t bit_offset) {
+    uint64_t at = GetNumTrieBits() + 64;
+    if (at + bit_count >= 64 * trie->size())
+        trie->resize((at + bit_count) / 64 + 1);
+    write_bits_from_string_to_bitmap(trie->data(), at, bits, bit_offset, bit_count);
+    UpdateNumTrieBits(bit_count);
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t counter) {
+//__attribute__((always_inline))
+inline void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t counter) {
     uint32_t digit_count = 1;
     for (uint64_t pw = varlen_counter_encoding_base; pw < counter; pw *= varlen_counter_encoding_base)
         digit_count++;
@@ -5421,10 +5484,10 @@ void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t counter
 
 template <bool int_optimized, PayloadType payload_type>
 //__attribute__((always_inline))
-void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const void *bits,
-                                                               uint32_t bit_count,
-                                                               uint32_t bit_offset,
-                                                               uint32_t bits_len_bits) {
+inline void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const void *bits,
+                                                                      uint32_t bit_count,
+                                                                      uint32_t bit_offset,
+                                                                      uint32_t bits_len_bits) {
     assert(!trie->empty());
     assert(bit_count <= 64);
 
@@ -5433,17 +5496,19 @@ void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const void *bits,
                                     (bits_len_bits + 7) / 8};
     uint64_t suffix = dummy_key.BitsAt(bit_offset, suffix_len);
 
-    const uint32_t final_suffix_insert_bit_pos = bit_count * GetNumKeys() % 64;
+    const uint32_t final_suffix_insert_bit_pos = bit_count * GetNumSuffixes() % 64;
     (*trie_suffixes)[trie_suffixes->size() - 1] |= suffix << final_suffix_insert_bit_pos;
     if (final_suffix_insert_bit_pos + bit_count >= 64)
         trie_suffixes->push_back(suffix >> (64 - final_suffix_insert_bit_pos));
+
+    UpdateNumSuffixes(1);
 }
 
 
 template <bool int_optimized, PayloadType payload_type>
-uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(const InfiniteByteString key_1,
-                                                                      const InfiniteByteString key_2,
-                                                                      uint32_t key_start_bit) {
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(const InfiniteByteString key_1,
+                                                                             const InfiniteByteString key_2,
+                                                                             uint32_t key_start_bit) {
     // Assumes that `key_start_bit` is the same as the `key_start_bit` used to create `last_trie_key`.
     uint32_t res = 0, byte_pos = key_start_bit / 8, bit_offset = key_start_bit % 8;
     uint64_t read_1, read_2;
@@ -5466,36 +5531,40 @@ uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(const Infi
 
 
 template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::BuildTrie(const Diva<int_optimized, payload_type>::InfiniteByteString *keys,
-                                                         uint32_t key_count, 
-                                                         uint32_t key_start_bit, 
-                                                         const uint32_t slot_size) {
+inline void Diva<int_optimized, payload_type>::Infix::BuildTrie(const InfiniteByteString *keys,
+                                                                uint32_t key_count, 
+                                                                uint32_t key_start_bit, 
+                                                                uint32_t slot_size) {
     if (trie == nullptr)
         trie = new std::vector<uint64_t> {0, 0};
     if (trie_suffixes == nullptr)
         trie_suffixes = new std::vector<uint64_t> {0};
 
-    if (GetCallDepth() == 0) {
-        bool has_prefix_keys = false;
-        for (uint32_t i = 1; i < key_count; i++) {
-            if (key_start_bit + GetSharedPrefixLen(keys[i - 1], keys[i], key_start_bit) == 8 * keys[i - 1].length) {
-                has_prefix_keys = true;
-                break;
-            }
+    bool has_prefix_keys = false;
+    for (uint32_t i = 1; i < key_count; i++) {
+        if (key_start_bit + GetSharedPrefixLen(keys[i - 1], keys[i], key_start_bit) == 8 * keys[i - 1].length) {
+            has_prefix_keys = true;
+            break;
         }
-        SetHasPrefixKeys(has_prefix_keys);
     }
+    SetHasPrefixKeys(has_prefix_keys);
 
+    BuildTrieRecurse(keys, key_count, key_start_bit, slot_size);
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::BuildTrieRecurse(const InfiniteByteString *keys,
+                                                                       uint32_t key_count, 
+                                                                       uint32_t key_start_bit, 
+                                                                       uint32_t slot_size) {
     if (key_count == 1) {   // Base Case
         AddBitsToTrie(1, 1);
         AddSuffixToTrie(keys[0].str, slot_size, key_start_bit, 8 * keys[0].length);
-        IncrementNumKeys();
         return;
     }
 
     // Recurse
-    IncrementCallDepth();
-
     const uint32_t shared_prefix_bits = GetSharedPrefixLen(keys[0], keys[key_count - 1], key_start_bit);
     int32_t split_pos = -1, prefix_key_count = 0;
     for (uint32_t i = 0; i < key_count; i++) {
@@ -5515,22 +5584,222 @@ void Diva<int_optimized, payload_type>::Infix::BuildTrie(const Diva<int_optimize
             AddCounterToTrie(0);
             AddBitsToTrie(prefix_key_count + 1 < split_pos, 1); // Has left child
             AddBitsToTrie(split_pos != -1, 1);                  // Has right child
+            UpdateNumPrefixKeys(1);
         }
         if (prefix_key_count < split_pos)
-            BuildTrie(keys + prefix_key_count, split_pos - prefix_key_count, new_start_bit, slot_size);
+            BuildTrieRecurse(keys + prefix_key_count, split_pos - prefix_key_count, new_start_bit, slot_size);
         if (split_pos != -1)
-            BuildTrie(keys + split_pos, key_count - split_pos, new_start_bit, slot_size);
+            BuildTrieRecurse(keys + split_pos, key_count - split_pos, new_start_bit, slot_size);
     }
     else {
         // +1 for the "internal node" bit
         AddBitsToTrie(nullptr, shared_prefix_bits + 1);
         AddBitsToTrie(1, 1);
         AddBitsToTrie(keys[0].str, shared_prefix_bits, key_start_bit);
-        BuildTrie(keys, split_pos, new_start_bit, slot_size);
-        BuildTrie(keys + split_pos, key_count - split_pos, new_start_bit, slot_size);
+        BuildTrieRecurse(keys, split_pos, new_start_bit, slot_size);
+        BuildTrieRecurse(keys + split_pos, key_count - split_pos, new_start_bit, slot_size);
+    }
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetActualSuffixLen(uint32_t slot_size) {
+    const uint32_t trie_bits = GetNumTrieBits();
+    const uint32_t suffix_count = GetNumSuffixes();
+    const uint32_t key_count = GetNumPrefixKeys() + suffix_count;
+    const uint32_t actual_suffix_len = slot_size * key_count < trie_bits ? 0 
+                                       : (trie_bits - slot_size * key_count) / suffix_count;
+    return actual_suffix_len;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumBits(uint32_t slot_size) {
+    const uint32_t trie_bits = GetNumTrieBits();
+    const uint32_t suffix_count = GetNumSuffixes();
+    const uint32_t actual_suffix_len = GetActualSuffixLen(slot_size);
+    uint32_t suffix_bits = 0;
+    uint64_t read_word_buffer = 0;
+    uint32_t read_word_buffer_filled_bits = 0;
+    for (uint32_t i = 0; i < suffix_count; i++) {
+        uint64_t fragment = read_data_from_bitmap(trie_suffixes->data(), suffix_bits,
+                                                  read_word_buffer, read_word_buffer_filled_bits,
+                                                  actual_suffix_len);
+        if (fragment >> (actual_suffix_len - 1)) {
+            do {
+                fragment = read_data_from_bitmap(trie_suffixes->data(), suffix_bits,
+                                                 read_word_buffer, read_word_buffer_filled_bits,
+                                                 slot_size);
+            } while (fragment >> (slot_size - 1));
+        }
+    }
+    return trie_bits + suffix_bits;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline int32_t Diva<int_optimized, payload_type>::Infix::QueryTrie(const InfiniteByteString l_key,
+                                                                   const InfiniteByteString r_key, 
+                                                                   uint32_t key_start_bit,
+                                                                   uint32_t slot_size) {
+    const bool has_prefix_keys = HasPrefixKeys();
+    TrieIterator it(&((*trie)[1]));
+    int32_t last_depth = -1;
+    while (true) {
+        it.Advance(has_prefix_keys);
+        auto [depth, children] = it.depth_branch.back();
+        const uint32_t compare_len = depth - last_depth - 1;
+        const uint32_t compare_len_l = std::max(0, 8 * static_cast<int32_t>(l_key.length) - last_depth);
+        const int32_t compare_l = compare_bits_from_string_to_bitmap(it.buf, it.bit_pos - compare_len,
+                                                                     l_key.str, last_depth + 1, 
+                                                                     std::min(compare_len, compare_len_l));
+        if (compare_l > 0)
+            return -depth;
+        const uint32_t compare_len_r = std::max(0, 8 * static_cast<int32_t>(r_key.length) - last_depth);
+        int32_t compare_r = compare_bits_from_string_to_bitmap(it.buf, it.bit_pos - compare_len,
+                                                               r_key.str, last_depth + 1, 
+                                                               std::min(compare_len, compare_len_r));
+        if (compare_len_r < compare_len) {
+            uint8_t zeros[compare_len / 8 + 2] = {};
+            compare_r = compare_bits_from_string_to_bitmap(it.buf, it.bit_pos - compare_len, 
+                                                           zeros, 0, 
+                                                           compare_len - compare_len_r);
+        }
+        if (compare_r)
+            return compare_r < 0 ? depth : -depth;
+
+        const uint32_t l_bit = l_key.GetBit(depth);
+        const uint32_t r_bit = r_key.GetBit(depth);
+        if (r_bit == 0 && (children & 1) == 0)
+            return -depth;
+        if (l_bit == 1 && (children & 1) == 1)
+            it.SkipSubtree(has_prefix_keys);
+        last_depth = depth;
+    }
+    return it.depth_branch.back().first;
+}
+
+
+/*****************************************************************************
+ **                              Trie Iterator                              **
+ *****************************************************************************/
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const void *buf):
+        buf(reinterpret_cast<const uint64_t *>(buf)) {
+    depth_branch.reserve(depth_reserve_size);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const Infix *infix):
+        buf(&((*(infix->trie))[1])) {
+    depth_branch.reserve(depth_reserve_size);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const Infix& infix): 
+        buf(&((*(infix.trie))[1])) {
+    depth_branch.reserve(depth_reserve_size);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const TrieIterator& other):
+        buf(other.buf),
+        num_prefix_keys_read(other.num_prefix_keys_read),
+        num_keys_read(other.num_keys_read),
+        bit_pos(other.bit_pos),
+        depth_branch(other.depth_branch) { 
+    depth_branch.reserve(depth_reserve_size);
+}
+
+template <bool int_optimized, PayloadType payload_type>
+inline typename Diva<int_optimized, payload_type>::Infix::TrieIterator& 
+Diva<int_optimized, payload_type>::Infix::TrieIterator::operator=(const TrieIterator& other) {
+    buf = other.buf;
+    num_prefix_keys_read = other.num_prefix_keys_read;
+    num_keys_read = other.num_keys_read;
+    bit_pos = other.bit_pos;
+    depth_branch = other.depth_branch;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::Advance(bool has_prefix_keys) {
+    const bool is_leaf = AtLeaf();
+    bit_pos++;
+    if (is_leaf) {
+        while (!depth_branch.empty()) {
+            if (depth_branch.back().second == 0b11) {
+                depth_branch[depth_branch.size() - 1].second = 0b10;
+                break;
+            }
+            depth_branch.pop_back();
+        }
+        num_keys_read++;
+        return;
     }
 
-    DecrementCallDepth();
+    uint32_t advance_bits = 0;
+    while ((buf[bit_pos / 64] >> (bit_pos % 64)) == 0) {
+        advance_bits = 64 - bit_pos % 64;
+        bit_pos += advance_bits;
+    }
+    advance_bits = lowbit_pos(buf[bit_pos / 64] >> (bit_pos % 64));
+    bit_pos += advance_bits + 1;
+    if (has_prefix_keys) {
+        uint64_t counter = 0, pw = 1, read_buf = 0;
+        uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos;
+        const uint32_t num_fragments_to_read = advance_bits + 1;
+        for (uint32_t i = 0; i < num_fragments_to_read; i++) {
+            counter += read_data_from_bitmap(buf, read_bit_pos,
+                                             read_buf, read_buf_filled_len,
+                                             varlen_counter_encoding_fragment_length) * pw;
+            pw *= varlen_counter_encoding_base;
+            bit_pos += varlen_counter_encoding_fragment_length;
+        }
+        if (counter == 0) {
+            num_prefix_keys_read++;
+            depth_branch[depth_branch.size() - 1].second = read_data_from_bitmap(buf, read_bit_pos,
+                                                                                 read_buf, read_buf_filled_len, 
+                                                                                 2);
+            bit_pos += 2;
+            return;
+        }
+        bit_pos += counter - 1;
+        depth_branch.emplace_back(depth_branch.back().first + counter, 0b11);
+    }
+    else {
+        bit_pos += advance_bits;
+        depth_branch.emplace_back(depth_branch.back().first + advance_bits + 1, 0b11);
+    }
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtLeaf() {
+    return (buf[bit_pos / 64] >> (bit_pos % 64)) & 1;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtPrefixKey(bool has_prefix_keys) {
+    assert(has_prefix_keys);
+    if (AtLeaf())
+        return false;
+    uint64_t read_buf = 0;
+    uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos;
+    const uint64_t data = read_data_from_bitmap(buf, read_bit_pos, read_buf, read_buf_filled_len, 2 + varlen_counter_encoding_fragment_length);
+    return data == 0b10UL;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::SkipSubtree(bool has_prefix_keys) {
+    assert(depth_branch.back().second == 0b11);
+    const uint32_t original_depth = depth_branch.back().first;
+    do {
+        Advance(has_prefix_keys);
+    } while (original_depth < depth_branch.back().first);
+    assert(depth_branch.back().second == 0b10);
 }
 
 }
