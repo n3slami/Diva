@@ -397,6 +397,123 @@ inline bool compare_bitmap_to_bitmap(const uint64_t *a, uint32_t pos_a,
 }
 
 
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline uint64_t read_data_from_bitmap(const void *bitmap, uint32_t& bit_pos,
+                                      uint64_t& buffer_word, uint32_t& buffer_word_filled_bits,
+                                      uint32_t num_bits_to_read) {
+    const uint64_t *bitmap_words = reinterpret_cast<const uint64_t *>(bitmap);
+    const bool fetch_next_word = num_bits_to_read > buffer_word_filled_bits;
+    uint32_t bits_to_move = fetch_next_word ? buffer_word_filled_bits : num_bits_to_read;
+
+    uint64_t res = buffer_word & BITMASK(bits_to_move);
+    uint32_t res_filled_bits = bits_to_move;
+    buffer_word >>= bits_to_move;
+    buffer_word_filled_bits -= bits_to_move;
+    if (fetch_next_word) {
+        num_bits_to_read -= bits_to_move;
+        while (num_bits_to_read > 0) {
+            buffer_word_filled_bits = 64 - bit_pos % 64;
+            buffer_word = bitmap_words[bit_pos / 64];
+            buffer_word >>= bit_pos % 64;
+            bit_pos += buffer_word_filled_bits;
+
+            bits_to_move = std::min(num_bits_to_read, buffer_word_filled_bits);
+            res |= (buffer_word & BITMASK(bits_to_move)) << res_filled_bits;
+            res_filled_bits += bits_to_move;
+            buffer_word >>= bits_to_move;
+            buffer_word_filled_bits -= bits_to_move;
+            num_bits_to_read -= bits_to_move;
+        }
+    }
+    return res;
+}
+
+
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline void write_bits_to_bitmap(uint64_t *bitmap, uint32_t bitmap_pos,
+                                 uint64_t bits,
+                                 uint32_t num_bits_to_copy) {
+    bitmap[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
+    if (bitmap_pos % 64 + num_bits_to_copy > 64)
+        bitmap[bitmap_pos / 64 + 1] |= bits >> (64 - bitmap_pos % 64);
+}
+
+
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline void write_bits_from_string_to_bitmap(void *bitmap, uint32_t bitmap_pos,
+                                             const void *str, uint32_t str_pos, 
+                                             uint32_t num_bits_to_copy) {
+    uint64_t *bitmap_words = reinterpret_cast<uint64_t *>(bitmap);
+    const uint64_t *str_words = reinterpret_cast<const uint64_t *>(str);
+    const uint32_t bitmap_pos_end = bitmap_pos + num_bits_to_copy;
+    while (bitmap_pos < bitmap_pos_end) {
+        int32_t bit_count_to_write = std::min<int32_t>(64 - str_pos % 64,
+                                                       bitmap_pos_end - bitmap_pos);
+        uint64_t data = 0;
+        if (str) {
+            data = str_words[str_pos / 64];
+            data = __builtin_bswap64(data) >> (8 * sizeof(data) - bit_count_to_write - str_pos % 64);
+            data &= BITMASK(bit_count_to_write);
+        }
+        write_bits_to_bitmap(bitmap_words, bitmap_pos, data, bit_count_to_write);
+        str_pos += bit_count_to_write;
+        bitmap_pos += bit_count_to_write;
+    }
+}
+
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t pos_bitmap,
+                                                  const void *str, uint32_t pos_str,
+                                                  uint32_t num_bits_to_compare) {
+    int64_t res = 0;
+    const uint64_t *bitmap_words = reinterpret_cast<const uint64_t *>(bitmap);
+    const uint64_t *str_words = reinterpret_cast<const uint64_t *>(str);
+    const uint32_t pos_bitmap_end = pos_bitmap + num_bits_to_compare;
+    while (pos_bitmap < pos_bitmap_end) {
+        const uint32_t bit_count_to_compare = std::min(pos_bitmap_end - pos_bitmap,
+                                                        64 - std::max(pos_bitmap % 64, pos_str % 64));
+        const uint64_t compare_mask = BITMASK(bit_count_to_compare);
+
+        uint64_t data_bitmap = bitmap_words[pos_bitmap / 64];
+        data_bitmap = __builtin_bswap64(data_bitmap) 
+                        >> (8 * sizeof(data_bitmap) - bit_count_to_compare - pos_bitmap % 64);
+        data_bitmap &= compare_mask;
+
+        uint64_t data_str = str_words[pos_str / 64];
+        data_str = __builtin_bswap64(data_str) 
+                        >> (8 * sizeof(data_str) - bit_count_to_compare - pos_str % 64);
+        data_str &= compare_mask;
+
+        res = res ? res : data_bitmap - data_str;
+
+        pos_bitmap += bit_count_to_compare;
+        pos_str += bit_count_to_compare;
+    }
+    return res;
+}
+
+
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, uint64_t counter, const uint32_t counter_fragment_len, int32_t at) {
+    const uint64_t varlen_counter_encoding_base = BITMASK(counter_fragment_len);
+    uint32_t digit_count = 1;
+    for (uint64_t pw = varlen_counter_encoding_base; pw < counter; pw *= varlen_counter_encoding_base)
+        digit_count++;
+    uint32_t bit_pos = digit_count + 1;
+    uint64_t counter_encoding = 1ULL << digit_count;
+    while (counter) {
+        counter_encoding |= (counter % varlen_counter_encoding_base) << bit_pos;
+        counter /= varlen_counter_encoding_base;
+    }
+    write_bits_to_bitmap(bitmap, at, counter_encoding, digit_count * (counter_fragment_len + 1) + 1);
+}
+
+
 // Synchronization and Locking Primitives
 typedef uint8_t lock_t;         // Should change the dang wormhole to allow for longer locks
 static constexpr lock_t rwlock_no_access = 0;
