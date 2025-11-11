@@ -1315,8 +1315,8 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     }
     InfiniteByteString edited_key {copied_key_str, copied_key_len};
     if (zero_pos != -1) {
-        if (edited_key <= prev_key) {
-            // Edited key turned out to become smaller than the previous.
+        if (edited_key <= prev_key || prev_key.IsPrefixOf(edited_key, infix_store.GetInvalidBits())) {
+            // Edited key turned out to become smaller than the previous or a prefix thereof.
             // Inserting using the simple method...
             rwlock_unlock_write(infix_store.rwlock);
             UnlockLeaves(leaves_to_unlock, it_write_lock);
@@ -1446,7 +1446,7 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     infix_store.ptr = store_lt.ptr;
     infix_store.rwlock.store(store_lt.rwlock.load(std::memory_order_acquire), std::memory_order_release);
     if (zero_pos != -1) {
-        uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
+        uint64_t key_extraction = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, key.GetBit(shared_gt));
         key_extraction -= extraction_gt & (~BITMASK(infix_size_));
         if constexpr (payload_type == PayloadType::FixedLength) {
             InsertRawIntoInfixStore(store_gt, key_extraction | 1, total_implicit_gt, reinterpret_cast<const uint64_t *>(payload));

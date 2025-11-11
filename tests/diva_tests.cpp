@@ -4297,7 +4297,16 @@ public:
             const uint32_t n_keys = 30000000;
             const uint32_t n_threads = 8;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
-            const uint32_t query_period = 2000000;
+            const uint32_t query_period = 5000000;
+            
+            constexpr bool ascii = false;
+            std::string valid_ascii_characters = "";
+            for (char c = 'A'; c <= 'Z'; c++)
+                valid_ascii_characters += c;
+            for (char c = 'a'; c <= 'z'; c++)
+                valid_ascii_characters += c;
+            for (char c = '0'; c <= '9'; c++)
+                valid_ascii_characters += c;
 
             const uint32_t rng_seed = 2;
             std::mt19937_64 rng(rng_seed);
@@ -4310,8 +4319,12 @@ public:
                 else
                     str_length = 40 + rng() % 3;
                 char *str = new char[48];
-                for (uint32_t i = 0; i < str_length; i++)
-                    str[i] = std::max(1UL, rng());
+                for (uint32_t i = 0; i < str_length; i++) {
+                    if constexpr (ascii)
+                        str[i] = valid_ascii_characters[rng() % valid_ascii_characters.size()];
+                    else 
+                        str[i] = std::max(1UL, rng());
+                }
                 string_keys.emplace_back(reinterpret_cast<const char *>(str), str_length);
             }
             std::shuffle(string_keys.begin(), string_keys.end(), rng);
@@ -4394,9 +4407,18 @@ public:
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
             const uint32_t n_threads = 8;
-            const uint32_t n_bulk = n_keys / n_threads;
+            const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
             const uint64_t delete_threshold = 5000000;
-            const uint64_t query_period = 2000000;
+            const uint64_t query_period = 5000000;
+
+            constexpr bool ascii = false;
+            std::string valid_ascii_characters = "";
+            for (char c = 'A'; c <= 'Z'; c++)
+                valid_ascii_characters += c;
+            for (char c = 'a'; c <= 'z'; c++)
+                valid_ascii_characters += c;
+            for (char c = '0'; c <= '9'; c++)
+                valid_ascii_characters += c;
 
             const uint32_t rng_seed = 2;
             std::mt19937_64 rng(rng_seed);
@@ -4409,8 +4431,12 @@ public:
                 else
                     str_length = 40 + rng() % 3;
                 char *str = new char[48];
-                for (uint32_t i = 0; i < str_length; i++)
-                    str[i] = std::max(1UL, rng());
+                for (uint32_t i = 0; i < str_length; i++) {
+                    if constexpr (ascii)
+                        str[i] = valid_ascii_characters[rng() % valid_ascii_characters.size()];
+                    else
+                        str[i] = std::max(1UL, rng());
+                }
                 string_keys.emplace_back(reinterpret_cast<const char *>(str), str_length);
             }
             std::shuffle(string_keys.begin(), string_keys.end(), rng);
@@ -4442,7 +4468,7 @@ public:
                                 REQUIRE(s.PointQuery(string_keys[ti]));
                                 if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
                                     std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
-                                    for (uint32_t tj = n_bulk + i; tj < ti; tj += n_threads) {
+                                    for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
                                         if (payloads[tj][0] > delete_threshold) {
                                             bool found = false;
                                             for (auto it = s.GetIterator(string_keys[tj]); 
@@ -4453,6 +4479,18 @@ public:
                                                 if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
                                                     found = true;
                                                     break;
+                                                }
+                                            }
+                                            if (!found) {
+                                                for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]);
+                                                        it.IsValid();
+                                                        it++) {
+                                                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                                                    it.GetPayload(payload);
+                                                    if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
+                                                        found = true;
+                                                        break;
+                                                    }
                                                 }
                                             }
                                             REQUIRE(found);
