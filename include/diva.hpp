@@ -1517,6 +1517,8 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
             delete[] right_payload_list;
     }
     delete[] ptr_to_free;
+
+    n_keys_.fetch_add(left_list_len + right_list_len - infix_count, std::memory_order_release);
 }
 
 
