@@ -4177,13 +4177,127 @@ public:
             }
         }
 
+        SUBCASE("iterate bounded range") {
+            SUBCASE("sample end") {
+                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                    payload_size, (const uint64_t **) payloads);
+                uint32_t ind = 0;
+                const uint32_t end_ind = 20 * infix_store_target_size;
+                auto it = s.GetIterator(string_keys[ind], string_keys[end_ind]);
+                do {
+                    REQUIRE(it.IsValid());
+                    auto [fetch_key, bit_length] = *it;
+                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (O) {
+                        fetch_key = to_big_endian_order(fetch_key);
+                        key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    else {
+                        key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
+                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
+
+                    uint64_t it_payload[payload_size / 64 + 2];
+                    it.GetPayload(it_payload);
+                    REQUIRE(compare_bitmap_to_bitmap(payloads[ind], 0, it_payload, 0, payload_size));
+
+                    it++;
+                    ind++;
+                } while (ind <= end_ind);
+                REQUIRE(!it.IsValid());
+            }
+
+            SUBCASE("infix end") {
+                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                    payload_size, (const uint64_t **) payloads);
+                uint32_t ind = 0;
+                const uint32_t end_ind = 20 * infix_store_target_size - 10;
+                auto it = s.GetIterator(string_keys[ind], string_keys[end_ind]);
+                do {
+                    REQUIRE(it.IsValid());
+                    auto [fetch_key, bit_length] = *it;
+                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (O) {
+                        fetch_key = to_big_endian_order(fetch_key);
+                        key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    else {
+                        key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
+                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
+
+                    uint64_t it_payload[payload_size / 64 + 2];
+                    it.GetPayload(it_payload);
+                    REQUIRE(compare_bitmap_to_bitmap(payloads[ind], 0, it_payload, 0, payload_size));
+
+                    it++;
+                    ind++;
+                } while (ind <= end_ind);
+                REQUIRE(!it.IsValid());
+            }
+
+            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+            const uint32_t sample_gap = n_keys / 20;
+            for (uint32_t i = 0; i < n_keys; i += sample_gap)
+                s.AddTreeKey(reinterpret_cast<const uint8_t *>(string_keys[i].data()), string_keys[i].size(), payloads[i]);
+
+            const uint32_t infix_gap = 2;
+            uint32_t *perm = new uint32_t[n_keys / infix_gap + 1];
+            for (uint32_t i = 0; i < n_keys / infix_gap; i++)
+                perm[i] = i * infix_gap;
+            std::shuffle(perm, perm + n_keys / infix_gap, rng);
+            for (uint32_t i = 0; i < n_keys / infix_gap; i++) {
+                if (perm[i] % sample_gap == 0)
+                    continue;
+                s.Insert(string_keys[perm[i]], payloads[perm[i]]);
+            }
+            delete[] perm;
+
+            SUBCASE("non-existent end") {
+                uint32_t ind = 0;
+                const uint32_t end_ind = 20 * infix_store_target_size - 1;
+                auto it = s.GetIterator(string_keys[ind], string_keys[end_ind]);
+                do {
+                    REQUIRE(it.IsValid());
+                    auto [fetch_key, bit_length] = *it;
+                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (O) {
+                        fetch_key = to_big_endian_order(fetch_key);
+                        key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    else {
+                        key = {reinterpret_cast<const uint8_t *>(fetch_key.data()), static_cast<uint32_t>(fetch_key.size())};
+                        exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
+                    }
+                    const uint32_t last_bits_to_ignore = bit_length % 8 == 0 ? 0 : 8 - bit_length % 8;
+                    REQUIRE(key.IsPrefixOf(exp, last_bits_to_ignore));
+
+                    uint64_t it_payload[payload_size / 64 + 2];
+                    it.GetPayload(it_payload);
+                    REQUIRE(compare_bitmap_to_bitmap(payloads[ind], 0, it_payload, 0, payload_size));
+
+                    it++;
+                    ind += infix_gap;
+                } while (((ind + infix_gap - 1) / infix_gap) * infix_gap < end_ind);
+                REQUIRE(!it.IsValid());
+            }
+        }
+
         SUBCASE("concurrency with payloads") {
             const uint32_t infix_size = 10;
             const uint32_t seed = 2;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
             const uint32_t n_threads = 8;
-            const uint32_t n_bulk = n_keys / n_threads;
+            const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
+            const uint32_t query_period = 2000000;
 
             const uint32_t rng_seed = 2;
             std::mt19937_64 rng(rng_seed);
@@ -4241,12 +4355,29 @@ public:
                                     if (!deleted[pos].load(std::memory_order_acquire)) {
                                         auto it = s.GetIterator(string_keys[pos]);
                                         s.Delete(string_keys[pos],
-                                                [&](const void *ptr) {
-                                                    return compare_bitmap_to_bitmap(reinterpret_cast<const uint64_t *>(ptr), 0,
-                                                                                    payloads[pos], 0,
-                                                                                    payload_size);
+                                                [&](const uint64_t *ptr) {
+                                                    return compare_bitmap_to_bitmap(ptr, 0, payloads[pos], 0, payload_size);
                                                 });
                                         deleted[pos].store(true, std::memory_order_release);
+                                    }
+                                }
+                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
+                                    std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
+                                    for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
+                                        if (!deleted[tj].load(std::memory_order_acquire)) {
+                                            bool found = false;
+                                            for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]);
+                                                    it.IsValid();
+                                                    it++) {
+                                                uint64_t payload[(payload_size + 63) / 64 + 1];
+                                                it.GetPayload(payload);
+                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            REQUIRE(found);
+                                        }
                                     }
                                 }
                             }
@@ -4264,7 +4395,8 @@ public:
             const uint32_t n_keys = 30000000;
             const uint32_t n_threads = 8;
             const uint32_t n_bulk = n_keys / n_threads;
-            const uint64_t delete_threshold = 1000000;
+            const uint64_t delete_threshold = 5000000;
+            const uint64_t query_period = 2000000;
 
             const uint32_t rng_seed = 2;
             std::mt19937_64 rng(rng_seed);
@@ -4298,27 +4430,48 @@ public:
                                                 load_factor,
                                                 payload_size,
                                                 (const uint64_t **) payloads);
+            REQUIRE_EQ(s.GetNumKeys(), n_bulk);
 
             std::vector<std::thread> threads;
-            std::atomic<uint32_t> n_entries = 0;
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
-                                payloads[ti][0] = n_entries.load(std::memory_order_acquire);
+                                payloads[ti][0] = s.GetNumKeys();
                                 s.Insert(string_keys[ti], payloads[ti], rng());
                                 REQUIRE(s.PointQuery(string_keys[ti]));
-                                n_entries.fetch_add(1, std::memory_order_release);
+                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
+                                    std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
+                                    for (uint32_t tj = n_bulk + i; tj < ti; tj += n_threads) {
+                                        if (payloads[tj][0] > delete_threshold) {
+                                            bool found = false;
+                                            for (auto it = s.GetIterator(string_keys[tj]); 
+                                                    it.IsValid();
+                                                    it++) {
+                                                uint64_t payload[(payload_size + 63) / 64 + 1];
+                                                it.GetPayload(payload);
+                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            REQUIRE(found);
+                                        }
+                                    }
+                                }
                             }
                         }
                         else {
-                            while (n_entries.load(std::memory_order_acquire) < delete_threshold)
+                            while (s.GetNumKeys() < delete_threshold)
                                 cpu_pause();
-                            uint8_t key[200] = {};
-                            key[199] = 1;
-                            auto it = s.GetIterator(key, 200, [=](const uint64_t *payload) {
-                                                                   return payload[0] <= delete_threshold;
-                                                               });
+                            uint32_t key_len = 200;
+                            uint8_t key[key_len];
+                            memset(key, 0, key_len);
+                            if constexpr (O)
+                                key_len = 8;
+                            key[key_len - 1] = 1;
+                            auto it = s.GetIterator(key, key_len, nullptr, 0,
+                                    [=](const uint64_t *payload) { return payload[0] <= delete_threshold; });
                             while (it.IsValid())
                                 it++;
                         }

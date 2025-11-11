@@ -274,12 +274,13 @@ inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
     const uint32_t buf_size = 8 * sizeof(uint64_t);
     const uint32_t pos_in_end = pos_in + num_bits_to_copy;
     while (pos_in < pos_in_end) {
-        const uint32_t amount_to_move = std::min(pos_in_end - pos_in, std::min((buf_size - pos_in - 1) % buf_size + 1,
-                                                                               (buf_size - pos_out - 1) % buf_size + 1));
+        const uint32_t amount_to_move = std::min(pos_in_end - pos_in, std::min(buf_size - pos_in % buf_size,
+                                                                               buf_size - pos_out % buf_size));
         const uint64_t mask_in = BITMASK(amount_to_move) << (pos_in % buf_size);
         const uint64_t mask_out = BITMASK(amount_to_move) << (pos_out % buf_size);
         out[pos_out / buf_size] &= ~mask_out;
-        out[pos_out / buf_size] |= ((in[pos_in / buf_size] & mask_in) >> (pos_in % buf_size)) << (pos_out % buf_size);
+        out[pos_out / buf_size] |= ((in[pos_in / buf_size] & mask_in) >> (pos_in % buf_size)) 
+                                    << (pos_out % buf_size);
         pos_in += amount_to_move;
         pos_out += amount_to_move;
     }
@@ -294,8 +295,8 @@ inline bool compare_bitmap_to_bitmap(const uint64_t *a, uint32_t pos_a,
     const uint32_t buf_size = 8 * sizeof(uint64_t);
     const uint32_t pos_a_end = pos_a + num_bits_to_compare;
     while (pos_a < pos_a_end) {
-        const uint32_t amount_to_compare = std::min(pos_a_end - pos_a, std::min((buf_size - pos_a - 1) % buf_size + 1,
-                                                                                  (buf_size - pos_b - 1) % buf_size + 1));
+        const uint32_t amount_to_compare = std::min(pos_a_end - pos_a, std::min(buf_size - pos_a % buf_size,
+                                                                                buf_size - pos_b % buf_size));
         const uint64_t val_a = a[pos_a / buf_size] >> (pos_a % buf_size);
         const uint64_t val_b = b[pos_b / buf_size] >> (pos_b % buf_size);
         if ((val_a & BITMASK(amount_to_compare)) != (val_b & BITMASK(amount_to_compare)))
