@@ -4069,7 +4069,7 @@ public:
             const int32_t neighborhood_range = infix_gap * 30;
             SUBCASE("iterate over every key") {
                 int32_t ind = 0;
-                auto it = s.GetIterator(string_keys[ind]);
+                auto it = s.GetIterator();
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
@@ -4295,7 +4295,7 @@ public:
             const uint32_t seed = 2;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_threads = 8;
+            const uint32_t n_threads = 32;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
             const uint32_t query_period = 5000000;
             
@@ -4317,7 +4317,7 @@ public:
                 if constexpr (O)
                     str_length = 8;
                 else
-                    str_length = 40 + rng() % 3;
+                    str_length = 10 + rng() % 3;
                 char *str = new char[48];
                 for (uint32_t i = 0; i < str_length; i++) {
                     if constexpr (ascii)
@@ -4406,7 +4406,7 @@ public:
             const uint32_t seed = 2;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_threads = 8;
+            const uint32_t n_threads = 32;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
             const uint64_t delete_threshold = 5000000;
             const uint64_t query_period = 5000000;
@@ -4429,7 +4429,7 @@ public:
                 if constexpr (O)
                     str_length = 8;
                 else
-                    str_length = 40 + rng() % 3;
+                    str_length = 10 + rng() % 3;
                 char *str = new char[48];
                 for (uint32_t i = 0; i < str_length; i++) {
                     if constexpr (ascii)
@@ -4471,7 +4471,7 @@ public:
                                     for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
                                         if (payloads[tj][0] > delete_threshold) {
                                             bool found = false;
-                                            for (auto it = s.GetIterator(string_keys[tj]); 
+                                            for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
                                                     it.IsValid();
                                                     it++) {
                                                 uint64_t payload[(payload_size + 63) / 64 + 1];
@@ -4502,14 +4502,10 @@ public:
                         else {
                             while (s.GetNumKeys() < delete_threshold)
                                 cpu_pause();
-                            uint32_t key_len = 200;
-                            uint8_t key[key_len];
-                            memset(key, 0, key_len);
-                            if constexpr (O)
-                                key_len = 8;
-                            key[key_len - 1] = 1;
-                            auto it = s.GetIterator(key, key_len, nullptr, 0,
-                                    [=](const uint64_t *payload) { return payload[0] <= delete_threshold; });
+                            auto it = s.GetIterator(nullptr, 0, nullptr, 0,
+                                    [=](const uint64_t *payload) { 
+                                        return payload[0] <= delete_threshold && payload[0] > 0;
+                                    });
                             while (it.IsValid())
                                 it++;
                         }
@@ -4524,6 +4520,20 @@ public:
                 uint64_t payload[(payload_size + 63) / 64 + 1];
                 it.GetPayload(payload);
                 REQUIRE(payload[0] > delete_threshold);
+            }
+            for (uint32_t i = 0; i < n_keys; i++) {
+                if (i >= n_bulk && (i - n_bulk) % n_threads == 0)
+                    continue;
+                bool found = false;
+                for (auto it = s.GetIterator(string_keys[i], string_keys[i]); it.IsValid(); it++) {
+                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                    it.GetPayload(payload);
+                    if (compare_bitmap_to_bitmap(payloads[i], 0, payload, 0, payload_size)) {
+                        found = true;
+                        break;
+                    }
+                }
+                REQUIRE_EQ(found, payloads[i][0] > delete_threshold);
             }
         }
     }

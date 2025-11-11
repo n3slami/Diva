@@ -117,16 +117,6 @@ public:
     void BulkLoadStreamingFinish();
     uint64_t GetNumKeys() const;
 
-private:
-    static constexpr uint32_t infix_store_target_size = 1024;
-    static_assert(infix_store_target_size % 64 == 0);
-    static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
-    static constexpr uint32_t scale_shift = 15;
-    static constexpr uint32_t scale_implicit_shift = 15;
-    static constexpr uint32_t size_scalar_count = 500;
-    static constexpr uint32_t heap_alloc_threshold = 20000U;
-    static constexpr uint64_t max_exp_backoff = BITMASK(14);
-
     struct InfiniteByteString {
         const uint8_t *str;
         uint32_t length;
@@ -190,6 +180,92 @@ private:
             return length == rhs.length && memcmp(str, rhs.str, std::min(length, rhs.length)) == 0;
         }
     };
+
+    class Iterator {
+        friend class Diva<int_optimized, payload_type>;
+        friend class DivaTests;
+
+        using KeyType = std::conditional_t<int_optimized, uint64_t, std::string>;
+
+    public:
+        Iterator(Diva<int_optimized, payload_type> *parent):
+            filter_(parent) { }
+        ~Iterator();
+
+        Iterator(const Iterator& other);
+        Iterator& operator=(const Iterator& other);
+        std::pair<KeyType, uint32_t> operator*();
+        Iterator& operator++();
+        Iterator operator++(int);
+        bool operator==(const Iterator& rhs) const;
+        bool operator!=(const Iterator& rhs) const;
+
+        void GetPayload(uint64_t *out) const;
+        void SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove);
+        bool IsValid() const;
+
+    private:
+        static constexpr uint32_t iterator_local_buf_len = 1 << 10;
+        Diva<int_optimized, payload_type> *filter_;
+        InfiniteByteString next_to_fetch_, end_key_;
+        uint32_t shared_, ignore_, implicit_;
+        uint8_t next_to_fetch_contents_[iterator_local_buf_len], end_key_contents_[iterator_local_buf_len];
+        uint8_t shared_prefix_[iterator_local_buf_len], current_key_contents_[iterator_local_buf_len];
+        std::vector<uint64_t> infixes_, bit_counts_, payloads_;
+        uint32_t ind_ = 0;
+        std::function<bool(const uint64_t *)> should_remove_;
+
+        Iterator(Diva<int_optimized, payload_type> *parent,
+                 std::string_view start, std::string_view end,
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
+        Iterator(Diva<int_optimized, payload_type> *parent, 
+                 const uint8_t *start, uint32_t start_len, 
+                 const uint8_t *end, uint32_t end_len, 
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
+        Iterator(Diva<int_optimized, payload_type> *parent,
+                 uint64_t start, uint64_t end,
+                 std::function<bool(const uint64_t *)> should_remove=nullptr);
+
+        void Fetch();
+        void FetchDelete();
+
+        void SetSharedPrefix(InfiniteByteString prefix, uint32_t shared, uint32_t ignore, uint32_t implicit) {
+            memcpy(shared_prefix_, prefix.str, prefix.length);
+            shared_ = shared;
+            ignore_ = ignore;
+            implicit_ = implicit;
+        }
+
+        void SetNextToFetch(const uint8_t *str, const uint32_t len) {
+            if (str != nullptr && len > 0) {
+                memcpy(next_to_fetch_contents_, str, len);
+                next_to_fetch_ = {next_to_fetch_contents_, len};
+            }
+            else 
+                next_to_fetch_ = {nullptr, 0};
+        }
+
+        void SetNextToFetchFromExtraction(const InfiniteByteString next, uint64_t extraction);
+
+        void SetEnd(const uint8_t *str, const uint32_t len) {
+            if (str != nullptr && len > 0) {
+                memcpy(end_key_contents_, str, len);
+                end_key_ = {end_key_contents_, len};
+            }
+            else 
+                end_key_ = {nullptr, 0};
+        }
+    };
+
+private:
+    static constexpr uint32_t infix_store_target_size = 1024;
+    static_assert(infix_store_target_size % 64 == 0);
+    static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
+    static constexpr uint32_t scale_shift = 15;
+    static constexpr uint32_t scale_implicit_shift = 15;
+    static constexpr uint32_t size_scalar_count = 500;
+    static constexpr uint32_t heap_alloc_threshold = 20000U;
+    static constexpr uint64_t max_exp_backoff = BITMASK(14);
 
     struct InfixStore {
         static const uint32_t size_grade_bit_count = 8;
@@ -271,79 +347,6 @@ private:
                 status |= (1U << 31);
             else 
                 status &= ~(1U << 31);
-        }
-    };
-
-    class Iterator {
-        friend class Diva<int_optimized, payload_type>;
-        friend class DivaTests;
-
-        using KeyType = std::conditional_t<int_optimized, uint64_t, std::string>;
-
-    public:
-        Iterator(const Iterator& other);
-        Iterator& operator=(const Iterator& other);
-        std::pair<KeyType, uint32_t> operator*();
-        Iterator& operator++();
-        Iterator operator++(int);
-        bool operator==(const Iterator& rhs) const;
-        bool operator!=(const Iterator& rhs) const;
-
-        void GetPayload(uint64_t *out) const;
-        void SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove);
-        bool IsValid() const;
-
-    private:
-        static constexpr uint32_t iterator_local_buf_len = 1 << 10;
-        Diva<int_optimized, payload_type> *filter_;
-        InfiniteByteString next_to_fetch_, end_key_;
-        uint32_t shared_, ignore_, implicit_;
-        uint8_t next_to_fetch_contents_[iterator_local_buf_len], end_key_contents_[iterator_local_buf_len];
-        uint8_t shared_prefix_[iterator_local_buf_len], current_key_contents_[iterator_local_buf_len];
-        std::vector<uint64_t> infixes_, bit_counts_, payloads_;
-        uint32_t ind_ = 0;
-        std::function<bool(const uint64_t *)> should_remove_;
-
-        Iterator(Diva<int_optimized, payload_type> *parent,
-                 std::string_view start, std::string_view end,
-                 std::function<bool(const uint64_t *)> should_remove=nullptr);
-        Iterator(Diva<int_optimized, payload_type> *parent, 
-                 const uint8_t *start, uint32_t start_len, 
-                 const uint8_t *end, uint32_t end_len, 
-                 std::function<bool(const uint64_t *)> should_remove=nullptr);
-        Iterator(Diva<int_optimized, payload_type> *parent,
-                 uint64_t start, uint64_t end,
-                 std::function<bool(const uint64_t *)> should_remove=nullptr);
-        ~Iterator();
-
-        void Fetch();
-        void FetchDelete();
-
-        void SetSharedPrefix(InfiniteByteString prefix, uint32_t shared, uint32_t ignore, uint32_t implicit) {
-            memcpy(shared_prefix_, prefix.str, prefix.length);
-            shared_ = shared;
-            ignore_ = ignore;
-            implicit_ = implicit;
-        }
-
-        void SetNextToFetch(const uint8_t *str, const uint32_t len) {
-            if (str != nullptr && len > 0) {
-                memcpy(next_to_fetch_contents_, str, len);
-                next_to_fetch_ = {next_to_fetch_contents_, len};
-            }
-            else 
-                next_to_fetch_ = {nullptr, 0};
-        }
-
-        void SetNextToFetchFromExtraction(const InfiniteByteString next, uint64_t extraction);
-
-        void SetEnd(const uint8_t *str, const uint32_t len) {
-            if (str != nullptr && len > 0) {
-                memcpy(end_key_contents_, str, len);
-                end_key_ = {end_key_contents_, len};
-            }
-            else 
-                end_key_ = {nullptr, 0};
         }
     };
 
@@ -460,12 +463,13 @@ private:
     uint32_t DeserializeInfixStore(const char *deser_buf, InfixStore& store) const;
 
 public:
-    Iterator GetIterator(std::string_view start, std::string_view end="",
+    Iterator GetIterator(std::string_view start="", std::string_view end="",
                          std::function<bool(const uint64_t *)> should_remove=nullptr);
     Iterator GetIterator(const uint8_t *start, const uint32_t start_len,
                          const uint8_t *end=nullptr, const uint32_t end_len=0,
                          std::function<bool(const uint64_t *)> should_remove=nullptr);
-    Iterator GetIterator(uint64_t start, uint64_t end=std::numeric_limits<uint64_t>::max(),
+    Iterator GetIterator(uint64_t start,
+                         uint64_t end=std::numeric_limits<uint64_t>::max(),
                          std::function<bool(const uint64_t *)> should_remove=nullptr);
 };
 
@@ -2295,7 +2299,10 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
                            tmp, [&] (std::pair<uint64_t, uint32_t> a, std::pair<uint64_t, uint32_t> b) {
                                 return CompareInfixes(a.first, b.first);
                            });
-                uint64_t payload_list_copy[payload_list_size + 1];
+                uint64_t payload_list_copy_contents[should_allocate_on_heap ? 1 : payload_list_size + 1];
+                uint64_t *payload_list_copy = payload_list_copy_contents;
+                if (should_allocate_on_heap)
+                    payload_list_copy = new uint64_t[payload_list_size + 1];
                 memcpy(payload_list_copy, payload_list, (payload_list_size + 1) * sizeof(uint64_t));
                 for (uint32_t i = 0; i < total_elem_count; i++) {
                     infix_list[i] = tmp[i].first;
@@ -2307,6 +2314,7 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
                 if (should_allocate_on_heap) {
                     delete[] pair_list;
                     delete[] tmp;
+                    delete[] payload_list_copy;
                 }
             }
             else {
@@ -4048,7 +4056,12 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized,
                                                              std::function<bool(const uint64_t *)> should_remove):
         filter_(parent),
         should_remove_(should_remove) {
-    SetNextToFetch(reinterpret_cast<const uint8_t *>(start.data()), start.size());
+    if (start.size() == 0) {
+        memset(next_to_fetch_contents_, 0, sizeof(next_to_fetch_contents_));
+        next_to_fetch_ = {next_to_fetch_contents_, iterator_local_buf_len - 1};
+    }
+    else
+        SetNextToFetch(reinterpret_cast<const uint8_t *>(start.data()), start.size());
     SetEnd(reinterpret_cast<const uint8_t *>(end.data()), end.size());
     if constexpr (payload_type == PayloadType::FixedLength) {
         if (should_remove_) {
@@ -4067,7 +4080,12 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized,
                                                              std::function<bool(const uint64_t *)> should_remove):
         filter_(parent),
         should_remove_(should_remove) {
-    SetNextToFetch(start, start_len);
+    if (start == nullptr || start_len == 0) {
+        memset(next_to_fetch_contents_, 0, sizeof(next_to_fetch_contents_));
+        next_to_fetch_ = {next_to_fetch_contents_, iterator_local_buf_len - 1};
+    }
+    else
+        SetNextToFetch(start, start_len);
     SetEnd(end, end_len);
     if constexpr (payload_type == PayloadType::FixedLength) {
         if (should_remove_) {
@@ -4321,6 +4339,7 @@ IteratorRefetchLowerUpperBounds:
     InfiniteByteString prev_key {};
     wormhole_int_iter it_int;
     wormhole_iter it;
+    assert(next_to_fetch_.str);
     filter_->GetLowerUpperBounds(next_to_fetch_, it_write_lock, leaves_to_unlock, it, it_int,
                                  prev_key, next_key, infix_store_ptr);
     if (next_key.str == nullptr) {
@@ -4392,6 +4411,11 @@ IteratorRefetchLowerUpperBounds:
     }
 
     if (implicit_part_l >= total_implicit) {    // Go to the next infix store if this one is done
+        if (end_key_.str != nullptr && end_key_ < next_key) {
+            SetNextToFetch(nullptr, 0);
+            rwlock_unlock_read(infix_store.rwlock);
+            return;
+        }
         SetNextToFetch(next_key.str, next_key.length);
         rwlock_unlock_read(infix_store.rwlock);
         if (!infixes_.empty())
@@ -4440,7 +4464,7 @@ IteratorRefetchLowerUpperBounds:
 
     rwlock_unlock_read(infix_store.rwlock);     // Done with `infix_store`
 
-    if (infixes_.size() == 0)
+    if (infixes_.size() == 0 && next_to_fetch_.str)
         goto IteratorRefetchLowerUpperBounds;
 }
 
@@ -4460,6 +4484,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     InfiniteByteString prev_key {};
     wormhole_int_iter it_int;
     wormhole_iter it;
+    assert(next_to_fetch_.str);
     filter_->GetLowerUpperBounds(next_to_fetch_, it_write_lock, leaves_to_unlock, it, it_int,
                                  prev_key, next_key, infix_store_ptr);
     if (next_key.str == nullptr) {
@@ -4480,8 +4505,8 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     if (next_to_fetch_ <= prev_key || (infix_store.IsPartialKey() && prev_key.IsPrefixOf(next_to_fetch_, infix_store.GetInvalidBits()))) {
         // Previous key was a partial key and a prefix of the query key
         if (end_key_.str != nullptr && prev_key > end_key_) {
+            filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
             SetNextToFetch(nullptr, 0);
-            rwlock_unlock_write(infix_store.rwlock);
             return;
         }
         uint64_t payload[(filter_->payload_size_ + 63) / 64 + 1];
@@ -4529,7 +4554,10 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     }
 
     if (implicit_part_l >= total_implicit) {    // Go to the next infix store if this one is done
-        SetNextToFetch(next_key.str, next_key.length);
+        if (end_key_.str != nullptr && end_key_ < next_key)
+            SetNextToFetch(nullptr, 0);
+        else
+            SetNextToFetch(next_key.str, next_key.length);
         rwlock_unlock_write(infix_store.rwlock);
         return;
     }
@@ -4542,7 +4570,6 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     const uint64_t recovered_implicit = prev_implicit + implicit_part_l;
     explicit_part_r = implicit_part_l == implicit_part_r ? explicit_part_r 
                                                          : BITMASK(filter_->infix_size_);
-    int32_t pos = runend_pos;
     std::vector<uint64_t> deletees;
     for (int32_t pos = runend_pos; pos >= runstart_pos; pos--) {
         const uint64_t slot_value = filter_->GetSlot(infix_store, pos);
