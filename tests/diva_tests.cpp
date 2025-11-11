@@ -4429,7 +4429,7 @@ public:
                 if constexpr (O)
                     str_length = 8;
                 else
-                    str_length = 10 + rng() % 3;
+                    str_length = 40 + rng() % 3;
                 char *str = new char[48];
                 for (uint32_t i = 0; i < str_length; i++) {
                     if constexpr (ascii)
