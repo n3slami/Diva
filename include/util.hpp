@@ -448,10 +448,12 @@ inline void write_bits_from_string_to_bitmap(void *bitmap, uint32_t bitmap_pos,
                                              uint32_t num_bits_to_copy) {
     uint64_t *bitmap_words = reinterpret_cast<uint64_t *>(bitmap);
     const uint64_t *str_words = reinterpret_cast<const uint64_t *>(str);
-    const uint32_t bitmap_pos_end = bitmap_pos + num_bits_to_copy;
-    while (bitmap_pos < bitmap_pos_end) {
+    const uint32_t bitmap_pos_start = bitmap_pos;
+    bitmap_pos += num_bits_to_copy;
+    while (bitmap_pos > bitmap_pos_start) {
         int32_t bit_count_to_write = std::min<int32_t>(64 - str_pos % 64,
-                                                       bitmap_pos_end - bitmap_pos);
+                                                       bitmap_pos - bitmap_pos_start);
+        bitmap_pos -= bit_count_to_write;
         uint64_t data = 0;
         if (str) {
             data = str_words[str_pos / 64];
@@ -460,40 +462,47 @@ inline void write_bits_from_string_to_bitmap(void *bitmap, uint32_t bitmap_pos,
         }
         write_bits_to_bitmap(bitmap_words, bitmap_pos, data, bit_count_to_write);
         str_pos += bit_count_to_write;
-        bitmap_pos += bit_count_to_write;
     }
 }
 
 // Assumes word-aligned buffers
+// Returns the position of the first differring bit +1, multiplied by the usual
+// comparison sign.
 __attribute__((always_inline))
-inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t pos_bitmap,
-                                                  const void *str, uint32_t pos_str,
+inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t bitmap_pos,
+                                                  const void *str, uint32_t str_pos,
                                                   uint32_t num_bits_to_compare) {
-    int64_t res = 0;
+    int64_t match_len = 0;
     const uint64_t *bitmap_words = reinterpret_cast<const uint64_t *>(bitmap);
     const uint64_t *str_words = reinterpret_cast<const uint64_t *>(str);
-    const uint32_t pos_bitmap_end = pos_bitmap + num_bits_to_compare;
-    while (pos_bitmap < pos_bitmap_end) {
-        const uint32_t bit_count_to_compare = std::min(pos_bitmap_end - pos_bitmap,
-                                                        64 - std::max(pos_bitmap % 64, pos_str % 64));
-        const uint64_t compare_mask = BITMASK(bit_count_to_compare);
+    const uint32_t bitmap_pos_start = bitmap_pos;
+    bitmap_pos += num_bits_to_compare;
+    while (bitmap_pos > bitmap_pos_start) {
+        const uint32_t bit_count_to_compare = std::min(bitmap_pos - bitmap_pos_start,
+                                                       64 - str_pos % 64);
+        bitmap_pos -= bit_count_to_compare;
 
-        uint64_t data_bitmap = bitmap_words[pos_bitmap / 64];
-        data_bitmap = __builtin_bswap64(data_bitmap) 
-                        >> (8 * sizeof(data_bitmap) - bit_count_to_compare - pos_bitmap % 64);
-        data_bitmap &= compare_mask;
+        uint64_t data_bitmap_buf = 0;
+        uint32_t data_bitmap_buf_filled_bits = 0, read_bitmap_pos = bitmap_pos;
+        uint64_t data_bitmap = read_data_from_bitmap(bitmap, read_bitmap_pos,
+                                                     data_bitmap_buf, data_bitmap_buf_filled_bits,
+                                                     bit_count_to_compare);
 
-        uint64_t data_str = str_words[pos_str / 64];
+        uint64_t data_str = str_words[str_pos / 64];
         data_str = __builtin_bswap64(data_str) 
-                        >> (8 * sizeof(data_str) - bit_count_to_compare - pos_str % 64);
-        data_str &= compare_mask;
+                    >> (8 * sizeof(data_str) - bit_count_to_compare - str_pos % 64);
+        data_str &= BITMASK(bit_count_to_compare);
 
-        res = res ? res : data_bitmap - data_str;
+        const uint64_t data_diff = data_bitmap ^ data_str;
+        const uint32_t first_diff_bit_pos = highbit_pos(data_diff);
+        if (first_diff_bit_pos < 64)
+            return (match_len + bit_count_to_compare - first_diff_bit_pos)
+                    * (((data_str >> first_diff_bit_pos) & 1) ? 1 : -1);
+        match_len += bit_count_to_compare;
 
-        pos_bitmap += bit_count_to_compare;
-        pos_str += bit_count_to_compare;
+        str_pos += bit_count_to_compare;
     }
-    return res;
+    return 0;
 }
 
 
