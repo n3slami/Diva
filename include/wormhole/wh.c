@@ -1893,9 +1893,11 @@ wormhole_jump_leaf_pred_read(struct wormref * const ref, const struct kref * con
           wormleaf_unlock_read(leaf);
           break;
         }
-        spinlock_lock(&(leaf->sortlock));
-        wormleaf_sync_sorted(leaf);
-        spinlock_unlock(&(leaf->sortlock));
+        if (leaf->nr_sorted < leaf->nr_keys) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+        }
         const struct kv *other = wormleaf_kv_at_is(leaf, 0);
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
@@ -1945,9 +1947,11 @@ wormhole_jump_leaf_pred_write(struct wormref * const ref, const struct kref * co
           wormleaf_unlock_write(leaf);
           break;
         }
-        spinlock_lock(&(leaf->sortlock));
-        wormleaf_sync_sorted(leaf);
-        spinlock_unlock(&(leaf->sortlock));
+        if (leaf->nr_sorted < leaf->nr_keys) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+        }
         const struct kv *other = wormleaf_kv_at_is(leaf, 0);
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
@@ -1997,9 +2001,11 @@ wormhole_jump_leaf_pred_read_strict(struct wormref * const ref, const struct kre
           wormleaf_unlock_read(leaf);
           break;
         }
-        spinlock_lock(&(leaf->sortlock));
-        wormleaf_sync_sorted(leaf);
-        spinlock_unlock(&(leaf->sortlock));
+        if (leaf->nr_sorted < leaf->nr_keys) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+        }
         const struct kv *other = wormleaf_kv_at_is(leaf, 0);
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
@@ -2049,9 +2055,11 @@ wormhole_jump_leaf_pred_write_strict(struct wormref * const ref, const struct kr
           wormleaf_unlock_write(leaf);
           break;
         }
-        spinlock_lock(&(leaf->sortlock));
-        wormleaf_sync_sorted(leaf);
-        spinlock_unlock(&(leaf->sortlock));
+        if (leaf->nr_sorted < leaf->nr_keys) {
+          spinlock_lock(&(leaf->sortlock));
+          wormleaf_sync_sorted(leaf);
+          spinlock_unlock(&(leaf->sortlock));
+        }
         const struct kv *other = wormleaf_kv_at_is(leaf, 0);
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)

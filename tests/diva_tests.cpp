@@ -4406,9 +4406,9 @@ public:
             const uint32_t seed = 2;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_threads = 32;
+            const uint32_t n_threads = 8;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
-            const uint64_t delete_threshold = 5000000;
+            const uint64_t delete_threshold = 10000000;
             const uint64_t query_period = 5000000;
 
             constexpr bool ascii = false;
@@ -4458,14 +4458,17 @@ public:
                                                 (const uint64_t **) payloads);
             REQUIRE_EQ(s.GetNumKeys(), n_bulk);
 
+            std::atomic<uint64_t> n_keys_inserted_overall = 1;
             std::vector<std::thread> threads;
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
-                                payloads[ti][0] = s.GetNumKeys();
+                                payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
                                 s.Insert(string_keys[ti], payloads[ti], rng());
-                                REQUIRE(s.PointQuery(string_keys[ti]));
+                                n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
+                                if (payloads[ti][0] > delete_threshold)
+                                    REQUIRE(s.PointQuery(string_keys[ti]));
                                 if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
                                     std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
                                     for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
@@ -4500,14 +4503,12 @@ public:
                             }
                         }
                         else {
-                            while (s.GetNumKeys() < delete_threshold)
+                            while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
                                 cpu_pause();
-                            auto it = s.GetIterator(nullptr, 0, nullptr, 0,
+                            s.DeleteRange(nullptr, 0, nullptr, 0, 
                                     [=](const uint64_t *payload) { 
                                         return payload[0] <= delete_threshold && payload[0] > 0;
                                     });
-                            while (it.IsValid())
-                                it++;
                         }
                     });
             }
@@ -4515,11 +4516,10 @@ public:
                 t.join();
 
             // Make sure there are no entries that should've been deleted
-            uint8_t key[200] = {};
-            for (auto it = s.GetIterator(key, 200); it.IsValid(); it++) {
+            for (auto it = s.GetIterator(); it.IsValid(); it++) {
                 uint64_t payload[(payload_size + 63) / 64 + 1];
                 it.GetPayload(payload);
-                REQUIRE(payload[0] > delete_threshold);
+                REQUIRE((payload[0] > delete_threshold || payload[0] == 0));
             }
             for (uint32_t i = 0; i < n_keys; i++) {
                 if (i >= n_bulk && (i - n_bulk) % n_threads == 0)
@@ -4533,7 +4533,7 @@ public:
                         break;
                     }
                 }
-                REQUIRE_EQ(found, payloads[i][0] > delete_threshold);
+                REQUIRE_EQ(found, (payloads[i][0] > delete_threshold || payloads[i][0] == 0));
             }
         }
     }
