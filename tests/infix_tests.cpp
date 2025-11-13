@@ -349,7 +349,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
 
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 9, 13,
@@ -364,16 +364,16 @@ public:
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -383,18 +383,18 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 5, 7};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
         }
 
@@ -416,7 +416,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
 
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 7, 14, 19, 20,
@@ -431,16 +431,16 @@ public:
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
                     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -450,19 +450,19 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 6};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {1, 1};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 it.Advance(infix.HasPrefixKeys());
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
         }
 
@@ -485,7 +485,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 10, 11,
                     12, 14, 16, 17, 21, 22, 23, 25, 26, 28, 29, 31, 35, 36, 37,
@@ -507,16 +507,16 @@ public:
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -526,18 +526,18 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 11, 15, 18};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read, num_prefix_keys_read_checks[i]);
+                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
+                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
+                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
+                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch.back().first == -1);
+                REQUIRE(it.depth_branch_.back().first == -1);
             }
         }
     }
@@ -548,19 +548,19 @@ private:
                                    const std::vector<uint64_t>& expected_trie,
                                    const std::vector<uint64_t>& expected_trie_suffixes) {
         if (expected_trie.empty())
-            REQUIRE_EQ(infix.trie, nullptr);
+            REQUIRE_EQ(infix.trie_, nullptr);
         else {
-            REQUIRE_EQ(infix.trie->size(), expected_trie.size());
-            REQUIRE_EQ(memcmp(infix.trie->data(),
+            REQUIRE_EQ(infix.trie_->size(), expected_trie.size());
+            REQUIRE_EQ(memcmp(infix.trie_->data(),
                               expected_trie.data(),
                               sizeof(expected_trie[0]) * expected_trie.size()),
                        0);
         }
         if (expected_trie_suffixes.empty())
-            REQUIRE_EQ(infix.trie_suffixes, nullptr);
+            REQUIRE_EQ(infix.trie_suffixes_, nullptr);
         else {
-            REQUIRE_EQ(infix.trie_suffixes->size(), expected_trie_suffixes.size());
-            REQUIRE_EQ(memcmp(infix.trie_suffixes->data(),
+            REQUIRE_EQ(infix.trie_suffixes_->size(), expected_trie_suffixes.size());
+            REQUIRE_EQ(memcmp(infix.trie_suffixes_->data(),
                               expected_trie_suffixes.data(),
                               sizeof(expected_trie_suffixes[0]) * expected_trie_suffixes.size()),
                        0);
@@ -586,19 +586,19 @@ private:
                   << " num_prefix_keys=" << infix.GetNumPrefixKeys() 
                   << " num_suffixes=" << infix.GetNumSuffixes() 
                   << " num_trie_bits=" << infix.GetNumTrieBits() << std::endl;
-        if (infix.trie != nullptr) {
+        if (infix.trie_ != nullptr) {
             std::cerr << "trie: ";
-            for (uint32_t i = 1; i < infix.trie->size(); i++) {
+            for (uint32_t i = 1; i < infix.trie_->size(); i++) {
                 for (uint32_t j = 0; j < 64; j++)
-                    std::cerr << (((*infix.trie)[i] >> j) & 1);
+                    std::cerr << (((*infix.trie_)[i] >> j) & 1);
             }
             std::cerr << std::endl;
         }
-        if (infix.trie_suffixes != nullptr) {
+        if (infix.trie_suffixes_ != nullptr) {
             std::cerr << "trie_suffixes: ";
-            for (uint32_t i = 0; i < infix.trie_suffixes->size(); i++) {
+            for (uint32_t i = 0; i < infix.trie_suffixes_->size(); i++) {
                 for (uint32_t j = 0; j < 64; j++)
-                    std::cerr << (((*infix.trie_suffixes)[i] >> j) & 1);
+                    std::cerr << (((*infix.trie_suffixes_)[i] >> j) & 1);
             }
             std::cerr << std::endl;
         }
