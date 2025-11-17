@@ -435,9 +435,12 @@ __attribute__((always_inline))
 inline void write_bits_to_bitmap(uint64_t *bitmap, uint32_t bitmap_pos,
                                  uint64_t bits,
                                  uint32_t num_bits_to_copy) {
+    bitmap[bitmap_pos / 64] &= ~(BITMASK(num_bits_to_copy)<< (bitmap_pos % 64));
     bitmap[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
-    if (bitmap_pos % 64 + num_bits_to_copy > 64)
+    if (bitmap_pos % 64 + num_bits_to_copy > 64) {
+        bitmap[bitmap_pos / 64 + 1] &= ~BITMASK(num_bits_to_copy - (64 - bitmap_pos % 64));
         bitmap[bitmap_pos / 64 + 1] |= bits >> (64 - bitmap_pos % 64);
+    }
 }
 
 
@@ -462,6 +465,27 @@ inline void write_bits_from_string_to_bitmap(void *bitmap, uint32_t bitmap_pos,
         }
         write_bits_to_bitmap(bitmap_words, bitmap_pos, data, bit_count_to_write);
         str_pos += bit_count_to_write;
+    }
+}
+
+
+// Assumes word-aligned buffers
+__attribute__((always_inline))
+inline void write_bits_from_bitmap_to_string(void *str, uint32_t str_pos,
+                                             const void *bitmap, uint32_t bitmap_pos, 
+                                             uint32_t num_bits_to_copy) {
+    uint64_t *str_words = reinterpret_cast<uint64_t *>(str);
+    const uint32_t bitmap_pos_start = bitmap_pos;
+    bitmap_pos += num_bits_to_copy;
+    while (bitmap_pos > bitmap_pos_start) {
+        const uint32_t bit_count_to_write = std::min(64 - str_pos % 64, num_bits_to_copy);
+        bitmap_pos -= bit_count_to_write;
+        uint64_t data = 0;
+        copy_bitmap_to_bitmap(bitmap, bitmap_pos, &data, 0, bit_count_to_write);
+        data = __builtin_bswap64(data << (64 - bit_count_to_write));
+        str_words[str_pos / 64] |= data >> (str_pos % 64);
+        str_pos += bit_count_to_write;
+        num_bits_to_copy -= bit_count_to_write;
     }
 }
 
@@ -508,7 +532,7 @@ inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t b
 
 // Assumes word-aligned buffers
 __attribute__((always_inline))
-inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, uint64_t counter, const uint32_t counter_fragment_len, int32_t at) {
+inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, int32_t bitmap_pos, uint64_t counter, const uint32_t counter_fragment_len) {
     const uint64_t varlen_counter_encoding_base = BITMASK(counter_fragment_len);
     uint32_t digit_count = 1;
     for (uint64_t pw = varlen_counter_encoding_base; pw < counter; pw *= varlen_counter_encoding_base)
@@ -519,7 +543,7 @@ inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, uint64_t counter, c
         counter_encoding |= (counter % varlen_counter_encoding_base) << bit_pos;
         counter /= varlen_counter_encoding_base;
     }
-    write_bits_to_bitmap(bitmap, at, counter_encoding, digit_count * (counter_fragment_len + 1) + 1);
+    write_bits_to_bitmap(bitmap, bitmap_pos, counter_encoding, digit_count * (counter_fragment_len + 1) + 1);
 }
 
 

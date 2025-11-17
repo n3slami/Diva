@@ -574,8 +574,8 @@ public:
         SUBCASE("no prefix keys to prefix keys") {
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
             infix.SwitchTrieEncoding(true, slot_size);
-            const std::vector<uint64_t> expected_trie_suffixes = {0b101000000000011100000000001010100000000111100000000010100,
-                                                                  0b1010000000000101000000000011110000000001111100000000101110,
+            const std::vector<uint64_t> expected_trie_suffixes = {0b101000000000010110000000001110000000000101110000000010100,
+                                                                  0b1010000000000101000000000010111000000001111100000000111010,
                                                                   0b0};
             AssertTrieContents(infix, *expected_prefix.trie_, expected_trie_suffixes);
         }
@@ -590,7 +590,7 @@ public:
 
     static void TrieInsert() {
         const uint32_t N = 10;
-        const uint32_t slot_size = 5;
+        const uint32_t slot_size = 10;
         const uint32_t key_start_bit = 6;
         const uint32_t rng_seed = 1380;
         std::mt19937_64 rng(rng_seed);
@@ -613,52 +613,68 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
-
-            SUBCASE("iterate all") {
-                const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 9, 13,
-                    14, 18, 22, 23, 24, 25, 27, 33, 34, 35, 41, 45, 46, 47};
-                const std::vector<int32_t> depth_checks = {-1, 2, 3, 3, 5, 5,
-                    7, 9, 9, 7, 2, 3, 6, 6, 3, 6, 8, 8, 6};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11,
-                    0b11, 0b10, 0b11, 0b10, 0b11, 0b11, 0b10, 0b10, 0b10, 0b11,
-                    0b11, 0b10, 0b10, 0b11, 0b11, 0b10, 0b10};
-                const std::vector<int32_t> num_keys_read_checks = {0, 0, 0, 1,
-                    1, 2, 2, 2, 3, 4, 5, 5, 5, 6, 7, 7, 7, 8, 9};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-                REQUIRE(it.depth_branch_.back().first == -1);
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.Advance(infix.HasPrefixKeys());
+            SUBCASE("path diverging to the right") {
+                SUBCASE("first part zero") {
+                    uint8_t insertee_contents[8] = {0b00000000, 0b10100110, 0b00000000};
+                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
+                                                                 0b1111100001000111010010101110100110011100110001000};
+                    const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100100101111010110100001100010010111001000, 
+                                                                          0b0};
+                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+
+                SUBCASE("second part zero") {
+                    uint8_t insertee_contents[8] = {0b00000000, 0b10010110, 0b00000000};
+                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
+                                                                 0b1111100001000111100100101110100110011100110001000};
+                    const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100101101111010110100001100010010111001000, 
+                                                                          0b0};
+                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                }
             }
 
-            SUBCASE("skip subtrees") {
-                const std::vector<int32_t> bit_pos_checks = {6, 27, 41};
-                const std::vector<int32_t> depth_checks = {2, 3, 6};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11, 0b11};
-                const std::vector<int32_t> num_keys_read_checks = {0, 5, 7};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0};
+            SUBCASE("path diverging to the left") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b01110010, 0b10000000};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
+                                                             0b1111100001000110010001011101001011011100110001000};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100111101011010000110001001010100111001000, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+            }
 
-                REQUIRE(it.depth_branch_.back().first == -1);
-                it.Advance(infix.HasPrefixKeys());
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.SkipSubtree(infix.HasPrefixKeys());
-                    it.Advance(infix.HasPrefixKeys());
-                }
-                REQUIRE(it.depth_branch_.back().first == -1);
+            SUBCASE("path diverging from suffix from left") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b10101010};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110111,
+                                                             0b1111100001000111011000001000101110100110011100110001000};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100111100001011010100001100010010111001000, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+            }
+
+            SUBCASE("path diverging from suffix from right") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b11000101, 0b11010101};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110111,
+                                                             0b1111111000110000100011001000101110100110011100110001000};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000010100000101111010110100001100010010111001000, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+            }
+
+            SUBCASE("create prefix key") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b10000011, 0b10101010};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001010000,
+                                                             0b1110000100111001000011100011011100101010101011010101001100001110,
+                                                             0b1111010100001110};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b101000000000010110000000001110000000000101110000000010100, 
+                                                                      0b101000000000010100000000001011100000000111110100,
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
             }
         }
 
@@ -680,53 +696,58 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
-
-            SUBCASE("iterate all") {
-                const std::vector<int32_t> bit_pos_checks = {0, 7, 14, 19, 20,
-                    25, 30, 31, 32, 37, 42, 43, 44, 45, 50, 56, 57, 58};
-                const std::vector<int32_t> depth_checks = {-1, 2, 2, 3, 3, 4,
-                    5, 5, 4, 5, 6, 6, 5, 2, 3, 5, 5, 3};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11,
-                    0b11, 0b11, 0b10, 0b11, 0b11, 0b10, 0b10, 0b11, 0b11, 0b10,
-                    0b10, 0b10, 0b11, 0b11, 0b10, 0b10};
-                const std::vector<int32_t> num_keys_read_checks = {0, 0, 0, 0,
-                    1, 1, 1, 2, 3, 3, 3, 4, 5, 6, 6, 6, 7, 8};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
-                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-
-                REQUIRE(it.depth_branch_.back().first == -1);
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.Advance(infix.HasPrefixKeys());
-                }
-                REQUIRE(it.depth_branch_.back().first == -1);
+            SUBCASE("path diverging") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b10111111, 0b11111111};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000000,
+                                                             0b1111001100011000110111001100011011001100011010011011000100001110,
+                                                             0b0};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b110011101100101011001100111011101010100, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
             }
 
-            SUBCASE("skip subtrees") {
-                const std::vector<int32_t> bit_pos_checks = {14, 50};
-                const std::vector<int32_t> depth_checks = {2, 3};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11};
-                const std::vector<int32_t> num_keys_read_checks = {0, 6};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {1, 1};
+            SUBCASE("path diverging from suffix from left") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b01100101, 0b00000000};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000010,
+                                                             0b1001010001101111101010001100011011001100011010011011000100001110,
+                                                             0b11};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b110011001010110011000010110011101010100, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+            }
 
-                REQUIRE(it.depth_branch_.back().first == -1);
-                it.Advance(infix.HasPrefixKeys());
-                it.Advance(infix.HasPrefixKeys());
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.SkipSubtree(infix.HasPrefixKeys());
-                    it.Advance(infix.HasPrefixKeys());
+            SUBCASE("path diverging from suffix from right") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b10001101, 0b00000000};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000001,
+                                                             0b1110011000101000110111001100011011001100011010011011000100001110,
+                                                             0b1};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b110011001100011011001100111011101010100, 
+                                                                      0b0};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+            }
+
+            SUBCASE("create new prefix key") {
+                uint8_t insertee_contents[8] = {0b00000000, 0b10011001, 0b10110110};
+                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const std::vector<uint64_t> expected_trie = {0b1000000000000010000000000000100100000000000000000000000001001001,
+                                                             0b1001110100101000110111001100011011001100011010011011000100001110,
+                                                             0b110100010};
+                const std::vector<uint64_t> expected_trie_suffixes = {0b11001110101011001100111011101010100};
+                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                SUBCASE("create new prefix key child") {
+                    uint8_t insertee_contents[8] = {0b00000000, 0b10011011, 0b11111111};
+                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const std::vector<uint64_t> expected_trie = {0b1000000000000010000000000000101000000000000000000000000001001010,
+                                                                 0b1001110100101000110111001100011011001100011010011011000100001110,
+                                                                 0b1111100010};
+                    const std::vector<uint64_t> expected_trie_suffixes = {0b110011101110101011001100111011101010100,
+                                                                          0b0};
+                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
             }
         }
 
@@ -749,60 +770,15 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
-            SUBCASE("iterate all") {
-                const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 10, 11,
-                    12, 14, 16, 17, 21, 22, 23, 25, 26, 28, 29, 31, 35, 36, 37,
-                    39, 40, 41, 43, 45, 49, 61, 62, 63, 64, 65, 67, 71, 75, 76,
-                    77, 78, 82, 83};
-                const std::vector<int32_t> depth_checks = {-1, 2, 3, 4, 4, 3,
-                    4, 5, 5, 7, 7, 4, 5, 5, 6, 6, 7, 9, 9, 7, 8, 8, 2, 3, 4, 6,
-                    12, 12, 6, 4, 3, 4, 6, 8, 8, 6, 4, 6, 6};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11,
-                    0b11, 0b11, 0b10, 0b10, 0b11, 0b11, 0b10, 0b11, 0b10, 0b10,
-                    0b11, 0b10, 0b11, 0b10, 0b11, 0b11, 0b10, 0b10, 0b11, 0b10,
-                    0b10, 0b11, 0b11, 0b11, 0b11, 0b10, 0b10, 0b10, 0b10, 0b11,
-                    0b11, 0b11, 0b10, 0b10, 0b10, 0b11, 0b10};
-                const std::vector<int32_t> num_keys_read_checks = {0, 0, 0, 0,
-                    1, 2, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11,
-                    11, 11, 11, 11, 12, 13, 14, 15, 15, 15, 15, 16, 17, 18, 18,
-                    19};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-                REQUIRE(it.depth_branch_.back().first == -1);
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.Advance(infix.HasPrefixKeys());
-                }
-                REQUIRE(it.depth_branch_.back().first == -1);
-            }
-
-            SUBCASE("skip subtrees") {
-                const std::vector<int32_t> bit_pos_checks = {6, 43, 67, 82};
-                const std::vector<int32_t> depth_checks = {2, 3, 4, 6};
-                const std::vector<int32_t> children_mask_checks = {0b11, 0b11, 0b11, 0b11};
-                const std::vector<int32_t> num_keys_read_checks = {0, 11, 15, 18};
-                const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0, 0};
-
-                REQUIRE(it.depth_branch_.back().first == -1);
-                it.Advance(infix.HasPrefixKeys());
-                for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
-                    REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
-                    REQUIRE_EQ(it.depth_branch_.back().second, children_mask_checks[i]);
-                    REQUIRE_EQ(it.num_keys_read_, num_keys_read_checks[i]);
-                    REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
-                    it.SkipSubtree(infix.HasPrefixKeys());
-                    it.Advance(infix.HasPrefixKeys());
-                }
-                REQUIRE(it.depth_branch_.back().first == -1);
-            }
+            uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b00000000};
+            infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+            const std::vector<uint64_t> expected_trie = {0b1010100000000000000000000000001010101,
+                                                         0b1101100010110000100101011101101001011011011010011010111010001000,
+                                                         0b111100111110001001011};
+            const std::vector<uint64_t> expected_trie_suffixes = {0b1010010000101101000011000100101100011100101001000010100110101000,
+                                                                  0b1101010100100001000011100100001111010010,
+                                                                  0b0};
+            AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
         }
     }
 
