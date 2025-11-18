@@ -432,14 +432,15 @@ inline uint64_t read_data_from_bitmap(const void *bitmap, uint32_t& bit_pos,
 
 // Assumes word-aligned buffers
 __attribute__((always_inline))
-inline void write_bits_to_bitmap(uint64_t *bitmap, uint32_t bitmap_pos,
+inline void write_bits_to_bitmap(void *bitmap, uint32_t bitmap_pos,
                                  uint64_t bits,
                                  uint32_t num_bits_to_copy) {
-    bitmap[bitmap_pos / 64] &= ~(BITMASK(num_bits_to_copy)<< (bitmap_pos % 64));
-    bitmap[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
+    uint64_t *bitmap_words = reinterpret_cast<uint64_t *>(bitmap);
+    bitmap_words[bitmap_pos / 64] &= ~(BITMASK(num_bits_to_copy)<< (bitmap_pos % 64));
+    bitmap_words[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
     if (bitmap_pos % 64 + num_bits_to_copy > 64) {
-        bitmap[bitmap_pos / 64 + 1] &= ~BITMASK(num_bits_to_copy - (64 - bitmap_pos % 64));
-        bitmap[bitmap_pos / 64 + 1] |= bits >> (64 - bitmap_pos % 64);
+        bitmap_words[bitmap_pos / 64 + 1] &= ~BITMASK(num_bits_to_copy - (64 - bitmap_pos % 64));
+        bitmap_words[bitmap_pos / 64 + 1] |= bits >> (64 - bitmap_pos % 64);
     }
 }
 
@@ -482,8 +483,8 @@ inline void write_bits_from_bitmap_to_string(void *str, uint32_t str_pos,
         bitmap_pos -= bit_count_to_write;
         uint64_t data = 0;
         copy_bitmap_to_bitmap(bitmap, bitmap_pos, &data, 0, bit_count_to_write);
-        data = __builtin_bswap64(data << (64 - bit_count_to_write));
-        str_words[str_pos / 64] |= data >> (str_pos % 64);
+        data = __builtin_bswap64(data << (64 - bit_count_to_write - str_pos % 64));
+        str_words[str_pos / 64] |= data;
         str_pos += bit_count_to_write;
         num_bits_to_copy -= bit_count_to_write;
     }

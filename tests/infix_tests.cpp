@@ -40,7 +40,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -54,17 +54,29 @@ public:
             SUBCASE("small slots") {
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b0};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 48;
+                check_infix.trie_.push_back(0b111110000100011001000101110100110011100110001000);
+                check_infix.num_suffix_bits_ = 10;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b0);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 1);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b1000010000111001111010110100001100010010111001000};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 48;
+                check_infix.trie_.push_back(0b111110000100011001000101110100110011100110001000);
+                check_infix.num_suffix_bits_ = 50;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b1000010000111001111010110100001100010010111001000);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 5);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
         }
 
@@ -76,7 +88,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -85,22 +97,32 @@ public:
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
 
-            const std::vector<uint64_t> expected_trie = {0b1'000000000000001'0000000000001001'00000000000000000000000000111011,
-                                                         0b11100101000110111001100011011001100011010011011000100001110};
             SUBCASE("small slots") {
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b0};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 59;
+                check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100001110);
+                check_infix.num_suffix_bits_ = 9;
+                check_infix.num_suffixes_ = 9;
+                check_infix.trie_suffixes_.push_back(0b0);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 1);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b11001100101011001100111011101010100};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 59;
+                check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100001110);
+                check_infix.num_suffix_bits_ = 36;
+                check_infix.num_suffixes_ = 9;
+                check_infix.trie_suffixes_.push_back(0b11001100101011001100111011101010100);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 4);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
         }
 
@@ -113,7 +135,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -122,24 +144,35 @@ public:
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
 
-            const std::vector<uint64_t> expected_trie = {0b010100'00000000000000000000000001010100,
-                                                         0b1110110110000000100101011101101001011011011010011010111010001000,
-                                                         0b11110011111000100101};
             SUBCASE("small slots") {
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b0};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 84;
+                check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010001000);
+                check_infix.trie_.push_back(0b11110011111000100101);
+                check_infix.num_suffix_bits_ = 20;
+                check_infix.num_suffixes_ = 20;
+                check_infix.trie_suffixes_.push_back(0b0);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 1);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
                 infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-                const std::vector<uint64_t> expected_trie_suffixes = {0b1001010100101101000011000100101100011100101001000010100110101000,
-                                                                      0b11010101001000010000111001000011110};
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 84;
+                check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010001000);
+                check_infix.trie_.push_back(0b11110011111000100101);
+                check_infix.num_suffix_bits_ = 100;
+                check_infix.num_suffixes_ = 20;
+                check_infix.trie_suffixes_.push_back(0b1001010100101101000011000100101100011100101001000010100110101000);
+                check_infix.trie_suffixes_.push_back(0b11010101001000010000111001000011110);
                 REQUIRE_EQ(infix.GetActualSuffixLen(slot_size), 5);
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+                AssertInfix(infix, check_infix);
             }
         }
     }
@@ -160,7 +193,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -219,7 +252,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -271,7 +304,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -339,7 +372,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -349,7 +382,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_.data());
 
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 9, 13,
@@ -406,7 +439,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -416,7 +449,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_.data());
 
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 7, 14, 19, 20,
@@ -475,7 +508,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -485,7 +518,7 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
 
-            Diva<>::Infix::TrieIterator it(infix.trie_->data() + 1);
+            Diva<>::Infix::TrieIterator it(infix.trie_.data());
             SUBCASE("iterate all") {
                 const std::vector<int32_t> bit_pos_checks = {0, 6, 8, 10, 11,
                     12, 14, 16, 17, 21, 22, 23, 25, 26, 28, 29, 31, 35, 36, 37,
@@ -557,7 +590,7 @@ public:
         Diva<>::InfiniteByteString keys[N];
         for (uint32_t i = 0; i < N; i++) {
             const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-            keys[i] = {keys_contents[i], key_len};
+            keys[i] = {keys_contents[i], 8 * key_len};
             for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                 keys_contents[i][j] = rng();
         }
@@ -574,19 +607,28 @@ public:
         SUBCASE("no prefix keys to prefix keys") {
             infix.BuildTrie(keys, N, key_start_bit, slot_size);
             infix.SwitchTrieEncoding(true, slot_size);
-            const std::vector<uint64_t> expected_trie_suffixes = {0b101000000000010110000000001110000000000101110000000010100,
-                                                                  0b1010000000000101000000000010111000000001111100000000111010,
-                                                                  0b0};
-            AssertTrieContents(infix, *expected_prefix.trie_, expected_trie_suffixes);
+
+            Diva<>::Infix check_infix(expected_prefix);
+            check_infix.trie_suffixes_.clear();
+            check_infix.trie_suffixes_.push_back(0b101000000000010110000000001110000000000101110000000010100);
+            check_infix.trie_suffixes_.push_back(0b1010000000000101000000000010111000000001111100000000111010);
+            check_infix.trie_suffixes_.push_back(0b0);
+            check_infix.num_suffix_bits_ = 130;
+            AssertInfix(infix, check_infix);
         }
 
         SUBCASE("prefix keys to no prefix keys") {
             infix.BuildTrie(keys, N, key_start_bit, slot_size, true);
             infix.SwitchTrieEncoding(false, slot_size);
-            const std::vector<uint64_t> expected_trie_suffixes = {0b10000100001100011000100001000011000100001100010};
-            AssertTrieContents(infix, *expected_no_prefix.trie_, expected_trie_suffixes);
+
+            Diva<>::Infix check_infix(expected_no_prefix);
+            check_infix.trie_suffixes_.clear();
+            check_infix.trie_suffixes_.push_back(0b10000100001100011000100001000011000100001100010);
+            check_infix.num_suffix_bits_ = 50;
+            AssertInfix(infix, check_infix);
         }
     }
+
 
     static void TrieInsert() {
         const uint32_t N = 10;
@@ -603,7 +645,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -617,64 +659,89 @@ public:
                 SUBCASE("first part zero") {
                     uint8_t insertee_contents[8] = {0b00000000, 0b10100110, 0b00000000};
                     infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                    const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
-                                                                 0b1111100001000111010010101110100110011100110001000};
-                    const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100100101111010110100001100010010111001000, 
-                                                                          0b0};
-                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                    Diva<>::Infix check_infix(infix_value);
+                    check_infix.num_prefix_keys_ = 0;
+                    check_infix.num_trie_bits_ = 49;
+                    check_infix.trie_.push_back(0b1111100001000111010010101110100110011100110001000);
+                    check_infix.num_suffix_bits_ = 55;
+                    check_infix.num_suffixes_ = 11;
+                    check_infix.trie_suffixes_.push_back(0b100001000011100100101111010110100001100010010111001000);
+                    AssertInfix(infix, check_infix);
                 }
 
                 SUBCASE("second part zero") {
                     uint8_t insertee_contents[8] = {0b00000000, 0b10010110, 0b00000000};
                     infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                    const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
-                                                                 0b1111100001000111100100101110100110011100110001000};
-                    const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100101101111010110100001100010010111001000, 
-                                                                          0b0};
-                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                    Diva<>::Infix check_infix(infix_value);
+                    check_infix.num_prefix_keys_ = 0;
+                    check_infix.num_trie_bits_ = 49;
+                    check_infix.trie_.push_back(0b1111100001000111100100101110100110011100110001000);
+                    check_infix.num_suffix_bits_ = 55;
+                    check_infix.num_suffixes_ = 11;
+                    check_infix.trie_suffixes_.push_back(0b100001000011100101101111010110100001100010010111001000);
+                    AssertInfix(infix, check_infix);
                 }
             }
 
             SUBCASE("path diverging to the left") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b01110010, 0b10000000};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110001,
-                                                             0b1111100001000110010001011101001011011100110001000};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100111101011010000110001001010100111001000, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 49;
+                check_infix.trie_.push_back(0b1111100001000110010001011101001011011100110001000);
+                check_infix.num_suffix_bits_ = 55;
+                check_infix.num_suffixes_ = 11;
+                check_infix.trie_suffixes_.push_back(0b100001000011100111101011010000110001001010100111001000);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("path diverging from suffix from left") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b10101010};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110111,
-                                                             0b1111100001000111011000001000101110100110011100110001000};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000011100111100001011010100001100010010111001000, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 55;
+                check_infix.trie_.push_back(0b1111100001000111011000001000101110100110011100110001000);
+                check_infix.num_suffix_bits_ = 55;
+                check_infix.num_suffixes_ = 11;
+                check_infix.trie_suffixes_.push_back(0b100001000011100111100001011010100001100010010111001000);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("path diverging from suffix from right") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b11000101, 0b11010101};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b101100000000000000000000000000110111,
-                                                             0b1111111000110000100011001000101110100110011100110001000};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b100001000010100000101111010110100001100010010111001000, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 55;
+                check_infix.trie_.push_back(0b1111111000110000100011001000101110100110011100110001000);
+                check_infix.num_suffix_bits_ = 55;
+                check_infix.num_suffixes_ = 11;
+                check_infix.trie_suffixes_.push_back(0b100001000010100000101111010110100001100010010111001000);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("create prefix key") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10000011, 0b10101010};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001010000,
-                                                             0b1110000100111001000011100011011100101010101011010101001100001110,
-                                                             0b1111010100001110};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b101000000000010110000000001110000000000101110000000010100, 
-                                                                      0b101000000000010100000000001011100000000111110100,
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 80;
+                check_infix.trie_.push_back(0b1110000100111001000011100011011100101010101011010101001100001110);
+                check_infix.trie_.push_back(0b1111010100001110);
+                check_infix.num_suffix_bits_ = 120;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b101000000000010110000000001110000000000101110000000010100);
+                check_infix.trie_suffixes_.push_back(0b101000000000010100000000001011100000000111110100);
+                check_infix.trie_suffixes_.push_back(0b0);
+                AssertInfix(infix, check_infix);
             }
         }
 
@@ -686,7 +753,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -699,54 +766,75 @@ public:
             SUBCASE("path diverging") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10111111, 0b11111111};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000000,
-                                                             0b1111001100011000110111001100011011001100011010011011000100001110,
-                                                             0b0};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b110011101100101011001100111011101010100, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 64;
+                check_infix.trie_.push_back(0b1111001100011000110111001100011011001100011010011011000100001110);
+                check_infix.trie_.push_back(0b0);
+                check_infix.num_suffix_bits_ = 40;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b110011101100101011001100111011101010100);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("path diverging from suffix from left") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b01100101, 0b00000000};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000010,
-                                                             0b1001010001101111101010001100011011001100011010011011000100001110,
-                                                             0b11};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b110011001010110011000010110011101010100, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 66;
+                check_infix.trie_.push_back(0b1001010001101111101010001100011011001100011010011011000100001110);
+                check_infix.trie_.push_back(0b11);
+                check_infix.num_suffix_bits_ = 40;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b110011001010110011000010110011101010100);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("path diverging from suffix from right") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10001101, 0b00000000};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b1000000000000001000000000000101000000000000000000000000001000001,
-                                                             0b1110011000101000110111001100011011001100011010011011000100001110,
-                                                             0b1};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b110011001100011011001100111011101010100, 
-                                                                      0b0};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 65;
+                check_infix.trie_.push_back(0b1110011000101000110111001100011011001100011010011011000100001110);
+                check_infix.trie_.push_back(0b1);
+                check_infix.num_suffix_bits_ = 40;
+                check_infix.num_suffixes_ = 10;
+                check_infix.trie_suffixes_.push_back(0b110011001100011011001100111011101010100);
+                AssertInfix(infix, check_infix);
             }
 
             SUBCASE("create new prefix key") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10011001, 0b10110110};
                 infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                const std::vector<uint64_t> expected_trie = {0b1000000000000010000000000000100100000000000000000000000001001001,
-                                                             0b1001110100101000110111001100011011001100011010011011000100001110,
-                                                             0b110100010};
-                const std::vector<uint64_t> expected_trie_suffixes = {0b11001110101011001100111011101010100};
-                AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 3;
+                check_infix.num_trie_bits_ = 73;
+                check_infix.trie_.push_back(0b1001110100101000110111001100011011001100011010011011000100001110);
+                check_infix.trie_.push_back(0b110100010);
+                check_infix.num_suffix_bits_ = 36;
+                check_infix.num_suffixes_ = 9;
+                check_infix.trie_suffixes_.push_back(0b11001110101011001100111011101010100);
+                AssertInfix(infix, check_infix);
 
                 SUBCASE("create new prefix key child") {
                     uint8_t insertee_contents[8] = {0b00000000, 0b10011011, 0b11111111};
                     infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-                    const std::vector<uint64_t> expected_trie = {0b1000000000000010000000000000101000000000000000000000000001001010,
-                                                                 0b1001110100101000110111001100011011001100011010011011000100001110,
-                                                                 0b1111100010};
-                    const std::vector<uint64_t> expected_trie_suffixes = {0b110011101110101011001100111011101010100,
-                                                                          0b0};
-                    AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+                    Diva<>::Infix check_infix(infix_value);
+                    check_infix.num_prefix_keys_ = 3;
+                    check_infix.num_trie_bits_ = 74;
+                    check_infix.trie_.push_back(0b1001110100101000110111001100011011001100011010011011000100001110);
+                    check_infix.trie_.push_back(0b1111100010);
+                    check_infix.num_suffix_bits_ = 40;
+                    check_infix.num_suffixes_ = 10;
+                    check_infix.trie_suffixes_.push_back(0b110011101110101011001100111011101010100);
+                    AssertInfix(infix, check_infix);
                 }
             }
         }
@@ -760,7 +848,7 @@ public:
             Diva<>::InfiniteByteString keys[N];
             for (uint32_t i = 0; i < N; i++) {
                 const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
-                keys[i] = {keys_contents[i], key_len};
+                keys[i] = {keys_contents[i], 8 * key_len};
                 for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
                     keys_contents[i][j] = rng();
             }
@@ -772,38 +860,311 @@ public:
 
             uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b00000000};
             infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
-            const std::vector<uint64_t> expected_trie = {0b1010100000000000000000000000001010101,
-                                                         0b1101100010110000100101011101101001011011011010011010111010001000,
-                                                         0b111100111110001001011};
-            const std::vector<uint64_t> expected_trie_suffixes = {0b1010010000101101000011000100101100011100101001000010100110101000,
-                                                                  0b1101010100100001000011100100001111010010,
-                                                                  0b0};
-            AssertTrieContents(infix, expected_trie, expected_trie_suffixes);
+
+            Diva<>::Infix check_infix(infix_value);
+            check_infix.num_prefix_keys_ = 0;
+            check_infix.num_trie_bits_ = 85;
+            check_infix.trie_.push_back(0b1101100010110000100101011101101001011011011010011010111010001000);
+            check_infix.trie_.push_back(0b111100111110001001011);
+            check_infix.num_suffix_bits_ = 105;
+            check_infix.num_suffixes_ = 21;
+            check_infix.trie_suffixes_.push_back(0b1010010000101101000011000100101100011100101001000010100110101000);
+            check_infix.trie_suffixes_.push_back(0b1101010100100001000011100100001111010010);
+            AssertInfix(infix, check_infix);
+        }
+    }
+
+
+    static void TrieGetStrings() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+
+                std::vector<uint32_t> expected_key_bit_lens = {4,
+                                                               6,
+                                                               10,
+                                                               10,
+                                                               8,
+                                                               7,
+                                                               7,
+                                                               9,
+                                                               9,
+                                                               7};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00011000,
+                                                              0b00011110, 0b00000000,
+                                                              0b00011110, 0b01000000,
+                                                              0b00011111,
+                                                              0b00100000,
+                                                              0b00100010,
+                                                              0b00110001, 0b00000000,
+                                                              0b00110001, 0b10000000,
+                                                              0b00110010};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+                std::vector<uint32_t> expected_key_bit_lens = {7,
+                                                               9,
+                                                               13,
+                                                               13,
+                                                               11,
+                                                               10,
+                                                               10,
+                                                               12,
+                                                               12,
+                                                               10};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00011011, 0b00000000,
+                                                              0b00011110, 0b00001000,
+                                                              0b00011110, 0b01100000,
+                                                              0b00011111, 0b00000000,
+                                                              0b00100000, 0b11000000,
+                                                              0b00100011, 0b11000000,
+                                                              0b00110001, 0b01100000,
+                                                              0b00110001, 0b10000000,
+                                                              0b00110010, 0b00000000};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+                std::vector<uint32_t> expected_key_bit_lens = {2,
+                                                               4,
+                                                               6,
+                                                               6,
+                                                               7,
+                                                               7,
+                                                               6,
+                                                               6,
+                                                               6,
+                                                               4};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00000000,
+                                                              0b00010000,
+                                                              0b00010100,
+                                                              0b00011000,
+                                                              0b00011010,
+                                                              0b00011100,
+                                                              0b00100000,
+                                                              0b00100100,
+                                                              0b00110000};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+                std::vector<uint32_t> expected_key_bit_lens = {2,
+                                                               6,
+                                                               8,
+                                                               8,
+                                                               9,
+                                                               9,
+                                                               8,
+                                                               8,
+                                                               8,
+                                                               6};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00000000,
+                                                              0b00010001,
+                                                              0b00010111,
+                                                              0b00011001, 0b10000000,
+                                                              0b00011011, 0b00000000,
+                                                              0b00011110,
+                                                              0b00100001,
+                                                              0b00100110,
+                                                              0b00111000};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
+        }
+
+        SUBCASE("many keys") {
+            const uint32_t N = 20;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+                std::vector<uint32_t> expected_key_bit_lens = {5,
+                                                               5,
+                                                               6,
+                                                               8,
+                                                               8,
+                                                               6,
+                                                               7,
+                                                               10,
+                                                               10,
+                                                               9,
+                                                               9,
+                                                               13,
+                                                               13,
+                                                               7,
+                                                               5,
+                                                               9,
+                                                               9,
+                                                               7,
+                                                               7,
+                                                               7};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00001000,
+                                                              0b00010000,
+                                                              0b00010100,
+                                                              0b00010101,
+                                                              0b00011000,
+                                                              0b00011100,
+                                                              0b00011110, 0b00000000,
+                                                              0b00011110, 0b01000000,
+                                                              0b00011111, 0b00000000,
+                                                              0b00011111, 0b10000000,
+                                                              0b00100000, 0b11010000,
+                                                              0b00100000, 0b11011000,
+                                                              0b00100010,
+                                                              0b00101000,
+                                                              0b00110001, 0b00000000,
+                                                              0b00110001, 0b10000000,
+                                                              0b00110010,
+                                                              0b00111100,
+                                                              0b00111110};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
+                std::vector<uint32_t> expected_key_bit_lens = {8,
+                                                               8,
+                                                               9,
+                                                               11,
+                                                               11,
+                                                               9,
+                                                               10,
+                                                               13,
+                                                               13,
+                                                               12,
+                                                               12,
+                                                               16,
+                                                               16,
+                                                               10,
+                                                               8,
+                                                               12,
+                                                               12,
+                                                               10,
+                                                               10,
+                                                               10};
+                std::vector<uint8_t> expected_key_contents = {0b00000000,
+                                                              0b00001101,
+                                                              0b00010001, 0b00000000,
+                                                              0b00010100, 0b00000000,
+                                                              0b00010101, 0b01000000,
+                                                              0b00011011, 0b00000000,
+                                                              0b00011101, 0b00000000,
+                                                              0b00011110, 0b00001000,
+                                                              0b00011110, 0b01100000,
+                                                              0b00011111, 0b00000000,
+                                                              0b00011111, 0b10110000,
+                                                              0b00100000, 0b11010010,
+                                                              0b00100000, 0b11011001,
+                                                              0b00100011, 0b11000000,
+                                                              0b00101000,
+                                                              0b00110001, 0b01100000,
+                                                              0b00110001, 0b10000000,
+                                                              0b00110010, 0b00000000,
+                                                              0b00111100, 0b10000000,
+                                                              0b00111111, 0b01000000};
+                AssertRecoveredStrings(recovered_keys, recovered_key_contents,
+                                       expected_key_bit_lens, expected_key_contents);
+            }
         }
     }
 
 
 private:
-    static void AssertTrieContents(const Diva<>::Infix& infix,
-                                   const std::vector<uint64_t>& expected_trie,
-                                   const std::vector<uint64_t>& expected_trie_suffixes) {
-        if (expected_trie.empty())
-            REQUIRE_EQ(infix.trie_, nullptr);
-        else {
-            REQUIRE_EQ(infix.trie_->size(), expected_trie.size());
-            REQUIRE_EQ(memcmp(infix.trie_->data(),
-                              expected_trie.data(),
-                              sizeof(expected_trie[0]) * expected_trie.size()),
-                       0);
-        }
-        if (expected_trie_suffixes.empty())
-            REQUIRE_EQ(infix.trie_suffixes_, nullptr);
-        else {
-            REQUIRE_EQ(infix.trie_suffixes_->size(), expected_trie_suffixes.size());
-            REQUIRE_EQ(memcmp(infix.trie_suffixes_->data(),
-                              expected_trie_suffixes.data(),
-                              sizeof(expected_trie_suffixes[0]) * expected_trie_suffixes.size()),
-                       0);
+    static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
+        REQUIRE_EQ(infix.infix_, check_infix.infix_);
+        REQUIRE_EQ(infix.num_prefix_keys_, check_infix.num_prefix_keys_);
+        REQUIRE_EQ(infix.num_trie_bits_, check_infix.num_trie_bits_);
+        REQUIRE_EQ(infix.trie_, check_infix.trie_);
+        REQUIRE_EQ(infix.num_suffix_bits_, check_infix.num_suffix_bits_);
+        REQUIRE_EQ(infix.num_suffixes_, check_infix.num_suffixes_);
+        REQUIRE_EQ(infix.trie_suffixes_, check_infix.trie_suffixes_);
+    }
+
+
+    static void AssertRecoveredStrings(std::vector<Diva<>::InfiniteByteString> recovered_keys, std::vector<uint8_t> recovered_key_contents,
+                                       std::vector<uint32_t> expected_key_bit_lens, std::vector<uint8_t> expected_key_contents) {
+        REQUIRE_EQ(recovered_keys.size(), expected_key_bit_lens.size());
+        REQUIRE_EQ(recovered_key_contents.size(), expected_key_contents.size());
+        uint32_t ind = 0;
+        for (uint32_t i = 0; i < recovered_keys.size(); i++) {
+            const uint32_t bit_len = recovered_keys[i].length;
+            const uint32_t byte_len = (bit_len + 7) / 8;
+            REQUIRE_EQ(bit_len, expected_key_bit_lens[i]);
+            REQUIRE_EQ(memcmp(recovered_key_contents.data() + ind, expected_key_contents.data() + ind, byte_len), 0);
+            ind += byte_len;
         }
     }
 
@@ -811,7 +1172,7 @@ private:
     static void PrintKeys(const Diva<>::InfiniteByteString *keys, uint32_t N) {
         for (uint32_t i = 0; i < N; i++) {
             std::cerr << "key_len=" << keys[i].length << ": ";
-            for (uint32_t j = 0; j < keys[i].length; j++) {
+            for (uint32_t j = 0; j < (keys[i].length + 7) / 8; j++) {
                 for (int32_t k = 7; k >= 0; k--)
                     std::cerr << ((keys[i].str[j] >> k) & 1);
                 std::cerr << ' ';
@@ -824,24 +1185,20 @@ private:
     static void PrintTrieAndTrieSuffixes(Diva<>::Infix& infix) {
         std::cerr << "has_prefix_keys=" << infix.HasPrefixKeys() 
                   << " num_prefix_keys=" << infix.GetNumPrefixKeys() 
-                  << " num_suffixes=" << infix.GetNumSuffixes() 
-                  << " num_trie_bits=" << infix.GetNumTrieBits() << std::endl;
-        if (infix.trie_ != nullptr) {
-            std::cerr << "trie: ";
-            for (uint32_t i = 1; i < infix.trie_->size(); i++) {
-                for (uint32_t j = 0; j < 64; j++)
-                    std::cerr << (((*infix.trie_)[i] >> j) & 1);
-            }
-            std::cerr << std::endl;
+                  << " num_suffixes=" << infix.num_suffixes_
+                  << " num_suffix_bits_=" << infix.num_suffix_bits_
+                  << " num_trie_bits=" << infix.num_trie_bits_ << std::endl;
+        std::cerr << "trie: ";
+        for (uint32_t i = 0; i < infix.trie_.size(); i++) {
+            for (uint32_t j = 0; j < 64; j++)
+                std::cerr << ((infix.trie_[i] >> j) & 1);
         }
-        if (infix.trie_suffixes_ != nullptr) {
-            std::cerr << "trie_suffixes: ";
-            for (uint32_t i = 0; i < infix.trie_suffixes_->size(); i++) {
-                for (uint32_t j = 0; j < 64; j++)
-                    std::cerr << (((*infix.trie_suffixes_)[i] >> j) & 1);
-            }
-            std::cerr << std::endl;
+        std::cerr << std::endl << "trie_suffixes: ";
+        for (uint32_t i = 0; i < infix.trie_suffixes_.size(); i++) {
+            for (uint32_t j = 0; j < 64; j++)
+                std::cerr << ((infix.trie_suffixes_[i] >> j) & 1);
         }
+        std::cerr << std::endl;
     }
 };
 
@@ -864,6 +1221,10 @@ TEST_SUITE("infix") {
 
     TEST_CASE("insert") {
         InfixTests::TrieInsert();
+    }
+
+    TEST_CASE("get strings") {
+        InfixTests::TrieGetStrings();
     }
 }
 
