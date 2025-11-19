@@ -3332,8 +3332,8 @@ inline void Diva<int_optimized, payload_type>::InsertRawIntoInfixStore(InfixStor
         assert(size_grade < size_scalar_count);
 #endif // DEBUG
         ResizeInfixStore(store, total_implicit);
-        size_grade++;
     }
+    size_grade = store.GetSizeGrade();
 
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
@@ -3496,10 +3496,9 @@ inline void Diva<int_optimized, payload_type>::DeleteRawFromInfixStore(InfixStor
                                                                        std::function<bool(const uint64_t *)> should_remove) {
     uint32_t size_grade = store.GetSizeGrade();
     const uint32_t elem_count = store.GetElemCount();
-    if (size_grade > 0 && elem_count <= (size_grade > 1 ? scaled_sizes_[size_grade - 2] : exception_scaled_size_)) {
+    if (size_grade > 0 && elem_count <= (size_grade > 1 ? scaled_sizes_[size_grade - 2] : exception_scaled_size_))
         ResizeInfixStore(store, total_implicit);
-        size_grade--;
-    }
+    size_grade = store.GetSizeGrade();
 
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
@@ -4811,9 +4810,13 @@ template <bool int_optimized, PayloadType payload_type>
 inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
     ind_ = 0;
     infixes_.clear();
+    infixes_.reserve(64);
     bit_counts_.clear();
-    if constexpr (payload_type == PayloadType::FixedLength)
+    bit_counts_.reserve(64);
+    if constexpr (payload_type == PayloadType::FixedLength) {
         payloads_.clear();
+        payloads_.reserve(2 * filter_->payload_size_);
+    }
 
     const bool it_write_lock = false;
     
