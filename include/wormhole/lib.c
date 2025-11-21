@@ -1416,6 +1416,19 @@ rwlock_trylock_write(rwlock * const lock)
   }
 }
 
+  inline bool
+rwlock_trylock_upgrade_write(rwlock * const lock)
+{
+  lock_t * const pvar = (typeof(pvar))lock;
+  lock_v v0 = atomic_load_explicit(pvar, MO_CONSUME);
+  if ((v0 == 1) && atomic_compare_exchange_weak_explicit(pvar, &v0, RWLOCK_WBIT, MO_ACQUIRE, MO_RELAXED)) {
+    rwdep_lock_write(lock);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 // actually nr + 1
   inline bool
 rwlock_trylock_write_nr(rwlock * const lock, u16 nr)
@@ -1423,6 +1436,18 @@ rwlock_trylock_write_nr(rwlock * const lock, u16 nr)
 #pragma nounroll
   do {
     if (rwlock_trylock_write(lock))
+      return true;
+    cpu_pause();
+  } while (nr--);
+  return false;
+}
+
+  inline bool
+rwlock_trylock_upgrade_write_nr(rwlock * const lock, u16 nr)
+{
+#pragma nounroll
+  do {
+    if (rwlock_trylock_upgrade_write(lock))
       return true;
     cpu_pause();
   } while (nr--);
@@ -1445,6 +1470,25 @@ rwlock_lock_write(rwlock * const lock)
       cpu_pause();
 #endif
     } while (atomic_load_explicit(pvar, MO_CONSUME));
+  } while (true);
+}
+
+  inline void
+rwlock_lock_upgrade_write(rwlock * const lock)
+{
+  lock_t * const pvar = (typeof(pvar))lock;
+#pragma nounroll
+  do {
+    if (rwlock_trylock_upgrade_write(lock))
+      return;
+#pragma nounroll
+    do {
+#if defined(CORR)
+      corr_yield();
+#else
+      cpu_pause();
+#endif
+    } while (atomic_load_explicit(pvar, MO_CONSUME) != 1);
   } while (true);
 }
 

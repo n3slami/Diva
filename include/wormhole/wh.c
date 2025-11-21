@@ -518,6 +518,16 @@ wormleaf_lock_write(struct wormleaf * const leaf, struct wormref * const ref)
   }
 }
 
+  void
+wormleaf_lock_upgrade_write(struct wormleaf * const leaf, struct wormref * const ref)
+{
+  if (!rwlock_trylock_upgrade_write(&(leaf->leaflock))) {
+    wormhole_park(ref);
+    rwlock_lock_write(&(leaf->leaflock));
+    wormhole_resume(ref);
+  }
+}
+
   static bool
 wormleaf_trylock_write(struct wormleaf * const leaf, struct wormref * const ref)
 {

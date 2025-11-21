@@ -69,6 +69,9 @@ wormhole_delr(struct wormref * const ref, const struct kref * const start,
 wormleaf_lock_write(struct wormleaf * const leaf, struct wormref * const ref);
 
   void
+wormleaf_lock_upgrade_write(struct wormleaf * const leaf, struct wormref * const ref);
+
+  void
 wormleaf_lock_read(struct wormleaf * const leaf, struct wormref * const ref);
 
   void

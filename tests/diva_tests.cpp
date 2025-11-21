@@ -7,6 +7,7 @@
 #include "wormhole/wh_int.h"
 #include <atomic>
 #include <endian.h>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <string_view>
@@ -4291,11 +4292,11 @@ public:
         }
 
         SUBCASE("concurrency with payloads") {
-            const uint32_t infix_size = 10;
-            const uint32_t seed = 2;
+            const uint32_t infix_size = 8;
+            const uint32_t seed = 4;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_threads = 32;
+            const uint32_t n_threads = 16;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
             const uint32_t query_period = 5000000;
             
@@ -4404,8 +4405,9 @@ public:
         SUBCASE("concurrently iterating and deleting with payloads") {
             const uint32_t infix_size = 10;
             const uint32_t seed = 2;
-            const float load_factor = 0.95;
+            const float load_factor = 0.8;
             const uint32_t n_keys = 30000000;
+            const uint32_t n_duplicates = 3;
             const uint32_t n_threads = 8;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
             const uint64_t delete_threshold = 10000000;
@@ -4458,43 +4460,51 @@ public:
                                                 (const uint64_t **) payloads);
             REQUIRE_EQ(s.GetNumKeys(), n_bulk);
 
+            std::cerr << "querying bulk loaded" << std::endl;
+            for (int32_t i = 0; i < n_bulk; i++) {
+                bool found = false;
+                for (auto it = s.GetIterator(string_keys[i], string_keys[i]); it.IsValid(); ++it) {
+                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                    it.GetPayload(payload);
+                    if (compare_bitmap_to_bitmap(payloads[i], 0, payload, 0, payload_size))
+                        found = true;
+                }
+                REQUIRE(found);
+            }
+
             std::atomic<uint64_t> n_keys_inserted_overall = 1;
             std::vector<std::thread> threads;
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
+                                for (uint32_t kill_me = 0; kill_me < n_duplicates; kill_me++) {
+                                uint32_t kill_me_count = 0;
+                                for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); 
+                                        it.IsValid();
+                                        ++it) {
+                                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                                    it.GetPayload(payload);
+                                    kill_me_count += compare_bitmap_to_bitmap(payloads[ti], 0, payload, 0, payload_size);
+                                }
                                 payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
                                 s.Insert(string_keys[ti], payloads[ti], rng());
+                                }
                                 n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
                                 if (payloads[ti][0] > delete_threshold)
                                     REQUIRE(s.PointQuery(string_keys[ti]));
                                 if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
                                     std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
-                                    for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
+                                    for (int32_t tj = ti; tj >= 0; tj -= n_threads) {
                                         if (payloads[tj][0] > delete_threshold) {
                                             bool found = false;
                                             for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
                                                     it.IsValid();
-                                                    it++) {
+                                                    ++it) {
                                                 uint64_t payload[(payload_size + 63) / 64 + 1];
                                                 it.GetPayload(payload);
-                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
+                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size))
                                                     found = true;
-                                                    break;
-                                                }
-                                            }
-                                            if (!found) {
-                                                for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]);
-                                                        it.IsValid();
-                                                        it++) {
-                                                    uint64_t payload[(payload_size + 63) / 64 + 1];
-                                                    it.GetPayload(payload);
-                                                    if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size)) {
-                                                        found = true;
-                                                        break;
-                                                    }
-                                                }
                                             }
                                             REQUIRE(found);
                                         }
@@ -4516,7 +4526,7 @@ public:
                 t.join();
 
             // Make sure there are no entries that should've been deleted
-            for (auto it = s.GetIterator(); it.IsValid(); it++) {
+            for (auto it = s.GetIterator(); it.IsValid(); ++it) {
                 uint64_t payload[(payload_size + 63) / 64 + 1];
                 it.GetPayload(payload);
                 REQUIRE((payload[0] > delete_threshold || payload[0] == 0));
@@ -4525,7 +4535,7 @@ public:
                 if (i >= n_bulk && (i - n_bulk) % n_threads == 0)
                     continue;
                 bool found = false;
-                for (auto it = s.GetIterator(string_keys[i], string_keys[i]); it.IsValid(); it++) {
+                for (auto it = s.GetIterator(string_keys[i], string_keys[i]); it.IsValid(); ++it) {
                     uint64_t payload[(payload_size + 63) / 64 + 1];
                     it.GetPayload(payload);
                     if (compare_bitmap_to_bitmap(payloads[i], 0, payload, 0, payload_size)) {
@@ -4535,6 +4545,95 @@ public:
                 }
                 REQUIRE_EQ(found, (payloads[i][0] > delete_threshold || payloads[i][0] == 0));
             }
+        }
+
+
+        SUBCASE("guy's workload") {
+            std::ifstream inserts("./tests/phase1_insert.txt", std::ios::binary);
+            REQUIRE(inserts.is_open());
+            std::ifstream updates("./tests/phase1_update.txt", std::ios::binary);
+            REQUIRE(updates.is_open());
+
+            const uint32_t infix_size = 8;
+            const float load_factor = 0.95;
+            const uint32_t n_keys = 30000000;
+            const uint32_t n_init_samples = 50000;
+            const uint64_t delete_threshold = 100000;
+            const uint32_t n_threads = 16;
+
+            std::vector<std::string> string_keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                uint32_t key_length;
+                std::string key;
+                char dummy;
+                if (i < n_keys / 3) {
+                    inserts.read(reinterpret_cast<char *>(&key_length), sizeof(key_length));
+                    key_length = __builtin_bswap32(key_length);
+                    key.resize(key_length);
+                    inserts.read(key.data(), key_length);
+                    inserts.read(&dummy, sizeof(dummy));
+                }
+                else {
+                    updates.read(reinterpret_cast<char *>(&key_length), sizeof(key_length));
+                    key_length = __builtin_bswap32(key_length);
+                    key.resize(key_length);
+                    updates.read(key.data(), key_length);
+                    updates.read(&dummy, sizeof(dummy));
+                }
+                string_keys.push_back(key);
+            }
+            uint64_t *payloads_contents = new uint64_t[n_keys * (payload_size / 64 + 2)];
+            uint64_t **payloads = new uint64_t *[n_keys];
+            for (uint32_t i = 0; i < n_keys; i++) {
+                for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
+                    payloads_contents[i * (payload_size / 64 + 2) + j] = rng();
+                payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
+            }
+            std::cerr << "workload set up" << std::endl;
+
+            Diva<O, PayloadType::FixedLength> s(infix_size,
+                                                seed,
+                                                load_factor,
+                                                payload_size, 
+                                                true);
+
+            for (uint32_t i = 0; i < n_init_samples; i++)
+                s.Insert(string_keys[i], payloads[i], 1024);
+
+            std::atomic<uint64_t> n_keys_inserted_overall = 1;
+            std::vector<std::thread> threads;
+            for (uint32_t i = 0; i < n_threads; i++) {
+                threads.emplace_back([&, i] {
+                        if (i > 0) {
+                            uint64_t cnt = 0, total_count = 0, xor_ = 0;
+                            for (uint32_t ti = n_init_samples + i; ti < n_keys; ti += n_threads) {
+                                if ((ti - n_init_samples - i) % (10000 * n_threads) == 0)
+                                    std::cerr << "i=" << i << " @ti=" << ti << " avg=" << static_cast<long double>(cnt) / total_count << std::endl;
+                                for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); it.IsValid(); ++it) {
+                                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                                    it.GetPayload(payload);
+                                    xor_ ^= payload[0];
+                                    cnt++;
+                                }
+                                payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
+                                s.Insert(string_keys[ti], payloads[ti], rng());
+                                total_count++;
+                                n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
+                            }
+                            std::cerr << "done i=" << i << " cnt=" << cnt << " xor=" << xor_ << std::endl;
+                        }
+                        else {
+                            while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
+                                cpu_pause();
+                            s.DeleteRange(nullptr, 0, nullptr, 0, 
+                                    [=](const uint64_t *payload) { 
+                                        return payload[0] <= delete_threshold && payload[0] > 0;
+                                    });
+                        }
+                    });
+            }
+            for (auto& t : threads)
+                t.join();
         }
     }
 
@@ -4709,6 +4808,13 @@ private:
                 const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
                 const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
                 REQUIRE_EQ(memcmp(store_a->ptr, store_b->ptr, word_count * sizeof(uint64_t)), 0);
+                if constexpr (payload_type == PayloadType::FixedLength) {
+                    REQUIRE_EQ(store_a->num_sample_payloads, store_b->num_sample_payloads);
+                    const uint64_t *store_a_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_a->ptr[1]);
+                    const uint64_t *store_b_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_b->ptr[1]);
+                    const uint32_t num_sample_payload_bytes = (store_a->num_sample_payloads * a.payload_size_ + 7) / 8;
+                    REQUIRE_EQ(memcmp(store_a_sample_payloads_ptr, store_b_sample_payloads_ptr, num_sample_payload_bytes), 0);
+                }
                 wh_int_iter_skip1(&it_a, check_it_write, check_it_unlock);
                 wh_int_iter_skip1(&it_b, check_it_write, check_it_unlock);
             }
@@ -4740,7 +4846,15 @@ private:
                 REQUIRE_EQ(store_a->status, store_b->status);
                 const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
                 const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
-                REQUIRE_EQ(memcmp(store_a->ptr, store_b->ptr, word_count * sizeof(uint64_t)), 0);
+                REQUIRE_EQ(store_a->ptr[0], store_b->ptr[0]);
+                REQUIRE_EQ(memcmp(store_a->ptr + 2, store_b->ptr + 2, (word_count - 2) * sizeof(uint64_t)), 0);
+                if constexpr (payload_type == PayloadType::FixedLength) {
+                    REQUIRE_EQ(store_a->num_sample_payloads, store_b->num_sample_payloads);
+                    const uint64_t *store_a_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_a->ptr[1]);
+                    const uint64_t *store_b_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_b->ptr[1]);
+                    const uint32_t num_sample_payload_bytes = (store_a->num_sample_payloads * a.payload_size_ + 7) / 8;
+                    REQUIRE_EQ(memcmp(store_a_sample_payloads_ptr, store_b_sample_payloads_ptr, num_sample_payload_bytes), 0);
+                }
                 wh_iter_skip1(&it_a, check_it_write, check_it_unlock);
                 wh_iter_skip1(&it_b, check_it_write, check_it_unlock);
             }

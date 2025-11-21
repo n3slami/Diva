@@ -204,8 +204,20 @@ inline auto to_big_endian_order(uint16_t const &key) {
 };
 
 
+// Inclusive range
 //__attribute__((always_inline))
-inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+inline void zero_out_bitmap(uint64_t *ptr, int32_t l, int32_t r) {
+    while (l <= r) {
+        const int32_t offset = l % 64;
+        const uint32_t erase_amount = std::min(r - l, 63 - offset) + 1;
+        ptr[l / 64] &= ~(BITMASK(erase_amount) << offset);
+        l += erase_amount;
+    }
+}
+
+
+//__attribute__((always_inline))
+inline void move_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     const int32_t l_src_bit_pos = l;
     int32_t r_src_bit_pos = r;
     int32_t dst_bit_pos = r_src_bit_pos + shamt;
@@ -223,20 +235,18 @@ inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r
         r_src_bit_pos -= move_amount;
         dst_bit_pos -= move_amount;
     }
-    
-    // Zero out shifted part
-    r_src_bit_pos = l_src_bit_pos + shamt - 1;
-    while (r_src_bit_pos >= l_src_bit_pos) {
-        const int32_t offset = r_src_bit_pos % 64;
-        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, offset) + 1;
-        ptr[r_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << (offset - erase_amount + 1));
-        r_src_bit_pos -= erase_amount;
-    }
 }
 
 
 //__attribute__((always_inline))
-inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    move_bitmap_right(ptr, l, r, shamt);
+    zero_out_bitmap(ptr, l, l + shamt - 1);
+}
+
+
+//__attribute__((always_inline))
+inline void move_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     int32_t l_src_bit_pos = l;
     const int32_t r_src_bit_pos = r;
     int32_t dst_bit_pos = l_src_bit_pos - shamt;
@@ -254,15 +264,13 @@ inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r,
         l_src_bit_pos += move_amount;
         dst_bit_pos += move_amount;
     }
+}
 
-    // Zero out shifted part
-    l_src_bit_pos = r_src_bit_pos - shamt + 1;
-    while (l_src_bit_pos <= r_src_bit_pos) {
-        const int32_t offset = l_src_bit_pos % 64;
-        const uint32_t erase_amount = std::min(r_src_bit_pos - l_src_bit_pos, 63 - offset) + 1;
-        ptr[l_src_bit_pos / 64] &= ~(BITMASK(erase_amount) << offset);
-        l_src_bit_pos += erase_amount;
-    }
+
+//__attribute__((always_inline))
+inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    move_bitmap_left(ptr, l, r, shamt);
+    zero_out_bitmap(ptr, r - shamt + 1, r);
 }
 
 

@@ -346,6 +346,9 @@ rwlock_unlock_read(rwlock * const lock);
 rwlock_trylock_write(rwlock * const lock);
 
   extern bool
+rwlock_trylock_upgrade_write(rwlock * const lock);
+
+  extern bool
 rwlock_trylock_write_nr(rwlock * const lock, u16 nr);
 
   extern void
