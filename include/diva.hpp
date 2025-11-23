@@ -5571,7 +5571,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(con
                                                                              uint32_t key_start_bit) const {
     uint32_t res = 0, bit_pos = key_start_bit;
     uint64_t read_1, read_2;
-    const uint32_t min_length = std::min(bit_length_1, bit_length_2) - key_start_bit;
+    const uint32_t min_length = std::min(bit_length_1, bit_length_2);
     uint32_t delta;
     do {
         const uint32_t bytes_to_copy = std::min(8U, (min_length - bit_pos + bit_pos % 8 + 7) / 8);
@@ -5580,7 +5580,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(con
         memcpy(&read_2, key_2 + bit_pos / 8, bytes_to_copy);
         read_2 = __builtin_bswap64(read_2) << (bit_pos % 8);
 
-        const uint32_t advance_bits = 8 * bytes_to_copy - bit_pos % 8;
+        const uint32_t advance_bits = std::min(min_length - bit_pos, 8 * bytes_to_copy - bit_pos % 8);
         delta = std::min<uint32_t>(advance_bits, __builtin_ia32_lzcnt_u64(read_1 ^ read_2));
         res += delta;
         bit_pos += advance_bits;
@@ -5603,7 +5603,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(con
         read_2 = 0;
         write_bits_from_string_to_bitmap(&read_2, 0, key_2, bit_pos_2, num_bits_to_copy);
 
-        delta = num_bits_to_copy - highbit_pos(read_1 ^ read_2);
+        delta = num_bits_to_copy - highbit_pos(read_1 ^ read_2) - 1;
         res += delta;
         bit_pos_1 += num_bits_to_copy;
         bit_pos_2 += num_bits_to_copy;
@@ -5952,6 +5952,11 @@ inline void Diva<int_optimized, payload_type>::Infix::AdjustActualSuffixLen(uint
         do {
             if (write_bit_pos + write_len + 1 >= 64 * trie_suffixes_.size())
                 trie_suffixes_.push_back(0);
+            if (new_actual_suffix_len == 1 && write_buf_filled_len == 0) {
+                write_bits_to_bitmap(trie_suffixes_.data(), write_bit_pos, 0, 1);
+                write_bit_pos += write_len + 1;
+                break;
+            }
             write_bits_to_bitmap(trie_suffixes_.data(), write_bit_pos,
                                  (write_buf >> std::max<int32_t>(write_buf_filled_len - write_len, 0)) 
                                         | (1ULL << std::min(write_buf_filled_len, write_len)),
@@ -5960,7 +5965,7 @@ inline void Diva<int_optimized, payload_type>::Infix::AdjustActualSuffixLen(uint
             write_buf &= BITMASK(write_buf_filled_len - write_len);
             write_buf_filled_len -= write_len;
             write_len = slot_size - 1;
-        } while (static_cast<int32_t>(write_buf_filled_len) > 0);
+        } while (static_cast<int32_t>(write_buf_filled_len) >= 0);
     }
     num_suffix_bits_ = write_bit_pos;
 }
@@ -6290,17 +6295,18 @@ inline void Diva<int_optimized, payload_type>::Infix::DeleteTrie(const InfiniteB
                                                                  uint32_t key_start_bit,
                                                                  uint32_t slot_size) {
     // TODO: Perhaps it would be faster to handle deletes without getting the full strings?
-    const auto [keys, keys_contents] = GetStrings(slot_size);
+    auto [keys, keys_contents] = GetStrings(slot_size);
     int32_t remove_candidate = -1;
     for (uint32_t i = 0; i < keys.size(); i++) {
         const uint32_t match_bit_count = GetSharedPrefixLen(key, key_start_bit,
                                                             keys[i].str, keys[i].length);
+        assert(match_bit_count <= keys[i].length);
         if (match_bit_count == keys[i].length)
             remove_candidate = (remove_candidate == -1 || keys[remove_candidate].length < keys[i].length) ? i : remove_candidate;
     }
     assert(remove_candidate != -1);     // Deletee must exist.
     keys.erase(keys.begin() + remove_candidate);
-    BuildTrie(keys.data(), keys.size(), 0, slot_size);
+    BuildTrie(keys.data(), keys.size(), 0, slot_size, false, true);
 }
 
 
@@ -6355,7 +6361,7 @@ Diva<int_optimized, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
     for (uint32_t i = 0; i < res.size(); i++)
         res[i] = {res_contents.data() + (uint64_t) (res[i].str), res[i].length};
 
-    return {res, res_contents};
+    return {std::move(res), std::move(res_contents)};
 }
 
 
