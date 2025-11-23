@@ -1142,6 +1142,178 @@ public:
     }
 
 
+    static void TrieDelete() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            const uint32_t victim = 3;
+            Diva<>::InfiniteByteString baseline_keys[N - 1];
+            for (uint32_t i = 0; i < N; i++) {
+                if (i == victim)
+                    continue;
+                baseline_keys[i - (i > victim)] = keys[i];
+            }
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.num_suffix_bits_ = 14;
+                check_infix.trie_suffixes_[0] = 0b100100;
+                AssertInfix(infix, check_infix);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.num_suffix_bits_ = 55;
+                check_infix.trie_suffixes_[0] = 0b100001000011100111101011010000000000011100000111001000;
+                AssertInfix(infix, check_infix);
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("delete prefix key") {
+                const uint32_t victim = 0;
+                Diva<>::InfiniteByteString baseline_keys[N - 1];
+                for (uint32_t i = 0; i < N; i++) {
+                    if (i == victim)
+                        continue;
+                    baseline_keys[i - (i > victim)] = keys[i];
+                }
+                uint8_t victim_key[1] = {0b00001111};
+
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.DeleteTrie({victim_key, 1}, 0, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.trie_suffixes_[0] = 0b110000110000101000110000110000111000111000101000100;
+                AssertInfix(infix, check_infix);
+            }
+
+            SUBCASE("delete non-prefix key") {
+                const uint32_t victim = 4;
+                Diva<>::InfiniteByteString baseline_keys[N - 1];
+                for (uint32_t i = 0; i < N; i++) {
+                    if (i == victim)
+                        continue;
+                    baseline_keys[i - (i > victim)] = keys[i];
+                }
+
+                SUBCASE("small slots") {
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                    Diva<>::Infix check_infix(infix_value);
+                    check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                    check_infix.num_suffix_bits_ = 13;
+                    check_infix.trie_suffixes_[0] = 0b111000;
+                    AssertInfix(infix, check_infix);
+                }
+                SUBCASE("wide slots") {
+                    const uint32_t slot_size = 10;
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                    Diva<>::Infix check_infix(infix_value);
+                    check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                    check_infix.num_suffix_bits_ = 42;
+                    check_infix.trie_suffixes_[0] = 0b11001100101011000000000011110011101010100;
+                    AssertInfix(infix, check_infix);
+                }
+            }
+        }
+
+        SUBCASE("many keys") {
+            const uint32_t N = 20;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            const uint32_t victim = 2;
+            Diva<>::InfiniteByteString baseline_keys[N - 1];
+            for (uint32_t i = 0; i < N; i++) {
+                if (i == victim)
+                    continue;
+                baseline_keys[i - (i > victim)] = keys[i];
+            }
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                AssertInfix(infix, check_infix);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                AssertInfix(infix, check_infix);
+            }
+        }
+    }
+
+
 private:
     static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
         REQUIRE_EQ(infix.infix_, check_infix.infix_);
@@ -1225,6 +1397,10 @@ TEST_SUITE("infix") {
 
     TEST_CASE("get strings") {
         InfixTests::TrieGetStrings();
+    }
+
+    TEST_CASE("delete") {
+        InfixTests::TrieDelete();
     }
 }
 
