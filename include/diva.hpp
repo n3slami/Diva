@@ -296,7 +296,7 @@ private:
         InfixStore() = default;
         InfixStore(const InfixStore &other):
                     status(other.status),
-                    num_sample_payloads(num_sample_payloads),
+                    num_sample_payloads(other.num_sample_payloads),
                     rwlock(0),
                     ptr(other.ptr) { 
             rwlock.store(0, std::memory_order::memory_order_release);
@@ -2178,23 +2178,26 @@ inline void Diva<int_optimized, payload_type>::Delete(const uint8_t *input_key, 
     if (prev_key == key) {
         if constexpr (payload_type == PayloadType::FixedLength) {
             uint64_t payload[(payload_size_ + 63) / 64 + 1];
+            bool removed = false;
             for (uint32_t i = 0; i < infix_store.num_sample_payloads; i++) {
                 GetSamplePayload(infix_store, i, payload);
                 if (should_remove(payload)) {
                     RemoveSamplePayload(infix_store, i);
+                    removed = true;
                     break;
                 }
             }
-            if (infix_store.num_sample_payloads == 0) {
+            if (removed || infix_store.num_sample_payloads == 0) {
                 rwlock_unlock_write(infix_store.rwlock);
-                UnlockLeaves(leaves_to_unlock, it_write_lock);
-                DeleteMerge(key);
+                if (infix_store.num_sample_payloads == 0)
+                    DeleteMerge(key);
+                else 
+                    n_keys_.fetch_sub(1, std::memory_order_release);
                 return;
             }
         }
         else {
             rwlock_unlock_write(infix_store.rwlock);
-            UnlockLeaves(leaves_to_unlock, it_write_lock);
             DeleteMerge(key);
             return;
         }
