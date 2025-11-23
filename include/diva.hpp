@@ -6404,8 +6404,9 @@ int32_t Diva<int_optimized, payload_type>::Infix::GetLongestMatch(const Infinite
         const uint64_t diff = read_key ^ read_suffix;
         if (diff)
             return res;
+        depth += bits_to_compare;
     }
-    res += suffix_len;
+    res = depth;
     return res;
 }
 

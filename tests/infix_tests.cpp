@@ -1314,6 +1314,195 @@ public:
     }
 
 
+    static void TrieGetLongestMatch() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 4);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00011110, 0b00110001, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00011110, 0b10110001, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 7);
+                }
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00000111, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100011, 0b11010010, 0b10101101};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                }
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 4);
+                }
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00101110, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 2);
+                }
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b11111110, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100101, 0b10101011, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 6);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 6);
+                }
+                {
+                    const uint32_t query_key_len = 2;
+                    uint8_t query_key_contents[query_key_len] = {0b00011111, 0b11111110};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 2);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100001, 0b00101001, 0b11011011};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 8);
+                }
+            }
+        }
+
+        SUBCASE("many keys") {
+            const uint32_t N = 20;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b11011001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 13);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b10101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00111111, 0b01101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 7);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b11011001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 16);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b10101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                }
+                {
+                    const uint32_t query_key_len = 3;
+                    uint8_t query_key_contents[query_key_len] = {0b00111111, 0b01101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                }
+            }
+        }
+    }
+
+
 private:
     static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
         REQUIRE_EQ(infix.infix_, check_infix.infix_);
@@ -1401,6 +1590,10 @@ TEST_SUITE("infix") {
 
     TEST_CASE("delete") {
         InfixTests::TrieDelete();
+    }
+
+    TEST_CASE("get longest match") {
+        InfixTests::TrieGetLongestMatch();
     }
 }
 
