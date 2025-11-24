@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <immintrin.h>
 
 #define MAX_VALUE(nbits) ((1ULL << (nbits)) - 1)
@@ -217,6 +218,20 @@ inline void zero_out_bitmap(uint64_t *ptr, int32_t l, int32_t r) {
 
 
 //__attribute__((always_inline))
+inline void zero_out_bitmap_unaligned(uint64_t *ptr, int32_t l, int32_t r) {
+    while (l <= r) {
+        const int32_t offset = l % 64;
+        const uint32_t erase_amount = std::min(r - l, 63 - offset) + 1;
+        uint64_t val;
+        memcpy(&val, ptr + l / 64, sizeof(val));
+        val &= ~(BITMASK(erase_amount) << offset);
+        memcpy(ptr + l / 64, &val, sizeof(val));
+        l += erase_amount;
+    }
+}
+
+
+//__attribute__((always_inline))
 inline void move_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     const int32_t l_src_bit_pos = l;
     int32_t r_src_bit_pos = r;
@@ -239,9 +254,41 @@ inline void move_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r,
 
 
 //__attribute__((always_inline))
+inline void move_bitmap_right_unaligned(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    const int32_t l_src_bit_pos = l;
+    int32_t r_src_bit_pos = r;
+    int32_t dst_bit_pos = r_src_bit_pos + shamt;
+    while (r_src_bit_pos >= l_src_bit_pos) {
+        const int32_t src_offset = r_src_bit_pos % 64;
+        const int32_t dst_offset = dst_bit_pos % 64;
+        const int32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
+                                             std::min(src_offset, dst_offset)) + 1;
+        const uint64_t move_mask = BITMASK(move_amount);
+        const uint64_t payload = (ptr[r_src_bit_pos / 64] >> (src_offset - move_amount + 1)) & move_mask;
+
+        uint64_t val;
+        memcpy(&val, ptr + dst_bit_pos / 64, sizeof(dst_bit_pos));
+        val &= ~(move_mask << (dst_offset - move_amount + 1));
+        val |= payload << (dst_offset - move_amount + 1);
+        memcpy(ptr + dst_bit_pos / 64, &val, sizeof(dst_bit_pos));
+
+        r_src_bit_pos -= move_amount;
+        dst_bit_pos -= move_amount;
+    }
+}
+
+
+//__attribute__((always_inline))
 inline void shift_bitmap_right(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     move_bitmap_right(ptr, l, r, shamt);
     zero_out_bitmap(ptr, l, l + shamt - 1);
+}
+
+
+//__attribute__((always_inline))
+inline void shift_bitmap_right_unaligned(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    move_bitmap_right_unaligned(ptr, l, r, shamt);
+    zero_out_bitmap_unaligned(ptr, l, l + shamt - 1);
 }
 
 
@@ -268,9 +315,41 @@ inline void move_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, 
 
 
 //__attribute__((always_inline))
+inline void move_bitmap_left_unaligned(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    int32_t l_src_bit_pos = l;
+    const int32_t r_src_bit_pos = r;
+    int32_t dst_bit_pos = l_src_bit_pos - shamt;
+    while (l_src_bit_pos <= r_src_bit_pos) {
+        const int32_t src_offset = l_src_bit_pos % 64;
+        const int32_t dst_offset = dst_bit_pos % 64;
+        const uint32_t move_amount = std::min(r_src_bit_pos - l_src_bit_pos,
+                                              63 - std::max(src_offset, dst_offset)) + 1;
+        const uint64_t move_mask = BITMASK(move_amount);
+        const uint64_t payload = (ptr[l_src_bit_pos / 64] >> src_offset) & move_mask;
+
+        uint64_t val;
+        memcpy(&val, ptr + dst_bit_pos / 64, sizeof(val));
+        val &= ~(move_mask << dst_offset);
+        val |= payload << dst_offset;
+        memcpy(ptr + dst_bit_pos / 64, &val, sizeof(val));
+
+        l_src_bit_pos += move_amount;
+        dst_bit_pos += move_amount;
+    }
+}
+
+
+//__attribute__((always_inline))
 inline void shift_bitmap_left(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
     move_bitmap_left(ptr, l, r, shamt);
     zero_out_bitmap(ptr, r - shamt + 1, r);
+}
+
+
+//__attribute__((always_inline))
+inline void shift_bitmap_left_unaligned(uint64_t *ptr, const uint32_t l, const uint32_t r, const uint32_t shamt) {
+    move_bitmap_left_unaligned(ptr, l, r, shamt);
+    zero_out_bitmap_unaligned(ptr, r - shamt + 1, r);
 }
 
 

@@ -1512,14 +1512,15 @@ inline std::tuple<uint32_t, bool> Diva<int_optimized, payload_type>::GetExpanded
     const uint64_t upper_implicit_lim = upper_lim >> infix_size_;
     for (int32_t i = 0; i < list_len; i++) {
         const int32_t new_lowbit_position = lowbit_pos(list[i]) + shamt;
-#ifdef DEBUG
-        assert(63 > new_lowbit_position);
-#endif
-        if (new_lowbit_position >= infix_size_) {
+        if (infix_size_ <= new_lowbit_position && new_lowbit_position < 64) {
             const uint64_t implicit_part = (list[i] << shamt) >> infix_size_;
             const uint64_t start = std::max(lower_implicit_lim, implicit_part - (implicit_part & (-implicit_part)));
             const uint64_t end = std::min(upper_implicit_lim, implicit_part | (implicit_part - 1));
             actual_list_len += end - start;
+            expanded = true;
+        }
+        else if (new_lowbit_position >= 64) {
+            actual_list_len += upper_implicit_lim - lower_implicit_lim;
             expanded = true;
         }
     }
@@ -1564,7 +1565,7 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
     const uint64_t lower_implicit_lim = lower_lim >> infix_size_;
     const uint64_t upper_implicit_lim = upper_lim >> infix_size_;
     for (int32_t i = 0; i < list_len; i++) {
-        const uint64_t val = list[i] << shamt;
+        const uint64_t val = shamt < 64 ? list[i] << shamt : 0UL;
         const uint64_t implicit_part = val >> infix_size_;
         const uint64_t explicit_part = val & BITMASK(infix_size_);
         if (explicit_part == 0) {
@@ -3244,7 +3245,7 @@ inline void Diva<int_optimized, payload_type>::RemoveSamplePayload(InfixStore &s
     else {
         const uint32_t l = (pos + 1) * payload_size_;
         const uint32_t r = store.num_sample_payloads * payload_size_ - 1;
-        shift_bitmap_left(payload_list, l, r, payload_size_);
+        shift_bitmap_left_unaligned(payload_list, l, r, payload_size_);
         payload_list = reinterpret_cast<uint64_t *>(realloc(payload_list,
                                                             ((store.num_sample_payloads - 1) * payload_size_ + 7) / 8));
     }
