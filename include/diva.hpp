@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -17,8 +16,6 @@
 #include <random>
 #include <string_view>
 #include <tuple>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <x86intrin.h>
 
@@ -446,9 +443,9 @@ private:
             return (num_bits + slot_size - 1) / slot_size;
         }
         uint32_t GetActualSuffixLen(uint32_t slot_size) const;
-        uint32_t GetNumBits(uint32_t slot_size) const;
+        uint32_t GetNumBits() const;
         uint32_t GetNumSlots(uint32_t slot_size) const {
-            return (GetNumBits(slot_size) + slot_size - 1) / slot_size;
+            return (GetNumBits() + slot_size - 1) / slot_size;
         }
 
         std::vector<Infix> TakePrefixBits(uint32_t num_bits);
@@ -5443,7 +5440,6 @@ inline int32_t Diva<int_optimized, payload_type>::Infix::CompareStringToBitmap(c
                                                                                const InfiniteByteString str, uint32_t str_pos,
                                                                                uint32_t num_bits_to_compare) const {
     int64_t match_len = 0;
-    const uint64_t *bitmap_words = reinterpret_cast<const uint64_t *>(bitmap);
     const uint32_t bitmap_pos_start = bitmap_pos;
     bitmap_pos += num_bits_to_compare;
     while (bitmap_pos > bitmap_pos_start) {
@@ -5524,8 +5520,7 @@ inline void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const Infi
                                                                       uint32_t suffix_bit_pos,
                                                                       uint32_t slot_size) {
     assert(!trie_.empty());
-    const uint32_t added_bit_count = std::max(((suffix_bit_count - suffix_bit_pos + slot_size - 2) / (slot_size - 1)), 1U)
-                                     * slot_size;
+    const uint32_t added_bit_count = ((suffix_bit_count - suffix_bit_pos) / (slot_size - 1) + 1) * slot_size;
     if (num_suffix_bits_ + added_bit_count >= 64 * trie_suffixes_.size()) {
         const uint32_t old_size = trie_suffixes_.size();
         trie_suffixes_.resize((num_suffix_bits_ + added_bit_count + 63) / 64);
@@ -5550,14 +5545,13 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::WriteSuffixToSuffixes(
     const uint32_t orig_write_pos = write_pos;
     uint32_t write_size = actual_suffix_len;
     do {
-        uint32_t bits_to_copy = write_size > 1 ? std::min(write_size - 1, suffix_len - suffix_offset) : 0;
-        bits_to_copy -= (bits_to_copy == write_size - 1 && suffix_offset + bits_to_copy >= suffix_len);
+        const uint32_t bits_to_copy = write_size > 1 ? std::min(write_size - 1, suffix_len - suffix_offset) : 0;
         const uint64_t data = suffix.BitsAt(suffix_offset, bits_to_copy) | (1ULL << bits_to_copy);
         write_bits_to_bitmap(trie_suffixes_.data(), write_pos, data, write_size);
         write_pos += write_size;
-        suffix_offset += bits_to_copy;
+        suffix_offset += write_size - 1;
         write_size = slot_size;
-    } while (suffix_offset < suffix_len);
+    } while (suffix_offset <= suffix_len);
     return write_pos - orig_write_pos;
 }
 
@@ -5741,7 +5735,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetActualSuffixLen(uin
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumBits(uint32_t slot_size) const {
+inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumBits() const {
     return num_trie_bits_ + num_suffix_bits_;
 }
 
@@ -5752,8 +5746,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixBitPos(uint32
                                                                           int32_t actual_suffix_len_) const {
     const uint32_t actual_suffix_len = actual_suffix_len_ == -1 ? GetActualSuffixLen(slot_size) 
                                                                 : actual_suffix_len_;
-    uint64_t suffix_read_buf = 0;
-    uint32_t suffix_read_buf_filled_bits = 0, suffix_bit_pos = 0, res = 0;
+    uint32_t res = 0;
     for (uint32_t i = 0; i < suffix_rank; i++) {
         res += actual_suffix_len;
         bool has_extras = (trie_suffixes_[(res - 1) / 64] >> ((res - 1) % 64)) & 1UL;
@@ -5782,7 +5775,7 @@ inline std::pair<uint32_t, uint32_t> Diva<int_optimized, payload_type>::Infix::G
         suffix = read_data_from_bitmap(trie_suffixes_.data(), suffix_bit_pos,
                                        suffix_read_buf, suffix_read_buf_filled_bits,
                                        part_len);
-        res += actual_suffix_len > 1 ? highbit_pos(suffix) : 0;
+        res += part_len > 1 ? highbit_pos(suffix) : 0;
         res_with_meta += part_len;
         not_done = suffix >> (part_len - 1);
         part_len = slot_size;
@@ -5806,8 +5799,8 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixString(uint32
     while (not_done) {
         suffix = read_data_from_bitmap(trie_suffixes_.data(), suffix_bit_pos,
                                        suffix_read_buf, suffix_read_buf_filled_bits,
-                                       actual_suffix_len);
-        const uint32_t valid_len = actual_suffix_len > 1 ? highbit_pos(suffix) : 0;
+                                       part_len);
+        const uint32_t valid_len = part_len > 1 ? highbit_pos(suffix) : 0;
         not_done = suffix >> (part_len - 1);
         suffix = __builtin_bswap64((suffix & BITMASK(valid_len)) << (64 - valid_len - res_bit_pos % 8));
         uint64_t stamp;
@@ -6373,7 +6366,7 @@ int32_t Diva<int_optimized, payload_type>::Infix::GetLongestMatch(const Infinite
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
     int32_t res = -1;
-    int32_t last_depth = -1, last_bit_pos = -1;
+    int32_t last_depth = -1;
     while (true) {
         it.Advance(has_prefix_keys);
         auto [depth, children] = it.depth_branch_.back();
@@ -6419,6 +6412,119 @@ int32_t Diva<int_optimized, payload_type>::Infix::GetLongestMatch(const Infinite
     }
     res = depth;
     return res;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+void Diva<int_optimized, payload_type>::Infix::AdaptTrie(const InfiniteByteString key, 
+                                                         uint32_t key_start_bit,
+                                                         uint32_t adapt_length,
+                                                         uint32_t slot_size) {
+    TrieIterator it(trie_.data());
+    const bool has_prefix_keys = HasPrefixKeys();
+    const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
+    int32_t last_depth = -1;
+    bool prefix_match = false;
+    while (true) {
+        it.Advance(has_prefix_keys);
+        auto [depth, children] = it.depth_branch_.back();
+        const int32_t current_str_bit_pos = key_start_bit + last_depth + 1;
+        const uint32_t path_len = depth - last_depth - 1;
+        if (path_len > 0) {
+            const uint32_t compare_len = std::min<int32_t>(path_len,
+                    std::max(0, 8 * static_cast<int32_t>(key.length) - last_depth));
+            const int32_t compare = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len,
+                                                          key, current_str_bit_pos, 
+                                                          compare_len);
+            if (compare != 0) {
+                assert(prefix_match);
+                DeleteTrie(key, key_start_bit, slot_size);
+                InsertTrie(key, key_start_bit, slot_size);
+                AdaptTrie(key, key_start_bit, adapt_length, slot_size);
+                return;
+            }
+        }
+        if (it.AtPrefixKey(has_prefix_keys)) {
+            prefix_match = true;
+            it.Advance(has_prefix_keys);
+        }
+        if ((children & 1) == 1 && key.GetBit(key_start_bit + depth) == 1)
+            it.SkipSubtree(has_prefix_keys);
+        if (it.AtLeaf())
+            break;
+        last_depth = depth;
+    }
+    assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
+    uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
+
+    // Check if suffixes match
+    uint32_t suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_, slot_size, actual_suffix_len_backup);
+    auto [suffix_len, suffix_len_with_meta] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len_backup);
+    uint8_t suffix_contents[suffix_len / 8 + 8];
+    memset(suffix_contents, 0, suffix_len / 8 + 8);
+    const InfiniteByteString suffix = {suffix_contents, (suffix_len + 7) / 8};
+    bool suffix_match = true;
+    GetSuffixString(suffix_bit_pos, slot_size, suffix_contents, 0, actual_suffix_len_backup);
+    for (uint32_t i = 0; i < suffix_len; i += 64) {
+        const uint32_t bits_to_compare = std::min(64U, suffix_len - i);
+        const uint64_t read_key = key.BitsAt(key_start_bit + depth + i, bits_to_compare);
+        const uint64_t read_suffix = suffix.BitsAt(i, bits_to_compare);
+        const uint64_t diff = read_key ^ read_suffix;
+        if (diff) {
+            suffix_match = false;
+            break;
+        }
+    }
+
+    if (suffix_match) {
+        if (depth + suffix_len < adapt_length) {    // Only update suffixes if we're actually extending something
+            const uint32_t old_key_len = depth + suffix_len;
+
+            // Find the last fragment written of the previous key
+            uint32_t old_write_len = 0, write_len = GetActualSuffixLen(slot_size) - 1, encoding_bit_offset = 0;
+            while (depth < old_key_len) {
+                depth += write_len;
+                encoding_bit_offset += write_len + 1;
+                old_write_len = write_len;
+                write_len = slot_size - 1;
+            }
+            if (old_write_len > 0) {
+                write_len = old_write_len;
+                depth -= write_len;
+                encoding_bit_offset -= write_len + 1;
+            }
+
+            // Encode new fragments
+            uint64_t encoded_suffix[(adapt_length - depth) / 32 + 1];
+            memset(encoded_suffix, 0, ((adapt_length - depth) / 32 + 1) * sizeof(encoded_suffix[0]));
+            uint32_t encoding_bit_pos = 0;
+            while (depth <= adapt_length) {
+                uint64_t data = key.BitsAt(depth, write_len) | (1ULL << write_len);
+                data >>= write_len - std::min(write_len, adapt_length - depth);
+                write_bits_to_bitmap(encoded_suffix, encoding_bit_pos, data, write_len + 1);
+                encoding_bit_pos += write_len + 1;
+                depth += write_len;
+                write_len = slot_size - 1;
+            }
+            
+            // Expand, shift, and write
+            const uint32_t added_bit_count = encoding_bit_pos + encoding_bit_offset - suffix_len_with_meta;
+            if (num_suffix_bits_ + added_bit_count >= 64 * trie_suffixes_.size()) {
+                const uint32_t old_size = trie_suffixes_.size();
+                trie_suffixes_.resize((num_suffix_bits_ + added_bit_count + 63) / 64);
+                memset(trie_suffixes_.data() + old_size, 0, (trie_suffixes_.size() - old_size) * sizeof(trie_suffixes_[0]));
+            }
+            shift_bitmap_right(trie_suffixes_.data(), suffix_bit_pos + encoding_bit_offset, num_suffix_bits_, added_bit_count);
+            copy_bitmap_to_bitmap(encoded_suffix, 0, trie_suffixes_.data(), suffix_bit_pos + encoding_bit_offset, encoding_bit_pos);
+            num_suffix_bits_ += added_bit_count;
+        }
+    }
+    else {
+        assert(prefix_match);
+        DeleteTrie(key, key_start_bit, slot_size);
+        InsertTrie(key, key_start_bit, slot_size);
+        AdaptTrie(key, key_start_bit, adapt_length, slot_size);
+    }
 }
 
 
