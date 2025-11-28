@@ -498,7 +498,6 @@ inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t b
                                                   const void *str, uint32_t str_pos,
                                                   uint32_t num_bits_to_compare) {
     int64_t match_len = 0;
-    const uint64_t *bitmap_words = reinterpret_cast<const uint64_t *>(bitmap);
     const uint64_t *str_words = reinterpret_cast<const uint64_t *>(str);
     const uint32_t bitmap_pos_start = bitmap_pos;
     bitmap_pos += num_bits_to_compare;

@@ -392,10 +392,10 @@ private:
         };
 
         uint64_t infix_;
-        uint32_t num_suffixes_;
-        uint32_t num_suffix_bits_;
-        uint32_t num_prefix_keys_;
-        uint32_t num_trie_bits_;
+        uint32_t num_suffixes_ = 0;
+        uint32_t num_suffix_bits_ = 0;
+        uint32_t num_prefix_keys_ = 0;
+        uint32_t num_trie_bits_ = 0;
         std::vector<uint64_t> trie_;
         std::vector<uint64_t> trie_suffixes_;
 
@@ -450,8 +450,8 @@ private:
             return (GetNumBits() + slot_size - 1) / slot_size;
         }
 
-        std::vector<Infix> TakePrefixBits(uint32_t num_bits);
-        void Merge(const Infix& other);
+        std::vector<Infix> SplitPrefixBits(uint32_t num_bits, uint32_t slot_size);
+        void Merge(const Infix& other, uint32_t slot_size);
 
     private:
         static constexpr uint32_t has_prefix_keys_bit_pos = 63;
@@ -474,13 +474,15 @@ private:
 
         void AddBitsToTrie(uint64_t bits, uint32_t bit_count);
         void AddBitsToTrie(const void *bits, uint32_t bit_count, uint32_t bit_offset);
+        void AddBitsFromBitmapToTrie(const void *bits, uint32_t bit_count, uint32_t bit_offset);
         void AddCounterToTrie(uint64_t counter);
         uint32_t GetCounterDigitCount(uint64_t counter) const;
         void AddSuffixToTrie(const InfiniteByteString suffix, uint32_t suffix_bit_count, uint32_t suffix_bit_pos,
                              uint32_t slot_size);
         uint32_t WriteSuffixToSuffixes(const InfiniteByteString suffix, uint32_t suffix_len, uint32_t suffix_offset,
                                        uint32_t write_pos, uint32_t actual_suffix_len, uint32_t slot_size);
-        uint32_t GetSuffixBitPos(uint32_t suffix_rank, uint32_t slot_size, int32_t actual_suffix_len_=-1) const;
+        uint32_t GetSuffixBitPos(uint32_t suffix_rank, uint32_t slot_size,
+                                 int32_t actual_suffix_len_=-1, uint32_t prev_suffix_bit_pos=0) const;
         std::pair<uint32_t, uint32_t> GetSuffixLength(uint32_t suffix_bit_pos,
                                                       uint32_t slot_size,
                                                       int32_t actual_suffix_len_=-1) const;
@@ -496,7 +498,8 @@ private:
                                     uint32_t start_bit_1,
                                     const uint8_t *key_2,
                                     uint32_t bit_count_2) const;
-        void SwitchTrieEncoding(bool has_duplicates, uint32_t slot_size);
+        void SwitchTrieEncoding(bool has_duplicates, uint32_t slot_size,
+                                int32_t old_actual_suffix_len=-1);
         void AdjustActualSuffixLen(uint32_t old_actual_suffix_len,
                                    uint32_t new_actual_suffix_len,
                                    uint32_t slot_size);
@@ -5482,6 +5485,18 @@ inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const void *
 
 template <bool int_optimized, PayloadType payload_type>
 //__attribute__((always_inline))
+inline void Diva<int_optimized, payload_type>::Infix::AddBitsFromBitmapToTrie(const void *bits,
+                                                                              uint32_t bit_count,
+                                                                              uint32_t bit_offset) {
+    if (num_trie_bits_ + bit_count >= 64 * trie_.size())
+        trie_.resize((num_trie_bits_ + bit_count) / 64 + 1);
+    copy_bitmap_to_bitmap(bits, bit_offset, trie_.data(), num_trie_bits_, bit_count);
+    num_trie_bits_ += bit_count;
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+//__attribute__((always_inline))
 inline void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t counter) {
     uint32_t digit_count = GetCounterDigitCount(counter);
     uint32_t bit_pos = digit_count + 1;
@@ -5734,10 +5749,11 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumBits() const {
 template <bool int_optimized, PayloadType payload_type>
 inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixBitPos(uint32_t suffix_rank,
                                                                           uint32_t slot_size,
-                                                                          int32_t actual_suffix_len_) const {
+                                                                          int32_t actual_suffix_len_,
+                                                                          uint32_t prev_suffix_bit_pos) const {
     const uint32_t actual_suffix_len = actual_suffix_len_ == -1 ? GetActualSuffixLen(slot_size) 
                                                                 : actual_suffix_len_;
-    uint32_t res = 0;
+    uint32_t res = prev_suffix_bit_pos;
     for (uint32_t i = 0; i < suffix_rank; i++) {
         res += actual_suffix_len;
         bool has_extras = (trie_suffixes_[(res - 1) / 64] >> ((res - 1) % 64)) & 1UL;
@@ -5956,14 +5972,22 @@ inline void Diva<int_optimized, payload_type>::Infix::AdjustActualSuffixLen(uint
 
 
 template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::SwitchTrieEncoding(bool has_prefix_keys, uint32_t slot_size) {
-    if (trie_[0] & 1ULL) {   // The entire trie is just a leaf, so nothing to do
+inline void Diva<int_optimized, payload_type>::Infix::SwitchTrieEncoding(bool has_prefix_keys, uint32_t slot_size,
+                                                                         int32_t old_actual_suffix_len) {
+    if (trie_[0] & 1UL) {   // The entire trie is just a leaf, so just have to adjust actual suffix length if needed
         SetHasPrefixKeys(has_prefix_keys);
+        const uint32_t actual_suffix_len = num_suffix_bits_;
+        const uint32_t new_actual_suffix_len = std::max(slot_size - 1, 1U);
+        if (actual_suffix_len != new_actual_suffix_len) {
+            num_suffix_bits_ = new_actual_suffix_len;
+            trie_suffixes_[0] = new_actual_suffix_len == 1 ? 0 : trie_suffixes_[0];
+        }
         return;
     }
 
     std::vector<uint64_t> trie_backup = trie_;
-    const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
+    const uint32_t actual_suffix_len_backup = old_actual_suffix_len == -1 ? GetActualSuffixLen(slot_size)
+                                                                          : old_actual_suffix_len;
     num_trie_bits_ = 0;
     trie_.resize(1);
     trie_[0] = 0;
@@ -6519,6 +6543,156 @@ void Diva<int_optimized, payload_type>::Infix::AdaptTrie(const InfiniteByteStrin
 }
 
 
+template <bool int_optimized, PayloadType payload_type>
+std::vector<typename Diva<int_optimized, payload_type>::Infix>
+Diva<int_optimized, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uint32_t slot_size) {
+    const int32_t num_split_bits = num_bits;
+    std::vector<Infix> res;
+    uint64_t current_prefix = 0;
+    const uint64_t infix_without_age_shifted = (num_split_bits < 64 ? (infix_ >> 1) << num_split_bits : 0);
+
+    TrieIterator it(trie_.data());
+    const bool has_prefix_keys = HasPrefixKeys();
+    const uint32_t actual_suffix_len = GetActualSuffixLen(slot_size);
+    int32_t suffix_bit_pos = 0;
+    do {
+        const int32_t last_depth = it.depth_branch_.back().first;
+        if (!it.AtLeaf())
+            it.Advance(has_prefix_keys);
+        auto [depth, children] = it.depth_branch_.back();
+        if (depth >= num_split_bits - 64) {     // Update `current_prefix`
+            if (last_depth < depth) {
+                const int32_t path_len = depth - last_depth - 1 + std::min(0, num_split_bits - depth);
+                const int32_t prefix_bit_pos = std::max(num_split_bits - depth, 0);
+                copy_bitmap_to_bitmap(trie_.data(), it.bit_pos_ - path_len,
+                                      &current_prefix, prefix_bit_pos + 1,
+                                      std::min(std::max(0, 63 - prefix_bit_pos), path_len));
+            }
+            const int32_t shamt = std::min(64, std::max(0, num_split_bits - depth));
+            current_prefix &= ~BITMASK(shamt + 1);
+            current_prefix |= (depth < num_split_bits) ? (static_cast<uint64_t>((children & -children) - 1) << shamt) 
+                                                       : 0UL;
+        }
+
+        // Add `current_prefix` to results if needed
+        if (depth > num_split_bits - 1 || (depth == num_split_bits - 1 
+                                            && (!it.AtLeaf() && !it.AtPrefixKey(has_prefix_keys)))) {   // Take whole subtrie(s)
+            const uint32_t total_skips = __builtin_popcountll(children);
+            const uint32_t num_skips = (depth == num_split_bits - 1) ? 1 : 2;
+            for (uint32_t skip_count = 0; skip_count < total_skips; skip_count += num_skips) {
+                // Update `current_prefix` if skipped a subtrie already
+                if (num_skips == 1 && skip_count == 1)
+                    current_prefix |= 0b10UL;
+
+                const uint32_t last_bit_pos = it.bit_pos_;
+                const uint32_t last_num_keys_read = it.num_keys_read_;
+                const uint32_t last_num_prefix_keys_read = it.num_prefix_keys_read_;
+                const uint32_t last_suffix_bit_pos = suffix_bit_pos;
+                if (it.AtPrefixKey(has_prefix_keys))
+                    it.Advance(has_prefix_keys);
+                for (uint32_t i = 0; i < std::min(num_skips, total_skips); i++)
+                    it.SkipSubtree(has_prefix_keys);
+
+                // Figure out the position of suffixes we have to copy
+                suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_ - last_num_keys_read,
+                                                 slot_size,
+                                                 actual_suffix_len,
+                                                 suffix_bit_pos);
+
+                Infix new_infix(infix_without_age_shifted | current_prefix | 1UL);
+                new_infix.num_prefix_keys_ = it.num_prefix_keys_read_ - last_num_prefix_keys_read + has_prefix_keys;
+                if (depth >= num_split_bits) {      // Copy part of path that is a prefix of everything
+                    const uint32_t path_len = depth - num_split_bits;
+                    if (has_prefix_keys)
+                        new_infix.AddCounterToTrie(path_len + 1);
+                    else {
+                        new_infix.AddBitsToTrie(nullptr, path_len + 1, 0);
+                        new_infix.AddBitsToTrie(1, 1);
+                    }
+                    new_infix.AddBitsFromBitmapToTrie(trie_.data(), path_len, last_bit_pos - path_len);
+                }
+                // Copy full subtrie
+                new_infix.AddBitsFromBitmapToTrie(trie_.data(), it.bit_pos_ - last_bit_pos, last_bit_pos);
+
+                // Setup suffixes
+                new_infix.num_suffixes_ = it.num_keys_read_ - last_num_keys_read;
+                new_infix.num_suffix_bits_ = suffix_bit_pos - last_suffix_bit_pos;
+                new_infix.trie_suffixes_.resize((new_infix.num_suffix_bits_ + 63) / 64);
+                copy_bitmap_to_bitmap(trie_suffixes_.data(), last_suffix_bit_pos,
+                                      new_infix.trie_suffixes_.data(), 0, 
+                                      new_infix.num_suffix_bits_);
+
+                const uint32_t new_actual_suffix_len = new_infix.GetActualSuffixLen(slot_size);
+                const bool should_remove_trie = (new_infix.num_trie_bits_ == 1 && new_infix.num_suffixes_ == 1) 
+                                                && new_infix.trie_suffixes_[0] == (actual_suffix_len == 1 ? 0UL : 1UL);
+                if (!should_remove_trie) {
+                    if (new_infix.num_prefix_keys_ == 1)                    // Switch trie encoding if possible 
+                        new_infix.SwitchTrieEncoding(false, slot_size, actual_suffix_len);
+                    else if (new_actual_suffix_len != actual_suffix_len)    // Adjust actual suffix length if needed
+                        new_infix.AdjustActualSuffixLen(actual_suffix_len, new_actual_suffix_len, slot_size);
+                }
+                else {                                                      // Remove the trie and its suffixes if nothing there
+                    new_infix.num_prefix_keys_ = 0;
+                    new_infix.num_trie_bits_ = 0;
+                    new_infix.trie_.clear();
+                    new_infix.num_suffixes_ = 0;
+                    new_infix.num_suffix_bits_ = 0;
+                    new_infix.trie_suffixes_.clear();
+                }
+
+                res.push_back(new_infix);
+            }
+        }
+        else if (it.AtLeaf()) {
+            const auto [suffix_len, suffix_len_with_meta] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len);
+            uint8_t suffix_contents[suffix_len / 8 + 8];
+            memset(suffix_contents, 0, suffix_len / 8 + 8);
+            const InfiniteByteString suffix = {suffix_contents, (suffix_len + 7) / 8};
+            GetSuffixString(suffix_bit_pos, slot_size, suffix_contents, 0, actual_suffix_len);
+
+            // Puts relevant part of the suffix into `current_prefix`
+            const int32_t shamt = std::min(63, std::max(num_split_bits - depth - 1, 0));
+            current_prefix &= ~BITMASK(shamt + 1);
+            const int32_t dead_bit_count = depth + static_cast<int32_t>(suffix_len) + 1 - num_split_bits;
+            current_prefix |= depth > num_split_bits ? 0 : suffix.BitsAt(num_split_bits - depth - shamt - 1, shamt) 
+                                                            << (std::min(63, std::max(0, -dead_bit_count)) + 1);
+
+            Infix new_infix(infix_without_age_shifted | current_prefix | (1UL << std::max(std::min(63, -dead_bit_count), 0)));
+            if (dead_bit_count > 0) {   // Has a single suffix to add
+                new_infix.AddBitsToTrie(1, 1);
+                new_infix.AddSuffixToTrie(suffix, suffix_len, suffix_len - dead_bit_count, slot_size);
+                new_infix.AdjustActualSuffixLen(slot_size, slot_size - 1, slot_size);
+            }
+            res.push_back(new_infix);
+            it.Advance(has_prefix_keys);
+            suffix_bit_pos += suffix_len_with_meta;
+        }
+        else if (it.AtPrefixKey(has_prefix_keys)) {
+            Infix new_infix(infix_without_age_shifted | current_prefix | (1UL << std::min(63, num_split_bits - depth)));
+            res.push_back(new_infix);
+            it.Advance(has_prefix_keys);
+        }
+
+        const auto [current_prefix_update_depth, current_prefix_update_children] = it.depth_branch_.back();
+        const int32_t current_prefix_update_shamt = std::min(64, num_split_bits - current_prefix_update_depth);
+        current_prefix &= ~BITMASK(current_prefix_update_shamt + 1);
+        current_prefix |= ((current_prefix_update_children & -current_prefix_update_children) - 1) 
+                                << current_prefix_update_shamt;
+    } while (it.depth_branch_.back().first != -1);
+
+    return std::move(res);
+}
+
+
+template <bool int_optimized, PayloadType payload_type>
+void Diva<int_optimized, payload_type>::Infix::Merge(const Infix& other, uint32_t slot_size) {
+    auto [keys, keys_contents] = GetStrings(slot_size);
+    auto [other_keys, other_keys_contents] = other.GetStrings(slot_size);
+    keys.insert(keys.end(), other_keys.begin(), other_keys.end());
+    BuildTrie(keys.data(), keys.size(), 0, slot_size, false, true);
+}
+
+
 /*****************************************************************************
  **                              Trie Iterator                              **
  *****************************************************************************/
@@ -6632,12 +6806,10 @@ inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtPrefixKey(
 
 template <bool int_optimized, PayloadType payload_type>
 inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::SkipSubtree(bool has_prefix_keys) {
-    assert(depth_branch_.back().second == 0b11);
-    const uint32_t original_depth = depth_branch_.back().first;
+    const int32_t original_depth = depth_branch_.back().first;
     do {
         Advance(has_prefix_keys);
     } while (original_depth < depth_branch_.back().first);
-    assert(depth_branch_.back().second == 0b10);
 }
 
 }
