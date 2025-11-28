@@ -1759,6 +1759,766 @@ public:
     }
 
 
+    static void TrieSplit() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 19;
+                    check_infixes.back().trie_.push_back(0b1110100110011100110);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 5;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 23;
+                    check_infixes.back().trie_.push_back(0b11111000010001100100010);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 5;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+                    
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(4, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 16;
+                    check_infixes.back().trie_.push_back(0b1110100110011100);
+                    check_infixes.back().num_suffixes_ = 4;
+                    check_infixes.back().num_suffix_bits_ = 4;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 8;
+                    check_infixes.back().trie_.push_back(0b11001000);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 2;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 13;
+                    check_infixes.back().trie_.push_back(0b1111100001000);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 3;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(5, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b10);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 14;
+                    check_infixes.back().trie_.push_back(0b11101001100110);
+                    check_infixes.back().num_suffixes_ = 4;
+                    check_infixes.back().num_suffix_bits_ = 4;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b1001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 4;
+                    check_infixes.back().trie_suffixes_.push_back(0b101);
+
+                    check_infixes.emplace_back(0b1101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 11;
+                    check_infixes.back().trie_.push_back(0b11111000100);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 3;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 19;
+                    check_infixes.back().trie_.push_back(0b1110100110011100110);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 30;
+                    check_infixes.back().trie_suffixes_.push_back(0b1000001100001001001110001000);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 23;
+                    check_infixes.back().trie_.push_back(0b11111000010001100100010);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 25;
+                    check_infixes.back().trie_suffixes_.push_back(0b100001000011100111101011);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(4, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b1000);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 16;
+                    check_infixes.back().trie_.push_back(0b1110100110011100);
+                    check_infixes.back().num_suffixes_ = 4;
+                    check_infixes.back().num_suffix_bits_ = 24;
+                    check_infixes.back().trie_suffixes_.push_back(0b1000001100001001001110);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 8;
+                    check_infixes.back().trie_.push_back(0b11001000);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 12;
+                    check_infixes.back().trie_suffixes_.push_back(0b1111001011);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 13;
+                    check_infixes.back().trie_.push_back(0b1111100001000);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 15;
+                    check_infixes.back().trie_suffixes_.push_back(0b10000100001110);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(5, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b100);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 14;
+                    check_infixes.back().trie_.push_back(0b11101001100110);
+                    check_infixes.back().num_suffixes_ = 4;
+                    check_infixes.back().num_suffix_bits_ = 24;
+                    check_infixes.back().trie_suffixes_.push_back(0b1000001100001001001110);
+
+                    check_infixes.emplace_back(0b1001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 14;
+                    check_infixes.back().trie_suffixes_.push_back(0b11110001011);
+
+                    check_infixes.emplace_back(0b1101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 11;
+                    check_infixes.back().trie_.push_back(0b11111000100);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 18;
+                    check_infixes.back().trie_suffixes_.push_back(0b1000001000001110);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(1, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 2;
+                    check_infixes.back().num_trie_bits_ = 58;
+                    check_infixes.back().trie_.push_back(0b1110010100011011100110001101100110001101001101100010001010);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(2, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 2;
+                    check_infixes.back().num_trie_bits_ = 57;
+                    check_infixes.back().trie_.push_back(0b111001010001101110011000110110011000110100110110001000110);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b10);
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 16;
+                    check_infixes.back().trie_.push_back(0b1111010111010110);
+                    check_infixes.back().num_suffixes_ = 6;
+                    check_infixes.back().num_suffix_bits_ = 12;
+                    check_infixes.back().trie_suffixes_.push_back(0b10101010101);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 9;
+                    check_infixes.back().trie_.push_back(0b111010010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b10101);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(4, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b100);
+
+                    check_infixes.emplace_back(0b1);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 13;
+                    check_infixes.back().trie_.push_back(0b1111010111010);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 10;
+                    check_infixes.back().trie_suffixes_.push_back(0b101010101);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 4;
+                    check_infixes.back().trie_suffixes_.push_back(0b101);
+
+                    check_infixes.emplace_back(0b111);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(5, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1000);
+
+                    check_infixes.emplace_back(0b10);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b1001);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 7;
+                    check_infixes.back().trie_.push_back(0b1111010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b10101);
+
+                    check_infixes.emplace_back(0b1001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b1001);
+
+                    check_infixes.emplace_back(0b1110);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(1, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 2;
+                    check_infixes.back().num_trie_bits_ = 58;
+                    check_infixes.back().trie_.push_back(0b1110010100011011100110001101100110001101001101100010001010);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 36;
+                    check_infixes.back().trie_suffixes_.push_back(0b11001100101011001100111011101010100);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(2, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 2;
+                    check_infixes.back().num_trie_bits_ = 57;
+                    check_infixes.back().trie_.push_back(0b111001010001101110011000110110011000110100110110001000110);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 36;
+                    check_infixes.back().trie_suffixes_.push_back(0b11001100101011001100111011101010100);
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b10);
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 16;
+                    check_infixes.back().trie_.push_back(0b1111010111010110);
+                    check_infixes.back().num_suffixes_ = 6;
+                    check_infixes.back().num_suffix_bits_ = 42;
+                    check_infixes.back().trie_suffixes_.push_back(0b11000001100000111000011100001010000100);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 9;
+                    check_infixes.back().trie_.push_back(0b111010010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 21;
+                    check_infixes.back().trie_suffixes_.push_back(0b11000001100000101);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(4, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b100);
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b100);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 13;
+                    check_infixes.back().trie_.push_back(0b1111010111010);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 35;
+                    check_infixes.back().trie_suffixes_.push_back(0b1100000110000011100001110000101);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 14;
+                    check_infixes.back().trie_suffixes_.push_back(0b1100000101);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b110);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(5, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1000);
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b10);
+
+                    check_infixes.emplace_back(0b101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 16;
+                    check_infixes.back().trie_suffixes_.push_back(0b11100000101);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 7;
+                    check_infixes.back().trie_.push_back(0b1111010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 21;
+                    check_infixes.back().trie_suffixes_.push_back(0b11000001100000111);
+
+                    check_infixes.emplace_back(0b1001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 16;
+                    check_infixes.back().trie_suffixes_.push_back(0b11000000101);
+
+                    check_infixes.emplace_back(0b1111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b10);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+        }
+
+        SUBCASE("many keys") {
+            const uint32_t N = 20;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 35;
+                    check_infixes.back().trie_.push_back(0b11101101001011011011010011010111010);
+                    check_infixes.back().num_suffixes_ = 11;
+                    check_infixes.back().num_suffix_bits_ = 11;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 43;
+                    check_infixes.back().trie_.push_back(0b1111001111100010010111101101100000001001010);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(6, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b10);
+
+                    check_infixes.emplace_back(0b110);
+                    
+                    check_infixes.emplace_back(0b1001);
+
+                    check_infixes.emplace_back(0b1011);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 4;
+                    check_infixes.back().trie_suffixes_.push_back(0b101);
+
+                    check_infixes.emplace_back(0b1101);
+
+                    check_infixes.emplace_back(0b1111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 15;
+                    check_infixes.back().trie_.push_back(0b111011010010110);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 10;
+                    check_infixes.back().trie_suffixes_.push_back(0b101010101);
+
+                    check_infixes.emplace_back(0b10001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 17;
+                    check_infixes.back().trie_.push_back(0b11101101100000010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 3;
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b10110);
+
+                    check_infixes.emplace_back(0b11001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 9;
+                    check_infixes.back().trie_.push_back(0b111110010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b10101);
+
+                    check_infixes.emplace_back(0b11111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 6;
+                    check_infixes.back().trie_suffixes_.push_back(0b1001);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                {
+                    auto split_infixes = infix.SplitPrefixBits(3, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 35;
+                    check_infixes.back().trie_.push_back(0b11101101001011011011010011010111010);
+                    check_infixes.back().num_suffixes_ = 11;
+                    check_infixes.back().num_suffix_bits_ = 66;
+                    check_infixes.back().trie_suffixes_.push_back(0b1011001000001100001001001100001110001010001000001010001101001000);
+                    check_infixes.back().trie_suffixes_.push_back(0b0);
+
+                    check_infixes.emplace_back(0b11);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 43;
+                    check_infixes.back().trie_.push_back(0b1111001111100010010111101101100000001001010);
+                    check_infixes.back().num_suffixes_ = 9;
+                    check_infixes.back().num_suffix_bits_ = 45;
+                    check_infixes.back().trie_suffixes_.push_back(0b11010101001000010000111001000011110100101010);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+                {
+                    auto split_infixes = infix.SplitPrefixBits(6, slot_size);
+
+                    std::vector<Diva<>::Infix> check_infixes;
+
+                    check_infixes.emplace_back(0b1);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b100);
+
+                    check_infixes.emplace_back(0b111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b101);
+                    
+                    check_infixes.emplace_back(0b1001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b1010);
+
+                    check_infixes.emplace_back(0b1011);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 6;
+                    check_infixes.back().trie_.push_back(0b110100);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 14;
+                    check_infixes.back().trie_suffixes_.push_back(0b10100001000);
+
+                    check_infixes.emplace_back(0b1101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b1110);
+
+                    check_infixes.emplace_back(0b1111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 15;
+                    check_infixes.back().trie_.push_back(0b111011010010110);
+                    check_infixes.back().num_suffixes_ = 5;
+                    check_infixes.back().num_suffix_bits_ = 35;
+                    check_infixes.back().trie_suffixes_.push_back(0b10110001000000110000010010001100);
+
+                    check_infixes.emplace_back(0b10001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 17;
+                    check_infixes.back().trie_.push_back(0b11101101100000010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 42;
+                    check_infixes.back().trie_suffixes_.push_back(0b111110000000001100100000000011010);
+
+                    check_infixes.emplace_back(0b10101);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 1;
+                    check_infixes.back().trie_.push_back(0b1);
+                    check_infixes.back().num_suffixes_ = 1;
+                    check_infixes.back().num_suffix_bits_ = 9;
+                    check_infixes.back().trie_suffixes_.push_back(0b100);
+
+                    check_infixes.emplace_back(0b11001);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 9;
+                    check_infixes.back().trie_.push_back(0b111110010);
+                    check_infixes.back().num_suffixes_ = 3;
+                    check_infixes.back().num_suffix_bits_ = 21;
+                    check_infixes.back().trie_suffixes_.push_back(0b100000010000001110);
+
+                    check_infixes.emplace_back(0b11111);
+                    check_infixes.back().num_prefix_keys_ = 0;
+                    check_infixes.back().num_trie_bits_ = 4;
+                    check_infixes.back().trie_.push_back(0b1110);
+                    check_infixes.back().num_suffixes_ = 2;
+                    check_infixes.back().num_suffix_bits_ = 16;
+                    check_infixes.back().trie_suffixes_.push_back(0b110100001010);
+
+                    for (uint32_t i = 0; i < check_infixes.size(); i++)
+                        AssertInfix(split_infixes[i], check_infixes[i]);
+                }
+            }
+        }
+    }
+
+
 private:
     static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
         REQUIRE_EQ(infix.infix_, check_infix.infix_);
@@ -1854,6 +2614,14 @@ TEST_SUITE("infix") {
 
     TEST_CASE("adapt") {
         InfixTests::TrieAdapt();
+    }
+
+    TEST_CASE("split") {
+        InfixTests::TrieSplit();
+    }
+
+    TEST_CASE("merge") {
+        //InfixTests::TrieMerge();
     }
 }
 
