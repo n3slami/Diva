@@ -1679,7 +1679,7 @@ private:
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
-        REQUIRE_EQ(store.GetElemCount(), checks.size());
+        REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + 1;
         const uint64_t *runends = store.ptr + 1 + Diva<>::infix_store_target_size / 64;
@@ -1734,7 +1734,7 @@ private:
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks,
                                     const uint64_t **check_payloads) {
         REQUIRE_NE(store.ptr, nullptr);
-        REQUIRE_EQ(store.GetElemCount(), checks.size());
+        REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + 1;
         const uint64_t *runends = store.ptr + 1 + PayloadDiva::infix_store_target_size / 64;
@@ -1793,7 +1793,7 @@ private:
         const uint64_t *runends = store.ptr + 1 + Diva<>::infix_store_target_size / 64;
 
         std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
-        std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetElemCount() << std::endl;
+        std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetFullSlotCount() << std::endl;
         if constexpr (payload_type == PayloadType::FixedLength) {
             std::cerr << "sample_payload=" << std::hex;
             uint64_t payload[(s.payload_size_ + 63) / 64];
