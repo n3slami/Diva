@@ -435,13 +435,14 @@ __attribute__((always_inline))
 inline void write_bits_to_bitmap(void *bitmap, uint32_t bitmap_pos,
                                  uint64_t bits,
                                  uint32_t num_bits_to_copy) {
+    bits &= BITMASK(num_bits_to_copy);
     uint64_t *bitmap_words = reinterpret_cast<uint64_t *>(bitmap);
-    bitmap_words[bitmap_pos / 64] &= ~(BITMASK(num_bits_to_copy)<< (bitmap_pos % 64));
+    bitmap_words[bitmap_pos / 64] &= ~(BITMASK(num_bits_to_copy) << (bitmap_pos % 64));
     bitmap_words[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
-    if (bitmap_pos % 64 + num_bits_to_copy > 64) {
-        bitmap_words[bitmap_pos / 64 + 1] &= ~BITMASK(num_bits_to_copy - (64 - bitmap_pos % 64));
-        bitmap_words[bitmap_pos / 64 + 1] |= bits >> (64 - bitmap_pos % 64);
-    }
+    const int32_t next_word_bit_count = std::max(static_cast<int32_t>(bitmap_pos) % 64 
+                                            + static_cast<int32_t>(num_bits_to_copy) - 64, 0);
+    bitmap_words[bitmap_pos / 64 + 1] &= ~BITMASK(next_word_bit_count);
+    bitmap_words[bitmap_pos / 64 + 1] |= bits >> (num_bits_to_copy - next_word_bit_count);
 }
 
 
@@ -533,7 +534,7 @@ inline int64_t compare_bits_from_string_to_bitmap(const void *bitmap, uint32_t b
 // Assumes word-aligned buffers
 __attribute__((always_inline))
 inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, int32_t bitmap_pos, uint64_t counter, const uint32_t counter_fragment_len) {
-    const uint64_t varlen_counter_encoding_base = BITMASK(counter_fragment_len);
+    const uint64_t varlen_counter_encoding_base = 1UL << counter_fragment_len;
     uint32_t digit_count = 1;
     for (uint64_t pw = varlen_counter_encoding_base; pw < counter; pw *= varlen_counter_encoding_base)
         digit_count++;
@@ -542,6 +543,7 @@ inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, int32_t bitmap_pos,
     while (counter) {
         counter_encoding |= (counter % varlen_counter_encoding_base) << bit_pos;
         counter /= varlen_counter_encoding_base;
+        bit_pos += counter_fragment_len;
     }
     write_bits_to_bitmap(bitmap, bitmap_pos, counter_encoding, digit_count * (counter_fragment_len + 1) + 1);
 }
