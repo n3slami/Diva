@@ -4375,7 +4375,7 @@ public:
                                         deleted[pos].store(true, std::memory_order_release);
                                     }
                                 }
-                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
+                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss
                                     std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
                                     for (int32_t tj = ti - n_threads; tj >= 0; tj -= n_threads) {
                                         if (!deleted[tj].load(std::memory_order_acquire)) {
@@ -4478,22 +4478,21 @@ public:
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
-                                for (uint32_t kill_me = 0; kill_me < n_duplicates; kill_me++) {
-                                uint32_t kill_me_count = 0;
-                                for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); 
-                                        it.IsValid();
-                                        ++it) {
-                                    uint64_t payload[(payload_size + 63) / 64 + 1];
-                                    it.GetPayload(payload);
-                                    kill_me_count += compare_bitmap_to_bitmap(payloads[ti], 0, payload, 0, payload_size);
-                                }
-                                payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
-                                s.Insert(string_keys[ti], payloads[ti], rng());
+                                for (uint32_t j = 0; j < n_duplicates; j++) {
+                                    for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); 
+                                            it.IsValid();
+                                            ++it) {
+                                        uint64_t payload[(payload_size + 63) / 64 + 1];
+                                        it.GetPayload(payload);
+                                        compare_bitmap_to_bitmap(payloads[ti], 0, payload, 0, payload_size);
+                                    }
+                                    payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
+                                    s.Insert(string_keys[ti], payloads[ti], rng());
                                 }
                                 n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
                                 if (payloads[ti][0] > delete_threshold)
                                     REQUIRE(s.PointQuery(string_keys[ti]));
-                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss has occurred
+                                if ((ti - n_bulk - i) % query_period == 0) {    // Ensure no data loss
                                     std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
                                     for (int32_t tj = ti; tj >= 0; tj -= n_threads) {
                                         if (payloads[tj][0] > delete_threshold) {
@@ -4557,9 +4556,10 @@ public:
             const uint32_t infix_size = 8;
             const float load_factor = 0.95;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_init_samples = 50000;
-            const uint64_t delete_threshold = 100000;
             const uint32_t n_threads = 16;
+            const uint32_t n_init_samples = 50000;
+            const uint64_t delete_threshold = 10000000;
+            const uint64_t query_period = 5000000;
 
             std::vector<std::string> string_keys;
             for (int32_t i = 0; i < n_keys; i++) {
@@ -4607,8 +4607,6 @@ public:
                         if (i > 0) {
                             uint64_t cnt = 0, total_count = 0, xor_ = 0;
                             for (uint32_t ti = n_init_samples + i; ti < n_keys; ti += n_threads) {
-                                if ((ti - n_init_samples - i) % (10000 * n_threads) == 0)
-                                    std::cerr << "i=" << i << " @ti=" << ti << " avg=" << static_cast<long double>(cnt) / total_count << std::endl;
                                 for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); it.IsValid(); ++it) {
                                     uint64_t payload[(payload_size + 63) / 64 + 1];
                                     it.GetPayload(payload);
@@ -4619,16 +4617,45 @@ public:
                                 s.Insert(string_keys[ti], payloads[ti], rng());
                                 total_count++;
                                 n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
+                                if ((ti - n_init_samples - i) % query_period == 0) {    // Ensure no data loss
+                                    std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
+                                    for (int32_t tj = ti; tj >= 0; tj -= n_threads) {
+                                        if (payloads[tj][0] > delete_threshold) {
+                                            bool found = false;
+                                            for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
+                                                    it.IsValid();
+                                                    ++it) {
+                                                uint64_t payload[(payload_size + 63) / 64 + 1];
+                                                it.GetPayload(payload);
+                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size))
+                                                    found = true;
+                                            }
+                                            if (!found) {
+                                                for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
+                                                        it.IsValid();
+                                                        ++it) {
+                                                    uint64_t payload[(payload_size + 63) / 64 + 1];
+                                                    it.GetPayload(payload);
+                                                    if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size))
+                                                        found = true;
+                                                }
+                                            }
+                                            REQUIRE(found);
+                                        }
+                                    }
+                                }
                             }
                             std::cerr << "done i=" << i << " cnt=" << cnt << " xor=" << xor_ << std::endl;
                         }
                         else {
                             while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
                                 cpu_pause();
+                            /*
                             s.DeleteRange(nullptr, 0, nullptr, 0, 
                                     [=](const uint64_t *payload) { 
                                         return payload[0] <= delete_threshold && payload[0] > 0;
                                     });
+                                    */
                         }
                     });
             }

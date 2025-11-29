@@ -149,6 +149,7 @@ public:
 
         __attribute__((always_inline))
         uint64_t BitsAt(const uint32_t bit_pos, const uint32_t res_width) const {
+            assert(bit_pos % 8 + res_width <= 64);
             if (bit_pos / 8 >= length)
                 return 0;
             uint64_t res = 0;
@@ -1369,9 +1370,9 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     const int32_t shamt_lt = shared_lt + ignore_lt + implicit_size_lt - shared - ignore - implicit_size;
     const uint64_t prev_extraction_lt = ExtractPartialKey(prev_key, shared_lt, ignore_lt, implicit_size_lt, 0);
     const uint64_t extraction_lt = ExtractPartialKey(key, shared_lt, ignore_lt, implicit_size_lt, 1);
-    const uint64_t left_start = prev_key.BitsAt(shared + ignore + implicit_size, shamt_lt) << infix_size_;
+    const uint64_t left_start = prev_key.BitsAt(shared + ignore + implicit_size + std::max(0, shamt_lt - 56), std::min(shamt_lt, 56)) << infix_size_;
     const uint64_t left_end = (((extraction >> infix_size_) - (prev_extraction >> infix_size_)) << (infix_size_ + shamt_lt))
-                              | (key.BitsAt(shared + ignore + implicit_size, shamt_lt) << infix_size_);
+                              | (key.BitsAt(shared + ignore + implicit_size + std::max(0, shamt_lt - 56), std::min(shamt_lt, 56)) << infix_size_);
     const uint32_t total_implicit_lt = ((extraction_lt >> infix_size_) - (prev_extraction_lt >> infix_size_)) + 1;
 
     auto [shared_gt, ignore_gt, implicit_size_gt] = GetSharedIgnoreImplicitLengths(
@@ -1382,9 +1383,9 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     const uint64_t extraction_gt = ExtractPartialKey(key, shared_gt, ignore_gt, implicit_size_gt, 0);
     const uint64_t next_extraction_gt = ExtractPartialKey(next_key, shared_gt, ignore_gt, implicit_size_gt, 1);
     const uint64_t right_start = (((extraction >> infix_size_) - (prev_extraction >> infix_size_)) << (infix_size_ + shamt_gt))
-                                | (key.BitsAt(shared + ignore + implicit_size, shamt_gt) << infix_size_);
+                                | (key.BitsAt(shared + ignore + implicit_size + std::max(0, shamt_gt - 56), std::min(shamt_gt, 56)) << infix_size_);
     const uint64_t right_end = (((next_extraction >> infix_size_) - (prev_extraction >> infix_size_)) << (infix_size_ + shamt_gt))
-                                | (next_key.BitsAt(shared + ignore + implicit_size, shamt_gt) << infix_size_);
+                                | (next_key.BitsAt(shared + ignore + implicit_size + std::max(0, shamt_gt - 56), std::min(shamt_gt, 56)) << infix_size_);
     const uint32_t total_implicit_gt = ((next_extraction_gt >> infix_size_) - (extraction_gt >> infix_size_)) + 1;
 
     const auto [left_list_len, left_exp] = GetExpandedInfixListLength(infix_list,
