@@ -5686,7 +5686,7 @@ inline void Diva<int_optimized, payload_type>::Infix::BuildTrieRecurse(const Inf
     for (uint32_t i = 0; i < key_count; i++) {
         prefix_key_count += (key_start_bit + shared_prefix_bits == keys[i].length);
         split_pos = split_pos != -1 ? split_pos 
-                                    : (keys[i].GetBit(key_start_bit + shared_prefix_bits) ? i : split_pos);
+                  : (keys[i].GetBit(key_start_bit + shared_prefix_bits) ? i : split_pos);
     }
     assert(prefix_key_count == 0 || HasPrefixKeys());
 
@@ -5698,12 +5698,16 @@ inline void Diva<int_optimized, payload_type>::Infix::BuildTrieRecurse(const Inf
         AddBitsToTrie(keys[0].str, shared_prefix_bits, key_start_bit);
         if (prefix_key_count > 0) {     // Add internal node corresponding to a prefix key
             AddCounterToTrie(0);
-            AddBitsToTrie(prefix_key_count + 1 < split_pos, 1); // Has left child
-            AddBitsToTrie(split_pos != -1, 1);                  // Has right child
+            AddBitsToTrie((prefix_key_count < split_pos 
+                            || (prefix_key_count > 0 && split_pos == -1)), 1);  // Has left child
+            AddBitsToTrie(split_pos != -1, 1);                                  // Has right child
             UpdateNumPrefixKeys(1);
         }
         if (prefix_key_count < split_pos)
             BuildTrieRecurse(keys + prefix_key_count, split_pos - prefix_key_count, new_start_bit,
+                             slot_size, store_full_keys);
+        else if (prefix_key_count > 0 && split_pos == -1)
+            BuildTrieRecurse(keys + prefix_key_count, key_count - prefix_key_count, new_start_bit,
                              slot_size, store_full_keys);
         if (split_pos != -1)
             BuildTrieRecurse(keys + split_pos, key_count - split_pos, new_start_bit,
