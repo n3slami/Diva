@@ -30,8 +30,13 @@ matplotlib.rcParams.update(rc_fonts)
 
 logging.getLogger().setLevel(logging.INFO)
 
+<<<<<<< Updated upstream
 RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
                               "diva": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
+=======
+RANGE_FILTERS_STYLE_KWARGS = {"steroids_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
+                              "steroids": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
+>>>>>>> Stashed changes
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "memento_expandable": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "grafite": {"marker": 'o', "color": "teal", "label": "Grafite"},
@@ -97,8 +102,14 @@ def plot_fpr(result_dir, output_dir):
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
 
     workloads = ["unif", "norm", "books", "osm"]
+<<<<<<< Updated upstream
     filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
                "proteus", "proteus_mistuned", "rencoder", "snarf", "oasis"]
+=======
+    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "proteus_mistuned", "rencoder", "snarf",
+               "oasis"]
+>>>>>>> Stashed changes
     memory_footprints = [10, 16]
     range_sizes = [0, 4, 8, 12, 16, 20, 24]
     workload_subdir = Path("fpr_bench")
@@ -119,7 +130,11 @@ def plot_fpr(result_dir, output_dir):
                         continue
                     json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                     result = json.loads(json_string)
+<<<<<<< Updated upstream
                     if result[-1]["bpk"] - (1 if "diva" in filter else 0) < memory_footprint + 1:
+=======
+                    if result[-1]["bpk"] - (1 if "steroids" in filter else 0) < memory_footprint + 1:
+>>>>>>> Stashed changes
                         plot_data[filter].append((2 ** range_size, result[-1]["fpr"]))
                         if i == len(memory_footprints) - 1:
                             speed_plot_data[filter].append((2 ** range_size, result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
@@ -134,7 +149,11 @@ def plot_fpr(result_dir, output_dir):
         axes[i][0].set_ylabel(f"FPR", fontsize=YLABEL_FONT_SIZE)
         axes[i][-1].set_ylabel(f"{memory_footprint} BPK", fontsize=YLABEL_FONT_SIZE)
         axes[i][-1].yaxis.set_label_position("right")
+<<<<<<< Updated upstream
     axes[-1][0].set_ylabel(f"$\\;\\;$Query\\\\Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
+=======
+    axes[-1][0].set_ylabel(f"Time [ns/query]", fontsize=YLABEL_FONT_SIZE)
+>>>>>>> Stashed changes
     axes[-1][-1].set_ylabel(f"{memory_footprints[-1]} BPK", fontsize=YLABEL_FONT_SIZE)
     axes[-1][-1].yaxis.set_label_position("right")
     for j in range(len(workloads)):
@@ -238,6 +257,7 @@ def plot_fpr_memory(result_dir, output_dir):
     XLABEL_FONT_SIZE = 9.5
     XTICK_FONT_SIZE = 8
     XPADDING = 1
+<<<<<<< Updated upstream
     WIDTH = 3
     HEIGHT = 1.35
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
@@ -246,6 +266,17 @@ def plot_fpr_memory(result_dir, output_dir):
     filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
                "proteus", "proteus_mistuned", "rencoder", "snarf", "oasis"]
     memory_footprints = [8, 10, 12, 14, 16, 18]
+=======
+    WIDTH = 8
+    HEIGHT = 1.8
+    YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
+
+    workloads = ["unif", "norm", "books", "osm"]
+    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "proteus_mistuned", "rencoder", "snarf",
+               "oasis"]
+    memory_footprints = [12, 14, 16, 18, 20]
+>>>>>>> Stashed changes
     RANGE_SIZE = 8
     workload_subdir = Path("fpr_bench")
 
@@ -263,8 +294,12 @@ def plot_fpr_memory(result_dir, output_dir):
                     continue
                 json_string = "[" + fix_file_contents(contents[:-2]) + "]"
                 result = json.loads(json_string)
+<<<<<<< Updated upstream
                 print(filter, result)
                 plot_data[filter].append((result[-1]["bpk"] - (1 if "diva" in filter else 0), result[-1]["fpr"]))
+=======
+                plot_data[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0), result[-1]["fpr"]))
+>>>>>>> Stashed changes
         for filter in filters:
             axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
     
@@ -286,8 +321,13 @@ def plot_fpr_memory(result_dir, output_dir):
     fig.subplots_adjust(hspace=0.1, wspace=0.1)
 
     legend_lines, legend_labels = axes[0].get_legend_handles_labels()
+<<<<<<< Updated upstream
     axes[0].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(2.15, 1.25),
                    fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
+=======
+    axes[0].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(0.3, 1.425),
+                   fancybox=True, shadow=False, ncol=6, fontsize=LEGEND_FONT_SIZE)
+>>>>>>> Stashed changes
     fig.savefig(output_dir / "fpr_memory.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
@@ -295,6 +335,7 @@ def plot_true(result_dir, output_dir):
     LEGEND_FONT_SIZE = 8
     YLABEL_FONT_SIZE = 11.5
     XLABEL_FONT_SIZE = 11.5
+<<<<<<< Updated upstream
     XTICK_FONT_SIZE = 9
     WIDTH = 3.5
     HEIGHT = 1.5
@@ -350,6 +391,43 @@ def plot_true(result_dir, output_dir):
     axes[0].text(9.5, 2.5e5, RANGE_LENGTH_TAGS["short"], fontsize=XLABEL_FONT_SIZE)
     axes[1].text(1, 2.5e5, "16 BPK", fontsize=XLABEL_FONT_SIZE)
 
+=======
+    WIDTH = 5
+    HEIGHT = 2
+    YTICKS = [1e5, 1e4, 1e3, 1e2]
+
+    WORKLOAD = "unif"
+    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    memory_footprints = [10, 12, 14, 16, 18, 20]
+    range_sizes = ["short", "long"]
+    workload_subdir = Path("true_bench")
+
+    fig, axes = plt.subplots(nrows=1, ncols=len(range_sizes),
+                             sharex=True, sharey='row', figsize=(WIDTH, HEIGHT))
+    for i, range_size in enumerate(range_sizes):
+        plot_data = {filter: [] for filter in filters}
+        for filter, memory_footprint in itertools.product(filters, memory_footprints):
+            file_path = result_dir / workload_subdir / Path(f"{filter}_{memory_footprint}_{WORKLOAD}_{range_size}.json")
+            if not file_path.is_file():
+                continue
+            with open(file_path, 'r') as result_file:
+                contents = result_file.read()
+                if len(contents) == 0:
+                    continue
+                json_string = "[" + fix_file_contents(contents[:-2]) + "]"
+                result = json.loads(json_string)
+                plot_data[filter].append((result[-1]["bpk"] - (1 if "steroids" in filter else 0),
+                                          result[-1]["time_q"] * 1e6 / result[-1]["n_queries"]))
+        for filter in filters:
+            axes[i].plot(*zip(*plot_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+
+    title = DATASET_NAMES[WORKLOAD if WORKLOAD != "real" else "books"] + "\nTime [ns/query]" 
+    axes[0].set_ylabel(title, fontsize=YLABEL_FONT_SIZE)
+    for i, range_size in enumerate(range_sizes):
+        axes[i].set_xlabel("Space [BPK]", fontsize=XLABEL_FONT_SIZE)
+        axes[i].set_title(RANGE_LENGTH_NAMES[range_size], fontsize=TITLE_FONT_SIZE)
+>>>>>>> Stashed changes
     for ax in axes.flatten():
         ax.set_yscale('log')
         ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
@@ -360,9 +438,15 @@ def plot_true(result_dir, output_dir):
     axes[1].set_xticks(XTICKS, XTICK_LABELS, fontsize=XTICK_FONT_SIZE)
     fig.subplots_adjust(wspace=0.1)
 
+<<<<<<< Updated upstream
     legend_lines, legend_labels = axes[0].get_legend_handles_labels()
     axes[1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(1.025, 1.25),
                    fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
+=======
+    legend_lines, legend_labels = axes[1].get_legend_handles_labels()
+    axes[1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-1.495, 1.45),
+                   fancybox=True, shadow=False, ncol=5, fontsize=LEGEND_FONT_SIZE)
+>>>>>>> Stashed changes
     fig.savefig(output_dir / "true.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
@@ -379,8 +463,13 @@ def plot_construction(result_dir, output_dir):
     PATTERN_DENSITY = 2
     matplotlib.rcParams["hatch.linewidth"] = 0.3
 
+<<<<<<< Updated upstream
     filters = ["diva", "diva_int", "memento", "grafite", "surf", "rosetta",
                "proteus", "rencoder", "snarf", "oasis"]
+=======
+    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+>>>>>>> Stashed changes
     log_number_of_keys = [6, 7, 8, 9]
     workload_subdir = Path("construction_bench")
 
@@ -431,6 +520,7 @@ def plot_expansion(result_dir, output_dir):
     WIDTH = 3.5
     HEIGHT = 3.5
     FRAC_EXPANSION_COUNT = 4
+<<<<<<< Updated upstream
     MEMORY_FOOTPRINT = 16
     N_EXPANSIONS = 6
     XTICK_FONT_SIZE = 9
@@ -438,6 +528,11 @@ def plot_expansion(result_dir, output_dir):
     XTICK_LABELS = ["$\\frac{1}{" + str(2 ** (N_EXPANSIONS - i)) + "}$" for i in range(N_EXPANSIONS)] + ["$1$"]
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
     YTICKS_MEMORY = [15, 20, 25, 30, 35]
+=======
+    MEMORY_FOOTPRINT = 20
+    XTICKS = list(range(7))
+    YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
+>>>>>>> Stashed changes
 
     filters = ["diva", "diva_int", "memento_expandable", "rosetta", "rencoder", "snarf"]
     range_sizes = ["short", "long"]
@@ -499,8 +594,12 @@ def plot_expansion(result_dir, output_dir):
             axes[i][j].set_yscale("log")
         axes[i][j].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs="auto"))
     axes[1][0].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+<<<<<<< Updated upstream
     axes[1][0].set_ylim(bottom=13, top=35)
     axes[1][0].set_yticks(YTICKS_MEMORY)
+=======
+    axes[1][0].set_ylim(bottom=15, top=35)
+>>>>>>> Stashed changes
 
     axes[0][0].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[0]], fontsize=XLABEL_FONT_SIZE)
     axes[0][0].set_ylabel("FPR", fontsize=YLABEL_FONT_SIZE)
@@ -508,15 +607,28 @@ def plot_expansion(result_dir, output_dir):
     axes[0][1].text(0.25, 1.5 * YTICKS[-1], RANGE_LENGTH_TAGS[range_sizes[1]], fontsize=XLABEL_FONT_SIZE)
     axes[0][1].set_yticklabels([])
 
+<<<<<<< Updated upstream
     axes[1][0].set_ylabel("Space [BPK]", fontsize=YLABEL_FONT_SIZE)
+=======
+    axes[1][0].set_title("Space", fontsize=TITLE_FONT_SIZE)
+    axes[1][0].set_ylabel("BPK", fontsize=TITLE_FONT_SIZE)
+
+    axes[1][1].set_title("Inserts", fontsize=TITLE_FONT_SIZE)
+>>>>>>> Stashed changes
     axes[1][1].yaxis.set_label_position("right")
     axes[1][1].yaxis.tick_right()
     axes[1][1].set_ylabel("Insert Latency [ns/op]", fontsize=YLABEL_FONT_SIZE)
 
     legend_lines, legend_labels = axes[1][1].get_legend_handles_labels()
+<<<<<<< Updated upstream
     axes[0][1].legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(-1.075,1.35),
                       fancybox=True, shadow=False, ncol=(len(filters) + 1) // 2, fontsize=LEGEND_FONT_SIZE)
     fig.subplots_adjust(hspace=0.15, wspace=0.1)
+=======
+    axes[0][1].legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(1.0,0.975),
+                  fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
+    fig.subplots_adjust(hspace=0.25, wspace=0.1)
+>>>>>>> Stashed changes
     fig.savefig(output_dir / "expansion.pdf", bbox_inches='tight', pad_inches=0.01)
 
 
@@ -527,7 +639,11 @@ def plot_delete(result_dir, output_dir):
     WIDTH = 1.8
     HEIGHT = 1.7
 
+<<<<<<< Updated upstream
     filters = ["diva", "diva_int", "memento", "snarf"]
+=======
+    filters = ["steroids", "steroids_int", "memento", "snarf"]
+>>>>>>> Stashed changes
     range_sizes = ["short", "long"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     workload_subdir = Path("delete_bench")
