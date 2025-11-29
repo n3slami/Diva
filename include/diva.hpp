@@ -397,7 +397,7 @@ private:
         std::vector<uint64_t> trie_;
         std::vector<uint64_t> trie_suffixes_;
 
-        Infix(const uint64_t infix):
+        Infix(const uint64_t infix=0):
                 infix_(infix) { }
         Infix(const uint64_t infix, const InfixStore& infix_store,
               uint32_t slot_pos, uint32_t slot_size);
@@ -6829,13 +6829,13 @@ void Diva<int_optimized, payload_type>::Infix::SerializeToPtr(void *ptr,
                           ptr, bit_pos + escape_sequence_cost + 1 + num_trie_bits_,
                           num_suffix_bits_);
 
-    if (infix_ == 1) {
+    if (infix_ != 1) {
         // Convert first slot to the correct format with an escape sequence
         uint64_t read_buf;
-        uint32_t read_buf_filled_len = 0, read_bit_pos = 0;
-        const uint64_t second_slot = read_data_from_bitmap(ptr, bit_pos,
+        uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos;
+        const uint64_t second_slot = read_data_from_bitmap(ptr, read_bit_pos,
                                                            read_buf, read_buf_filled_len,
-                                                           read_bit_pos);
+                                                           slot_size);
         write_bits_to_bitmap(ptr, bit_pos, second_slot >> escape_sequence_cost, slot_size);
     }
 }
@@ -6855,7 +6855,7 @@ void Diva<int_optimized, payload_type>::Infix::DeserializeFromPtr(void *ptr,
     const uint64_t escape_sequence_cost = slot_size - highbit_pos(infix_);
 
     bool has_prefix_keys = false;
-    uint32_t trie_start = 0;
+    uint32_t trie_start;
     if (infix_ != 1) {
         has_prefix_keys = second_slot & 1;
         // Change bitmap to ease parsing
@@ -6869,20 +6869,21 @@ void Diva<int_optimized, payload_type>::Infix::DeserializeFromPtr(void *ptr,
     }
 
     // Parse trie
-    TrieIterator it(ptr, trie_start);
+    TrieIterator it(ptr);
+    it.bit_pos_ = trie_start;
     do {
         it.Advance(has_prefix_keys);
-    } while (it.depth_branch_.back().first == -1);
+    } while (it.depth_branch_.back().first != -1);
 
     // Setup infix
     num_prefix_keys_ = has_prefix_keys + it.num_prefix_keys_read_;
     num_trie_bits_ = it.bit_pos_ - trie_start;
     trie_.resize((num_trie_bits_ + 63) / 64);
     memset(trie_.data(), 0, trie_.size() * sizeof(trie_[0]));
-    copy_bitmap_to_bitmap(ptr, trie_start, trie_suffixes_.data(), 0, num_trie_bits_);
+    copy_bitmap_to_bitmap(ptr, trie_start, trie_.data(), 0, num_trie_bits_);
     num_suffixes_ = it.num_keys_read_;
     num_suffix_bits_ = GetSuffixBitPos(reinterpret_cast<const uint64_t *>(ptr), num_suffixes_, 
-                                       slot_size, GetActualSuffixLen(slot_size), it.bit_pos_);
+                                       slot_size, GetActualSuffixLen(slot_size), it.bit_pos_) - it.bit_pos_;
     trie_suffixes_.resize((num_suffix_bits_ + 63) / 64);
     memset(trie_suffixes_.data(), 0, trie_suffixes_.size() * sizeof(trie_suffixes_[0]));
     copy_bitmap_to_bitmap(ptr, it.bit_pos_, trie_suffixes_.data(), 0, num_suffix_bits_);
@@ -6958,13 +6959,11 @@ inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::Advance(bool
         return;
     }
 
-    uint32_t advance_bits = 0;
-    while ((buf_[bit_pos_ / 64] >> (bit_pos_ % 64)) == 0) {
-        advance_bits = 64 - bit_pos_ % 64;
-        bit_pos_ += advance_bits;
-    }
-    advance_bits = lowbit_pos(buf_[bit_pos_ / 64] >> (bit_pos_ % 64));
-    bit_pos_ += advance_bits + 1;
+    uint32_t advance_bits = bit_pos_;
+    while ((buf_[bit_pos_ / 64] >> (bit_pos_ % 64)) == 0)
+        bit_pos_ += 64 - bit_pos_ % 64;
+    bit_pos_ += lowbit_pos(buf_[bit_pos_ / 64] >> (bit_pos_ % 64)) + 1;
+    advance_bits = bit_pos_ - advance_bits - 1;
     if (has_prefix_keys) {
         uint64_t counter = 0, pw = 1, read_buf = 0;
         uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos_;

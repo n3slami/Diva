@@ -3038,6 +3038,203 @@ public:
     }
 
 
+    static void InterfaceInfixStore() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        const uint32_t prefix_length_bytes = 3;
+        uint8_t prefix_contents[prefix_length_bytes] = {0b01010101, 0b11111111, 0b00110011};
+        const Diva<>::InfiniteByteString prefix = {prefix_contents, prefix_length_bytes};
+
+        uint8_t infix_store_buf[1024];
+        memset(infix_store_buf, 0, sizeof(infix_store_buf));
+        const uint32_t slot_pos = 5;
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            SUBCASE("zero infix") {
+                const uint64_t infix_value = 1;
+                Diva<>::Infix infix(infix_value);
+
+                SUBCASE("small slots") {
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 14);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000010,
+                                                                    0b10000000, 0b10011000, 0b00110011, 0b01011101,
+                                                                    0b01100100, 0b10000100, 0b00001111, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+                SUBCASE("wide slots") {
+                    const uint32_t slot_size = 10;
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+                                                                    0b00000000, 0b00000000, 0b00000100, 0b00000000,
+                                                                    0b00000000, 0b11000100, 0b10011100, 0b11101001,
+                                                                    0b00100010, 0b00100011, 0b01111100, 0b11100100,
+                                                                    0b00010010, 0b01000011, 0b11101011, 0b00111001,
+                                                                    0b10000100, 0b00000000, 0b00000000, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+            }
+            SUBCASE("non-zero infix") {
+                const uint64_t infix_value = 5;
+                Diva<>::Infix infix(infix_value);
+
+                SUBCASE("small slots") {
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 14);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00001010,
+                                                                    0b00100000, 0b11100110, 0b01001100, 0b00010111,
+                                                                    0b00011001, 0b11100001, 0b00000011, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+                SUBCASE("wide slots") {
+                    const uint32_t slot_size = 10;
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+                                                                    0b00000000, 0b00000000, 0b00010100, 0b00000000,
+                                                                    0b00000000, 0b00110001, 0b01100111, 0b10111010,
+                                                                    0b11001000, 0b00001000, 0b00011111, 0b10111001,
+                                                                    0b11000100, 0b11010000, 0b01111010, 0b00001110,
+                                                                    0b00100001, 0b00000000, 0b00000000, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            SUBCASE("zero infix") {
+                const uint64_t infix_value = 1;
+                Diva<>::Infix infix(infix_value);
+
+                SUBCASE("small slots") {
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 16);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000010,
+                                                                    0b11101000, 0b00010000, 0b10011011, 0b11000110,
+                                                                    0b01101100, 0b11001100, 0b10001101, 0b01110010};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+                SUBCASE("wide slots") {
+                    const uint32_t slot_size = 10;
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+                                                                    0b00000000, 0b00000000, 0b00000100, 0b00000000,
+                                                                    0b01000000, 0b10000111, 0b11011000, 0b00110100,
+                                                                    0b01100110, 0b01100011, 0b01101110, 0b10010100,
+                                                                    0b01010011, 0b11011101, 0b10011001, 0b10010101,
+                                                                    0b00011001, 0b00000000, 0b00000000, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+            }
+            SUBCASE("non-zero infix") {
+                const uint64_t infix_value = 5;
+                Diva<>::Infix infix(infix_value);
+
+                SUBCASE("small slots") {
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 16);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b01001010,
+                                                                    0b00111000, 0b11000100, 0b10100110, 0b00110001,
+                                                                    0b00011011, 0b01110011, 0b10100011, 0b00011100};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+                SUBCASE("wide slots") {
+                    const uint32_t slot_size = 10;
+                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
+                    infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+                                                                    0b00000000, 0b00000000, 0b00010100, 0b00010000,
+                                                                    0b11000000, 0b00100001, 0b00110110, 0b10001101,
+                                                                    0b11011001, 0b10011000, 0b00011011, 0b11100101,
+                                                                    0b01010100, 0b01110111, 0b01100110, 0b01100101,
+                                                                    0b00000110, 0b00000000, 0b00000000, 0b00000000};
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+
+                    Diva<>::Infix deserialized_infix;
+                    deserialized_infix.DeserializeFromPtr(infix_store_buf, slot_pos * slot_size, slot_size);
+                    AssertInfix(infix, deserialized_infix);
+                    REQUIRE_EQ(memcmp(infix_store_buf, infix_store_expected_buf, sizeof(infix_store_expected_buf)), 0);
+                }
+            }
+        }
+    }
+
+
 private:
     static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
         REQUIRE_EQ(infix.infix_, check_infix.infix_);
@@ -3145,6 +3342,10 @@ TEST_SUITE("infix") {
 
     TEST_CASE("prepend prefix") {
         InfixTests::PrependPrefix();
+    }
+
+    TEST_CASE("interface with infix store") {
+        InfixTests::InterfaceInfixStore();
     }
 }
 
