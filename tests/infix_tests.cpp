@@ -21,7 +21,7 @@ typedef Diva<false, PayloadType::None> PayloadDiva;
 
 class InfixTests {
 public:
-    static void TrieBuild() {
+    static void Build() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -174,7 +174,7 @@ public:
     }
 
 
-    static void TrieQuery() {
+    static void Query() {
         const uint32_t N = 10;
         const uint32_t slot_size = 10;
         const uint32_t key_start_bit = 6;
@@ -353,7 +353,7 @@ public:
     }
 
 
-    static void TrieIterate() {
+    static void Iterate() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -572,7 +572,7 @@ public:
     }
 
 
-    static void TrieSwitchEncoding() {
+    static void SwitchEncoding() {
         const uint32_t N = 10;
         const uint32_t slot_size = 10;
         const uint32_t key_start_bit = 6;
@@ -626,7 +626,7 @@ public:
     }
 
 
-    static void TrieInsert() {
+    static void Insert() {
         const uint32_t N = 10;
         const uint32_t slot_size = 10;
         const uint32_t key_start_bit = 6;
@@ -871,7 +871,7 @@ public:
     }
 
 
-    static void TrieGetStrings() {
+    static void GetStrings() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -1138,7 +1138,7 @@ public:
     }
 
 
-    static void TrieDelete() {
+    static void Delete() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -1310,7 +1310,7 @@ public:
     }
 
 
-    static void TrieGetLongestMatch() {
+    static void GetLongestMatch() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -1499,7 +1499,7 @@ public:
     }
 
 
-    static void TrieAdapt() {
+    static void Adapt() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -1759,7 +1759,7 @@ public:
     }
 
 
-    static void TrieSplit() {
+    static void Split() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
@@ -2519,6 +2519,417 @@ public:
     }
 
 
+    static void PrependPrefix() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        const uint32_t prefix_length_bytes = 3;
+        uint8_t prefix_contents[prefix_length_bytes] = {0b01010101, 0b11111111, 0b00110011};
+        const Diva<>::InfiniteByteString prefix = {prefix_contents, prefix_length_bytes};
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110010001000000;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110101001000000;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110010101);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110010001000000;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110101001000000;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110010101);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000100100011010;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000101010011010;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += add_bits + Diva<>::Infix::varlen_counter_encoding_fragment_length + 1;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1100011010011011000100101010111111111001100110000000000100011100;
+                        check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1100011010011011000101011111111100110011000000000000000100011100;
+                        check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000100100011010;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000101010011010;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += add_bits + Diva<>::Infix::varlen_counter_encoding_fragment_length + 1;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1100011010011011000100101010111111111001100110000000000100011100;
+                        check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1100011010011011000101011111111100110011000000000000000100011100;
+                        check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+        }
+
+        SUBCASE("many keys") {
+            const uint32_t N = 20;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010010001000000;
+                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010101001000000;
+                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
+                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010010101;
+                        check_infix.trie_.push_back(0b11110011111000100101);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
+                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010101111;
+                        check_infix.trie_.push_back(0b11110011111000100101);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010010001000000;
+                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010101001000000;
+                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_trie_bits_ += 2 * add_bits;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
+                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010010101;
+                        check_infix.trie_.push_back(0b11110011111000100101);
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
+                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010101111;
+                        check_infix.trie_.push_back(0b11110011111000100101);
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+        }
+
+        SUBCASE("single key") {
+            const uint32_t N = 1;
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("small slots") {
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_suffix_bits_ = 9;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b1001010;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b1001101;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_suffix_bits_ = 44;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b1000100001100011001110011111111111110101010;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b1000100001000010000100111001111111111111101;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+
+                Diva<>::Infix check_infix(infix);
+                SUBCASE("short") {
+                    const uint32_t add_bits = 3;
+                    check_infix.num_suffix_bits_ = 19;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b100101000000;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b100110100000;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+                SUBCASE("long") {
+                    const uint32_t add_bits = 32;
+                    check_infix.num_suffix_bits_ = 49;
+                    SUBCASE("no offset") {
+                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b10000100000000010110011001111111110101010101;
+                        AssertInfix(infix, check_infix);
+                    }
+                    SUBCASE("some offset") {
+                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                        check_infix.trie_suffixes_[0] = 0b10000100000000011100000001111001100110111111;
+                        AssertInfix(infix, check_infix);
+                    }
+                }
+            }
+        }
+
+        SUBCASE("no trie") {
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix(infix_value);
+
+            SUBCASE("short") {
+                const uint32_t add_bits = 3;
+                SUBCASE("no offset") {
+                    infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                    Diva<>::Infix check_infix(0b1000001);
+                    AssertInfix(infix, check_infix);
+                }
+                SUBCASE("some offset") {
+                    infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                    Diva<>::Infix check_infix(0b10100001);
+                    AssertInfix(infix, check_infix);
+                }
+            }
+            SUBCASE("long") {
+                const uint32_t add_bits = 32;
+                SUBCASE("no offset") {
+                    infix.PrependPrefix(prefix, 0, add_bits, slot_size);
+                    Diva<>::Infix check_infix(0b0101010111111111001100110000000000001);
+                    AssertInfix(infix, check_infix);
+                }
+                SUBCASE("some offset") {
+                    infix.PrependPrefix(prefix, 5, add_bits, slot_size);
+                    Diva<>::Infix check_infix(0b1011111111100110011000000000000000001);
+                    AssertInfix(infix, check_infix);
+                }
+            }
+        }
+    }
+
+
 private:
     static void AssertInfix(const Diva<>::Infix& infix, const Diva<>::Infix& check_infix) {
         REQUIRE_EQ(infix.infix_, check_infix.infix_);
@@ -2581,47 +2992,51 @@ private:
 
 TEST_SUITE("infix") {
     TEST_CASE("build") {
-        InfixTests::TrieBuild();
+        InfixTests::Build();
     }
 
     TEST_CASE("query") {
-        InfixTests::TrieQuery();
+        InfixTests::Query();
     }
 
     TEST_CASE("iterate") {
-        InfixTests::TrieIterate();
+        InfixTests::Iterate();
     }
 
     TEST_CASE("switch encoding") {
-        InfixTests::TrieSwitchEncoding();
+        InfixTests::SwitchEncoding();
     }
 
     TEST_CASE("insert") {
-        InfixTests::TrieInsert();
+        InfixTests::Insert();
     }
 
     TEST_CASE("get strings") {
-        InfixTests::TrieGetStrings();
+        InfixTests::GetStrings();
     }
 
     TEST_CASE("delete") {
-        InfixTests::TrieDelete();
+        InfixTests::Delete();
     }
 
     TEST_CASE("get longest match") {
-        InfixTests::TrieGetLongestMatch();
+        InfixTests::GetLongestMatch();
     }
 
     TEST_CASE("adapt") {
-        InfixTests::TrieAdapt();
+        InfixTests::Adapt();
     }
 
     TEST_CASE("split") {
-        InfixTests::TrieSplit();
+        InfixTests::Split();
     }
 
     TEST_CASE("merge") {
-        //InfixTests::TrieMerge();
+        //InfixTests::Merge();
+    }
+
+    TEST_CASE("prepend prefix") {
+        InfixTests::PrependPrefix();
     }
 }
 
