@@ -1,6 +1,6 @@
 /*
- * This file is part of --- <>.
- * Copyright (C) 2024 ---.
+ * This file is part of Diva <https://github.com/n3slami/Diva/tree/main>.
+ * Copyright (C) 2025 Navid Eslami.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,11 +23,9 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <filesystem>
 #include <iostream>
 #include <argparse/argparse.hpp>
 #include <limits>
-#include <random>
 #include <stdexcept>
 #include <string>
 #include <sys/types.h>
@@ -51,10 +49,6 @@ inline uint64_t timer_results[std::numeric_limits<uint8_t>::max()];
 
 template <typename InitFun, typename InsertFun, typename DeleteFun, typename RangeFun, typename SizeFun, typename... Args>
 void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun range_f, SizeFun size_f, Args... args) {
-    uint16_t l_buf_len, r_buf_len;
-    uint8_t l_buf[std::numeric_limits<uint16_t>::max()];
-    uint8_t r_buf[std::numeric_limits<uint16_t>::max()];
-    
     uint32_t n_keys = initial_int_keys.size(), n_queries = 0;
     uint32_t false_positives = 0, false_negatives = 0;
     time_points['c'] = timer::now();
@@ -141,6 +135,8 @@ void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, RangeFun
                 
                 break;
             }
+            case WorkloadIO::opcode::ResetDB: 
+                break;
         }
     }
 }
@@ -262,6 +258,8 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
                 test_out.Clear();
                 break;
             }
+            case WorkloadIO::opcode::ResetDB:
+                break;
         }
     }
 }

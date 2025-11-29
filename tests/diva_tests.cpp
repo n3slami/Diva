@@ -31,14 +31,14 @@ namespace diva {
 
 class DivaTests {
 public:
-    template <bool O>
+    template <DivaType diva_type>
     static void Insert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
-        Diva<O> s(infix_size, seed, load_factor);
+        Diva<diva_type> s(infix_size, seed, load_factor);
 
         uint64_t value;
         uint8_t buf[9];
@@ -74,9 +74,9 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,1,0b10111},   {118,1,0b00111},   {128,1,0b10101},   {139,1,0b00101},   {149,1,0b10011},   {161,1,0b00001},   {171,1,0b10001},   {181,1,0b11111},   {193,1,0b01101},   {202,1,0b11101},   {214,1,0b01011},   {224,1,0b11011},   {236,1,0b01001},   {246,1,0b10111},   {258,1,0b00111},   {267,1,0b10101},   {279,1,0b00101},   {289,1,0b10011},   {301,1,0b00001},   {311,1,0b10001},   {321,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,1,0b01101},   {762,1,0b11101},   {774,1,0b01011},   {784,1,0b11001},   {796,1,0b01001},   {805,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -111,9 +111,9 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,0,0b10111},   {107,1,0b10111},   {118,1,0b00111},   {128,0,0b10101},   {129,1,0b10101},   {139,1,0b00101},   {149,0,0b10011},   {150,1,0b10011},   {161,1,0b00001},   {171,0,0b10001},   {172,1,0b10001},   {181,1,0b11111},   {193,0,0b01101},   {194,1,0b01101},   {202,1,0b11101},   {214,0,0b01011},   {215,1,0b01011},   {224,1,0b11011},   {236,0,0b01001},   {237,1,0b01001},   {246,1,0b10111},   {258,0,0b00111},   {259,1,0b00111},   {267,1,0b10101},   {279,0,0b00101},   {280,1,0b00101},   {289,1,0b10011},   {301,0,0b00001},   {302,1,0b00001},   {311,1,0b10001},   {321,0,0b11111},   {322,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,1,0b01101},   {762,1,0b11101},   {774,1,0b01011},   {784,1,0b11001},   {796,1,0b01001},   {805,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -149,9 +149,9 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,0,0b10111},   {107,1,0b10111},   {118,1,0b00111},   {128,0,0b10101},   {129,1,0b10101},   {139,1,0b00101},   {149,0,0b10011},   {150,1,0b10011},   {161,1,0b00001},   {171,0,0b10001},   {172,1,0b10001},   {181,1,0b11111},   {193,0,0b01101},   {194,1,0b01101},   {202,1,0b11101},   {214,0,0b01011},   {215,1,0b01011},   {224,1,0b11011},   {236,0,0b01001},   {237,1,0b01001},   {246,1,0b10111},   {258,0,0b00111},   {259,1,0b00111},   {267,1,0b10101},   {279,0,0b00101},   {280,1,0b00101},   {289,1,0b10011},   {301,0,0b00001},   {302,1,0b00001},   {311,1,0b10001},   {321,0,0b11111},   {322,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,0,0b01101},   {753,0,0b10001},   {754,0,0b10101},   {755,0,0b11001},   {756,1,0b11101},   {757,0,0b00001},   {758,0,0b00101},   {759,0,0b01001},   {760,0,0b01101},   {761,0,0b10001},   {762,0,0b10101},   {763,0,0b11001},   {764,1,0b11101},   {765,0,0b00001},   {766,0,0b00101},   {767,0,0b01001},   {768,0,0b01101},   {769,0,0b10001},   {770,0,0b10101},   {771,0,0b11001},   {772,1,0b11101},   {773,0,0b00001},   {774,0,0b00101},   {775,0,0b01001},   {776,0,0b01101},   {777,0,0b10001},   {778,0,0b10101},   {779,0,0b11001},   {780,1,0b11101},   {781,0,0b00001},   {782,0,0b00101},   {783,0,0b01001},   {784,0,0b01101},   {785,0,0b10001},   {786,0,0b10101},   {787,0,0b11001},   {788,1,0b11101},   {789,0,0b00001},   {790,0,0b00101},   {791,0,0b01001},   {792,0,0b01101},   {793,0,0b10001},   {794,0,0b10101},   {795,0,0b11001},   {796,0,0b11101},   {797,1,0b11101},   {798,0,0b00001},   {799,0,0b00101},   {800,0,0b01001},   {801,0,0b01101},   {802,1,0b10001},   {803,1,0b01011},   {804,1,0b11001},   {805,1,0b01001},   {806,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -184,9 +184,9 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,1,0b00110},   {  2,1,0b00010},   {  4,1,0b00010},   {  5,1,0b11110},   {  6,1,0b11110},   {  8,1,0b11010},   {  9,1,0b10110},   { 10,1,0b10110},   { 12,1,0b10010},   { 13,0,0b01110},   { 14,1,0b01110},   { 15,1,0b01110},   { 16,0,0b01010},   { 17,1,0b01010},   { 18,1,0b01010},   { 19,0,0b00110},   { 20,1,0b00110},   { 21,1,0b00010},   { 22,0,0b00010},   { 23,1,0b00010},   { 24,1,0b11110},   { 25,0,0b11010},   { 26,1,0b11010},   { 27,1,0b11010},   { 28,0,0b10110},   { 29,1,0b10110},   { 30,1,0b10110},   { 31,0,0b10010},   { 32,1,0b10010},   { 33,1,0b01110},   { 34,0,0b01110},   { 35,1,0b01110},   { 36,1,0b01010},   { 37,0,0b01010},   { 38,1,0b01010},   { 39,1,0b00110},   { 40,0,0b00010},   { 41,1,0b00010},   { 42,1,0b00010},   { 43,0,0b11110},   { 44,1,0b11110},   { 45,1,0b11010},   { 46,1,0b11010},   { 47,1,0b10110},   { 48,1,0b10110},   { 49,1,0b10010},   { 50,1,0b01110},   { 51,1,0b01110},   { 52,1,0b01010},   { 53,1,0b01010},   { 55,1,0b00110},   { 56,1,0b00010},   { 57,1,0b00010},   { 59,1,0b11110},   { 60,1,0b11010},   { 61,1,0b11010},   { 63,1,0b10110},   { 64,1,0b10110},   { 66,1,0b10010},   { 67,1,0b01110},   { 68,1,0b01110},   { 69,1,0b01010},   { 70,1,0b00110},   { 71,1,0b00110},   { 72,1,0b00010},   { 73,1,0b00010},   { 74,1,0b11110},   { 75,1,0b11010},   { 76,1,0b11010},   { 77,1,0b10110},   { 78,1,0b10110},   { 79,1,0b10010},   { 80,1,0b01110},   { 81,1,0b01110},   { 82,1,0b01010},   { 83,1,0b00110},   { 84,1,0b00110},   { 85,1,0b00010},   { 86,1,0b00010},   { 87,1,0b11110},   { 88,1,0b11010},   { 89,0,0b00010},   { 90,0,0b01010},   { 91,0,0b10010},   { 92,1,0b11010},   { 93,0,0b00010},   { 94,0,0b01010},   { 95,1,0b10010}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -222,15 +222,15 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b10111},   {  1,0,0b00100},   {  2,1,0b10100},   {  3,0,0b00100},   {  4,1,0b10100},   {  5,0,0b00100},   {  6,1,0b10100},   {  7,0,0b00100},   {  8,1,0b10100},   {  9,0,0b00100},   { 10,1,0b10100},   { 11,0,0b00100},   { 12,1,0b10100},   { 13,0,0b00100},   { 14,1,0b10100},   { 15,0,0b00100},   { 16,1,0b10100},   { 17,0,0b00100},   { 18,1,0b10100},   { 19,0,0b00100},   { 20,1,0b10100},   { 21,0,0b00100},   { 22,1,0b10100},   { 23,0,0b00100},   { 24,1,0b10100},   { 25,0,0b00100},   { 26,1,0b10100},   { 27,0,0b00100},   { 28,1,0b10100},   { 29,0,0b00100},   { 30,1,0b10100},   { 31,0,0b00100},   { 32,1,0b10100},   { 33,0,0b00100},   { 34,1,0b10100},   { 35,0,0b00100},   { 36,0,0b10100},   { 37,1,0b10100},   { 38,0,0b00100},   { 39,1,0b10100},   { 40,0,0b00100},   { 41,1,0b10100},   { 42,1,0b00100},   { 43,1,0b01100},   { 44,1,0b00100},   { 45,1,0b00100},   { 46,1,0b11100},   { 47,1,0b11100},   { 48,1,0b10100},   { 49,1,0b01100},   { 50,1,0b01100},   { 51,1,0b00100},   { 52,1,0b00100},   { 53,1,0b11100},   { 54,1,0b10100},   { 55,1,0b10100},   { 56,1,0b01100},   { 57,1,0b00100},   { 58,1,0b00100},   { 59,1,0b00100},   { 60,1,0b11100},   { 61,1,0b11100},   { 62,1,0b10100},   { 63,1,0b01100},   { 64,1,0b01100},   { 65,1,0b00100},   { 66,1,0b11100},   { 67,1,0b11100},   { 68,1,0b10100},   { 70,1,0b10100},   { 73,1,0b01100},   { 76,1,0b00100}};
             uint8_t res_key[sizeof(uint64_t)];
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore store;
+            typename Diva<diva_type>::InfixStore store;
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
 
                 wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
 
                 wh_int_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
-                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<O>::InfixStore), &dummy);
+                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
                 REQUIRE(store.IsPartialKey());
                 REQUIRE_EQ(store.GetInvalidBits(), 7);
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -242,7 +242,7 @@ public:
                 wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
 
                 wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
-                             reinterpret_cast<void *>(&store), sizeof(typename Diva<O>::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
                 REQUIRE(store.IsPartialKey());
                 REQUIRE_EQ(store.GetInvalidBits(), 7);
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -254,22 +254,22 @@ public:
         // Split an extension of a partial boundary key
         uint8_t old_boundary [sizeof(uint64_t)];
         uint32_t old_boundary_size;
-        if constexpr (O) {
+        if constexpr (diva_type == DivaType::Int) {
             wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
             wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
             uint32_t dummy;
-            typename Diva<O>::InfixStore store;
+            typename Diva<diva_type>::InfixStore store;
             wh_int_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
-                             reinterpret_cast<void *>(&store), sizeof(typename Diva<O>::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
             wh_int_iter_destroy(it, check_it_write);
         }
         else {
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
             uint32_t dummy;
-            typename Diva<O>::InfixStore store;
+            typename Diva<diva_type>::InfixStore store;
             wh_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
-                         reinterpret_cast<void *>(&store), sizeof(typename Diva<O>::InfixStore), &dummy);
+                         reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
             wh_iter_destroy(it, check_it_write);
         }
         uint32_t extended_key_len = old_boundary_size + 1;
@@ -283,12 +283,12 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10001},   {  1,1,0b10111},   {  2,0,0b00100},   {  3,1,0b10100},   {  4,0,0b00100},   {  5,1,0b10100},   {  6,0,0b00100},   {  7,1,0b10100},   {  8,0,0b00100},   {  9,1,0b10100},   { 10,0,0b00100},   { 11,1,0b10100},   { 12,0,0b00100},   { 13,1,0b10100},   { 14,0,0b00100},   { 15,1,0b10100},   { 16,0,0b00100},   { 17,1,0b10100},   { 18,0,0b00100},   { 19,1,0b10100},   { 20,0,0b00100},   { 21,1,0b10100},   { 22,0,0b00100},   { 23,1,0b10100},   { 24,0,0b00100},   { 25,1,0b10100},   { 26,0,0b00100},   { 27,1,0b10100},   { 28,0,0b00100},   { 29,1,0b10100},   { 30,0,0b00100},   { 31,1,0b10100},   { 32,0,0b00100},   { 33,1,0b10100},   { 34,0,0b00100},   { 35,1,0b10100},   { 36,0,0b00100},   { 37,0,0b10100},   { 38,1,0b10100},   { 39,0,0b00100},   { 40,1,0b10100},   { 41,0,0b00100},   { 42,1,0b10100},   { 43,1,0b00100},   { 44,1,0b01100},   { 45,1,0b00100},   { 46,1,0b00100},   { 47,1,0b11100},   { 48,1,0b11100},   { 49,1,0b10100},   { 50,1,0b01100},   { 51,1,0b01100},   { 52,1,0b00100},   { 53,1,0b00100},   { 54,1,0b11100},   { 55,1,0b10100},   { 56,1,0b10100},   { 57,1,0b01100},   { 58,1,0b00100},   { 59,1,0b00100},   { 60,1,0b00100},   { 61,1,0b11100},   { 62,1,0b11100},   { 63,1,0b10100},   { 64,1,0b01100},   { 65,1,0b01100},   { 66,1,0b00100},   { 67,1,0b11100},   { 68,1,0b11100},   { 69,1,0b10100},   { 70,1,0b10100},   { 73,1,0b01100},   { 76,1,0b00100}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
             uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
             value &= ~BITMASK(shamt);
             value = to_big_endian_order(value);
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
@@ -341,10 +341,10 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b10000},   {  1,1,0b10000},   {  2,1,0b10000},   {  3,1,0b10000},   {  4,1,0b10000},   {  5,1,0b10000},   {  6,1,0b10000},   {  7,1,0b10000},   { 11,1,0b10000},   { 12,1,0b10000},   { 13,1,0b10000},   { 14,1,0b10000},   { 15,1,0b10000},   { 16,1,0b10000},   { 17,1,0b10000},   { 18,1,0b10000},   { 31,1,0b10000},   { 32,1,0b10000},   { 33,1,0b10000},   { 34,1,0b10000},   { 35,1,0b10000},   { 36,1,0b10000},   { 37,1,0b10000},   { 38,1,0b10000},   { 39,1,0b10000},   { 40,1,0b10000},   { 41,1,0b10000},   { 42,1,0b10000},   { 43,1,0b10000},   { 44,1,0b10000},   { 45,1,0b10000},   { 46,1,0b10000},   { 47,1,0b10000},   { 48,1,0b10000},   { 49,1,0b10000},   { 50,1,0b10000},   { 51,1,0b10000},   { 52,1,0b10000},   { 53,1,0b10000},   { 54,1,0b10000},   { 55,1,0b10000},   { 56,1,0b10000},   { 57,1,0b10000},   { 58,1,0b10000},   { 59,1,0b10000},   { 60,1,0b10000},   { 61,1,0b10000},   { 62,1,0b10000},   { 63,1,0b10000},   { 64,1,0b10000},   { 65,1,0b10000},   { 66,1,0b10000},   { 67,1,0b10000},   { 68,1,0b10000},   { 69,1,0b10000},   { 70,1,0b10000},   { 71,1,0b10000},   { 72,1,0b10000},   { 73,1,0b10000},   { 74,1,0b10000},   { 75,1,0b10000},   { 76,1,0b10000},   { 77,1,0b10000},   { 78,1,0b10000},   { 79,1,0b10000},   { 80,1,0b10000},   { 81,1,0b10000},   { 82,1,0b10000},   { 83,1,0b10000},   { 84,1,0b10000},   { 85,1,0b10000},   { 86,1,0b10000},   { 87,1,0b10000},   { 88,1,0b10000},   { 89,1,0b10000},   { 90,1,0b10000},   { 91,1,0b10000},   { 92,1,0b10000},   { 93,1,0b10000},   { 94,1,0b10000},   { 95,1,0b10000},   { 96,1,0b10000},   { 97,1,0b10000},   { 98,1,0b10000},   { 99,1,0b10000},   {100,1,0b10000},   {101,1,0b10000},   {102,1,0b10000},   {103,1,0b10000},   {104,1,0b10000},   {105,1,0b10000},   {106,1,0b10000},   {107,1,0b10000},   {108,1,0b10000},   {109,1,0b10000},   {110,1,0b10000},   {111,1,0b10000},   {112,1,0b10000},   {113,1,0b10000},   {114,1,0b10000},   {115,1,0b10000},   {116,1,0b10000},   {117,1,0b10000},   {118,1,0b10000},   {119,1,0b10000},   {120,1,0b10000},   {121,1,0b10000},   {122,1,0b10000},   {123,1,0b10000},   {124,1,0b10000},   {125,1,0b10000},   {126,1,0b10000},   {127,1,0b10000},   {128,1,0b10000},   {129,1,0b10000},   {130,1,0b10000},   {131,1,0b10000},   {132,1,0b10000},   {133,1,0b10000},   {134,1,0b10000},   {135,1,0b10000},   {136,1,0b10000},   {137,1,0b10000},   {138,1,0b10000},   {139,1,0b10000},   {140,1,0b10000},   {141,1,0b10000},   {142,1,0b10000},   {143,1,0b10000},   {144,1,0b10000},   {145,1,0b10000},   {146,1,0b10000},   {147,1,0b10000},   {148,1,0b10000},   {149,1,0b10000},   {150,1,0b10000},   {151,1,0b10000},   {152,1,0b10000},   {153,1,0b10000},   {154,1,0b10000},   {155,1,0b10000},   {156,1,0b10000},   {157,1,0b10000},   {158,1,0b10000},   {159,1,0b10000},   {160,1,0b10000},   {161,1,0b10000},   {162,1,0b10000},   {163,1,0b10000},   {164,1,0b10000},   {165,1,0b10000},   {166,1,0b10000},   {167,1,0b10000},   {168,1,0b10000},   {169,1,0b10000},   {170,1,0b10000},   {171,1,0b10000},   {172,1,0b10000},   {173,1,0b10000},   {174,1,0b10000},   {175,1,0b10000},   {176,1,0b10000},   {177,1,0b10000},   {178,1,0b10000},   {179,1,0b10000},   {180,1,0b10000},   {181,1,0b10000},   {182,1,0b10000},   {183,1,0b10000},   {184,1,0b10000},   {185,1,0b10000},   {186,1,0b10000},   {187,1,0b10000},   {188,1,0b10000},   {189,1,0b10000},   {190,1,0b10000},   {191,1,0b10000},   {192,1,0b10000},   {193,1,0b10000},   {194,1,0b10000},   {195,1,0b10000},   {196,1,0b10000},   {197,1,0b10000},   {198,1,0b10000},   {199,1,0b10000},   {200,1,0b10000},   {201,1,0b10000},   {202,1,0b10000},   {203,1,0b10000},   {204,1,0b10000},   {205,1,0b10000},   {206,1,0b10000},   {207,1,0b10000},   {208,1,0b10000},   {209,1,0b10000},   {210,1,0b10000},   {211,1,0b10000},   {212,1,0b10000},   {213,1,0b10000},   {214,1,0b10000},   {215,1,0b10000},   {216,1,0b10000},   {217,1,0b10000},   {218,1,0b10000},   {219,1,0b10000},   {220,1,0b10000},   {221,1,0b10000},   {222,1,0b10000},   {223,1,0b10000},   {224,1,0b10000},   {225,1,0b10000},   {226,1,0b10000},   {227,1,0b10000},   {228,1,0b10000},   {229,1,0b10000},   {230,1,0b10000},   {231,1,0b10000},   {232,1,0b10000},   {233,1,0b10000},   {234,1,0b10000},   {235,1,0b10000},   {236,1,0b10000},   {237,1,0b10000},   {238,1,0b10000},   {239,1,0b10000},   {240,1,0b10000},   {241,1,0b10000},   {242,1,0b10000},   {243,1,0b10000},   {244,1,0b10000},   {245,1,0b10000},   {246,1,0b10000},   {247,1,0b10000},   {248,1,0b10000},   {249,1,0b10000},   {250,1,0b10000},   {251,1,0b10000},   {252,1,0b10000},   {253,1,0b10000},   {254,1,0b10000}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type >::InfixStore *store;
 
             uint64_t value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - 2, check_it_write);
                 wh_int_iter_skip1_rev(it, check_it_write, check_it_unlock);
@@ -388,7 +388,7 @@ public:
             }
         }
 
-        if constexpr (O)
+        if constexpr (diva_type == DivaType::Int)
             return;
 
         uint8_t new_extended_key[12];
@@ -397,10 +397,10 @@ public:
             uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value), check_it_write);
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
             uint32_t dummy;
             wh_iter_peek(it, reinterpret_cast<void *>(new_extended_key), sizeof(new_extended_key), &new_extended_key_len, 
-                         reinterpret_cast<void *>(&store), sizeof(typename Diva<O>::InfixStore), &dummy);
+                         reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
             wh_iter_destroy(it, check_it_write);
         }
         memset(new_extended_key + new_extended_key_len, 0, 3);
@@ -413,7 +413,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
             const uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -435,7 +435,7 @@ public:
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{ 48,1,0b00001}};
             const uint8_t *res_key;
             uint32_t res_size, dummy;
-            typename Diva<O>::InfixStore *store;
+            typename Diva<diva_type>::InfixStore *store;
 
             const uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -455,7 +455,7 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void RandomInsert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -468,12 +468,12 @@ public:
         for (int32_t i = 0; i < init_n; i++)
             init_keys.push_back(rng());
         std::sort(init_keys.begin(), init_keys.end());
-        if constexpr (!O) {
+        if constexpr (diva_type != DivaType::Int) {
             for (int32_t i = 0; i < init_n; i++)
                 init_keys[i] = to_big_endian_order(init_keys[i]);
         }
-        Diva<O> s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
-                      seed, load_factor);
+        Diva<diva_type> s(infix_size, init_keys.begin(), init_keys.end(), sizeof(uint64_t),
+                          seed, load_factor);
 
         const uint32_t extra_n = 1400000;
         for (int32_t i = 0; i < extra_n; i++) {
@@ -483,12 +483,12 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void PointQuery() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Diva<O> s(infix_size, seed, load_factor);
+        Diva<diva_type> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -503,7 +503,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -517,7 +517,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -532,7 +532,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -626,12 +626,12 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void RangeQuery() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        Diva<O> s(infix_size, seed, load_factor);
+        Diva<diva_type> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -646,7 +646,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -660,7 +660,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -675,7 +675,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -834,14 +834,14 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void Delete() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
-        Diva<O> s(infix_size, seed, load_factor);
+        Diva<diva_type> s(infix_size, seed, load_factor);
 
         SUBCASE("merge") {
             SUBCASE("1") {
@@ -858,7 +858,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O>::InfixStore *store;
+                typename Diva<diva_type>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -869,7 +869,7 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b1'001010101'10000,
                     0b1'001010101'01011, 0b1'001111111'11001,
                     0b1'011111100'01000, 0b1'011111100'00111};
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -893,7 +893,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11001},   {  1,0,0b11011},   {  2,1,0b11011},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,1,0b00011},   { 37,0,0b11000},   { 38,1,0b10101},   { 40,1,0b11101},   { 47,0,0b00100},   { 48,1,0b00011}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -937,7 +937,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11001},   {  1,0,0b11011},   {  2,1,0b11011},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,1,0b00011},   { 37,0,0b11000},   { 38,1,0b10101},   { 40,1,0b11101},   { 47,0,0b00100},   { 48,1,0b00011}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -973,7 +973,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O>::InfixStore *store;
+                typename Diva<diva_type>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -984,7 +984,7 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b0'010100000'11111,
                     0b0'011110101'01000, 0b0'011110101'00001,
                     0b1'001001011'01011};
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -1008,7 +1008,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10100},   {  1,1,0b10101},   {  2,1,0b10111},   {  3,0,0b10000},   {  4,1,0b00001},   {  5,1,0b10111},   { 59,1,0b00001},   { 60,1,0b01101},   { 61,0,0b00011},   { 62,1,0b00011},   { 63,1,0b10111}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -1052,7 +1052,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10100},   {  1,1,0b10101},   {  2,1,0b10111},   {  3,0,0b10000},   {  4,1,0b00001},   {  5,1,0b10111},   { 59,1,0b00001},   { 60,1,0b01101},   { 61,0,0b00011},   { 62,1,0b00011},   { 63,1,0b10111}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -1087,7 +1087,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O>::InfixStore *store;
+                typename Diva<diva_type>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -1098,7 +1098,7 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b0'010100000'11111,
                     0b0'011110101'01000, 0b0'011110101'00001,
                     0b1'001001011'01011};
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -1122,7 +1122,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b00001},   {  1,0,0b00001},   {  2,0,0b00001},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,0,0b00001},   {  6,1,0b00001},   { 10,1,0b11111},   { 15,0,0b01000},   { 16,1,0b00001},   { 36,1,0b01011}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -1166,7 +1166,7 @@ public:
                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b00001},   {  1,0,0b00001},   {  2,0,0b00001},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,0,0b00001},   {  6,1,0b00001},   { 10,1,0b11111},   { 15,0,0b01000},   { 16,1,0b00001},   { 36,1,0b01011}};
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O>::InfixStore *store;
+                        typename Diva<diva_type>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -1211,7 +1211,7 @@ public:
             for (int32_t i = 1; i < 100; i++) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1223,7 +1223,7 @@ public:
             for (int32_t i = 90; i >= 70; i -= 2) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1236,7 +1236,7 @@ public:
             for (int32_t i = 1; i < 50; i++) {
                 const uint32_t shared = 34;
                 const uint32_t ignore = 1;
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                 const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                 const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1324,7 +1324,7 @@ public:
             std::vector<std::string> string_keys;
             for (int32_t i = 0; i < n_keys; i++) {
                 size_t str_length;
-                if constexpr (O)
+                if constexpr (diva_type == DivaType::Int)
                     str_length = 8;
                 else
                     str_length = 6 + rng() % 3;
@@ -1333,7 +1333,7 @@ public:
             }
             std::shuffle(string_keys.begin(), string_keys.end(), rng);
             std::sort(string_keys.begin(), string_keys.begin() + n_keys / 32);
-            Diva<O> s(infix_size, string_keys.begin(), string_keys.begin() + n_keys / 32, seed, load_factor);
+            Diva<diva_type> s(infix_size, string_keys.begin(), string_keys.begin() + n_keys / 32, seed, load_factor);
 
             std::vector<bool> deleted(n_keys, false);
             uint32_t i = n_keys / 32;
@@ -1355,14 +1355,14 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void ShrinkInfixSize() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
-        Diva<O> s(infix_size, seed, load_factor);
+        Diva<diva_type> s(infix_size, seed, load_factor);
 
         std::set<uint64_t> keys = {std::numeric_limits<uint64_t>::min(),
                                    std::numeric_limits<uint64_t>::max()};
@@ -1377,7 +1377,7 @@ public:
         for (int32_t i = 1; i < 100; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1391,7 +1391,7 @@ public:
         for (int32_t i = 90; i >= 70; i -= 2) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -1406,7 +1406,7 @@ public:
         for (int32_t i = 1; i < 50; i++) {
             const uint32_t shared = 34;
             const uint32_t ignore = 1;
-            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+            const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
             const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -1421,7 +1421,7 @@ public:
             s.ShrinkInfixSize(infix_size - 1);
             REQUIRE_EQ(s.infix_size_, infix_size - 1);
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, nullptr, 0, check_it_write);
                 {
@@ -1430,7 +1430,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1447,7 +1447,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b1001},   { 21,1,0b0001},   { 31,1,0b1001},   { 41,1,0b1111},   { 53,1,0b0111},   { 63,1,0b1111},   { 74,1,0b0101},   { 84,1,0b1101},   { 96,1,0b0101},   {106,0,0b1011},   {107,1,0b1011},   {118,1,0b0011},   {128,0,0b1011},   {129,1,0b1011},   {139,1,0b0011},   {149,0,0b1001},   {150,1,0b1001},   {161,1,0b0001},   {171,0,0b1001},   {172,1,0b1001},   {181,1,0b1111},   {193,0,0b0111},   {194,1,0b0111},   {202,1,0b1111},   {214,0,0b0101},   {215,1,0b0101},   {224,1,0b1101},   {236,0,0b0101},   {237,1,0b0101},   {246,1,0b1011},   {258,0,0b0011},   {259,1,0b0011},   {267,1,0b1011},   {279,0,0b0011},   {280,1,0b0011},   {289,1,0b1001},   {301,0,0b0001},   {302,1,0b0001},   {311,1,0b1001},   {321,0,0b1111},   {322,1,0b1111},   {333,1,0b0111},   {342,1,0b1111},   {354,1,0b0101},   {364,1,0b1101},   {376,1,0b0101},   {386,1,0b1011},   {398,1,0b0011},   {407,1,0b1011},   {419,1,0b0011},   {429,1,0b1001},   {441,1,0b0001},   {451,1,0b1001},   {461,1,0b1111},   {472,1,0b0111},   {482,1,0b1111},   {494,1,0b0101},   {504,1,0b1101},   {516,1,0b0101},   {526,1,0b1011},   {537,1,0b0011},   {547,1,0b1011},   {559,1,0b0001},   {569,1,0b1001},   {581,1,0b0001},   {591,1,0b1001},   {601,1,0b1111},   {612,1,0b0111},   {622,1,0b1111},   {634,1,0b0101},   {644,1,0b1101},   {656,1,0b0101},   {666,1,0b1011},   {677,1,0b0011},   {687,1,0b1011},   {699,1,0b0001},   {709,1,0b1001},   {721,1,0b0001},   {731,1,0b1001},   {740,1,0b1111},   {752,0,0b0111},   {753,0,0b1001},   {754,0,0b1011},   {755,0,0b1101},   {756,1,0b1111},   {757,0,0b0001},   {758,0,0b0011},   {759,0,0b0101},   {760,0,0b0111},   {761,0,0b1001},   {762,0,0b1011},   {763,0,0b1101},   {764,1,0b1111},   {765,0,0b0001},   {766,0,0b0011},   {767,0,0b0101},   {768,0,0b0111},   {769,0,0b1001},   {770,0,0b1011},   {771,0,0b1101},   {772,1,0b1111},   {773,0,0b0001},   {774,0,0b0011},   {775,0,0b0101},   {776,0,0b0111},   {777,0,0b1001},   {778,0,0b1011},   {779,0,0b1101},   {780,1,0b1111},   {781,0,0b0001},   {782,0,0b0011},   {783,0,0b0101},   {784,0,0b0111},   {785,0,0b1001},   {786,0,0b1011},   {787,0,0b1101},   {788,1,0b1111},   {789,0,0b0001},   {790,0,0b0011},   {791,0,0b0101},   {792,0,0b0111},   {793,0,0b1001},   {794,0,0b1011},   {795,0,0b1101},   {796,0,0b1111},   {797,1,0b1111},   {798,0,0b0001},   {799,0,0b0011},   {800,0,0b0101},   {801,0,0b0111},   {802,1,0b1001},   {803,1,0b0101},   {804,1,0b1101},   {805,1,0b0101},   {806,1,0b1011},   {817,1,0b0011},   {827,1,0b1011},   {839,1,0b0001},   {849,1,0b1001},   {861,1,0b0001},   {870,1,0b1001},   {880,1,0b1111},   {892,1,0b0111},   {902,1,0b1111},   {914,1,0b0101},   {924,1,0b1101},   {935,1,0b0101},   {945,1,0b1011},   {957,1,0b0011},   {967,1,0b1011},   {979,1,0b0001},   {989,1,0b1001},   {1001,1,0b0001},   {1010,1,0b0111},   {1020,1,0b1111},   {1032,1,0b0111},   {1042,1,0b1111},   {1054,1,0b0101},   {1064,1,0b1101}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1469,7 +1469,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1486,7 +1486,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b1001},   { 21,1,0b0001},   { 31,1,0b1001},   { 41,1,0b1111},   { 53,1,0b0111},   { 63,1,0b1111},   { 74,1,0b0101},   { 84,1,0b1101},   { 96,1,0b0101},   {106,0,0b1011},   {107,1,0b1011},   {118,1,0b0011},   {128,0,0b1011},   {129,1,0b1011},   {139,1,0b0011},   {149,0,0b1001},   {150,1,0b1001},   {161,1,0b0001},   {171,0,0b1001},   {172,1,0b1001},   {181,1,0b1111},   {193,0,0b0111},   {194,1,0b0111},   {202,1,0b1111},   {214,0,0b0101},   {215,1,0b0101},   {224,1,0b1101},   {236,0,0b0101},   {237,1,0b0101},   {246,1,0b1011},   {258,0,0b0011},   {259,1,0b0011},   {267,1,0b1011},   {279,0,0b0011},   {280,1,0b0011},   {289,1,0b1001},   {301,0,0b0001},   {302,1,0b0001},   {311,1,0b1001},   {321,0,0b1111},   {322,1,0b1111},   {333,1,0b0111},   {342,1,0b1111},   {354,1,0b0101},   {364,1,0b1101},   {376,1,0b0101},   {386,1,0b1011},   {398,1,0b0011},   {407,1,0b1011},   {419,1,0b0011},   {429,1,0b1001},   {441,1,0b0001},   {451,1,0b1001},   {461,1,0b1111},   {472,1,0b0111},   {482,1,0b1111},   {494,1,0b0101},   {504,1,0b1101},   {516,1,0b0101},   {526,1,0b1011},   {537,1,0b0011},   {547,1,0b1011},   {559,1,0b0001},   {569,1,0b1001},   {581,1,0b0001},   {591,1,0b1001},   {601,1,0b1111},   {612,1,0b0111},   {622,1,0b1111},   {634,1,0b0101},   {644,1,0b1101},   {656,1,0b0101},   {666,1,0b1011},   {677,1,0b0011},   {687,1,0b1011},   {699,1,0b0001},   {709,1,0b1001},   {721,1,0b0001},   {731,1,0b1001},   {740,1,0b1111},   {752,0,0b0111},   {753,0,0b1001},   {754,0,0b1011},   {755,0,0b1101},   {756,1,0b1111},   {757,0,0b0001},   {758,0,0b0011},   {759,0,0b0101},   {760,0,0b0111},   {761,0,0b1001},   {762,0,0b1011},   {763,0,0b1101},   {764,1,0b1111},   {765,0,0b0001},   {766,0,0b0011},   {767,0,0b0101},   {768,0,0b0111},   {769,0,0b1001},   {770,0,0b1011},   {771,0,0b1101},   {772,1,0b1111},   {773,0,0b0001},   {774,0,0b0011},   {775,0,0b0101},   {776,0,0b0111},   {777,0,0b1001},   {778,0,0b1011},   {779,0,0b1101},   {780,1,0b1111},   {781,0,0b0001},   {782,0,0b0011},   {783,0,0b0101},   {784,0,0b0111},   {785,0,0b1001},   {786,0,0b1011},   {787,0,0b1101},   {788,1,0b1111},   {789,0,0b0001},   {790,0,0b0011},   {791,0,0b0101},   {792,0,0b0111},   {793,0,0b1001},   {794,0,0b1011},   {795,0,0b1101},   {796,0,0b1111},   {797,1,0b1111},   {798,0,0b0001},   {799,0,0b0011},   {800,0,0b0101},   {801,0,0b0111},   {802,1,0b1001},   {803,1,0b0101},   {804,1,0b1101},   {805,1,0b0101},   {806,1,0b1011},   {817,1,0b0011},   {827,1,0b1011},   {839,1,0b0001},   {849,1,0b1001},   {861,1,0b0001},   {870,1,0b1001},   {880,1,0b1111},   {892,1,0b0111},   {902,1,0b1111},   {914,1,0b0101},   {924,1,0b1101},   {935,1,0b0101},   {945,1,0b1011},   {957,1,0b0011},   {967,1,0b1011},   {979,1,0b0001},   {989,1,0b1001},   {1001,1,0b0001},   {1010,1,0b0111},   {1020,1,0b1111},   {1032,1,0b0111},   {1042,1,0b1111},   {1054,1,0b0101},   {1064,1,0b1101}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1505,7 +1505,7 @@ public:
             s.ShrinkInfixSize(infix_size - 2);
             REQUIRE_EQ(s.infix_size_, infix_size - 2);
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, nullptr, 0, check_it_write);
                 {
@@ -1514,7 +1514,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1531,7 +1531,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b101},   { 21,1,0b001},   { 31,1,0b101},   { 41,1,0b111},   { 53,1,0b011},   { 63,1,0b111},   { 74,1,0b011},   { 84,1,0b111},   { 96,1,0b011},   {106,0,0b101},   {107,1,0b101},   {118,1,0b001},   {128,0,0b101},   {129,1,0b101},   {139,1,0b001},   {149,0,0b101},   {150,1,0b101},   {161,1,0b001},   {171,0,0b101},   {172,1,0b101},   {181,1,0b111},   {193,0,0b011},   {194,1,0b011},   {202,1,0b111},   {214,0,0b011},   {215,1,0b011},   {224,1,0b111},   {236,0,0b011},   {237,1,0b011},   {246,1,0b101},   {258,0,0b001},   {259,1,0b001},   {267,1,0b101},   {279,0,0b001},   {280,1,0b001},   {289,1,0b101},   {301,0,0b001},   {302,1,0b001},   {311,1,0b101},   {321,0,0b111},   {322,1,0b111},   {333,1,0b011},   {342,1,0b111},   {354,1,0b011},   {364,1,0b111},   {376,1,0b011},   {386,1,0b101},   {398,1,0b001},   {407,1,0b101},   {419,1,0b001},   {429,1,0b101},   {441,1,0b001},   {451,1,0b101},   {461,1,0b111},   {472,1,0b011},   {482,1,0b111},   {494,1,0b011},   {504,1,0b111},   {516,1,0b011},   {526,1,0b101},   {537,1,0b001},   {547,1,0b101},   {559,1,0b001},   {569,1,0b101},   {581,1,0b001},   {591,1,0b101},   {601,1,0b111},   {612,1,0b011},   {622,1,0b111},   {634,1,0b011},   {644,1,0b111},   {656,1,0b011},   {666,1,0b101},   {677,1,0b001},   {687,1,0b101},   {699,1,0b001},   {709,1,0b101},   {721,1,0b001},   {731,1,0b101},   {740,1,0b111},   {752,0,0b011},   {753,0,0b101},   {754,0,0b101},   {755,0,0b111},   {756,1,0b111},   {757,0,0b001},   {758,0,0b001},   {759,0,0b011},   {760,0,0b011},   {761,0,0b101},   {762,0,0b101},   {763,0,0b111},   {764,1,0b111},   {765,0,0b001},   {766,0,0b001},   {767,0,0b011},   {768,0,0b011},   {769,0,0b101},   {770,0,0b101},   {771,0,0b111},   {772,1,0b111},   {773,0,0b001},   {774,0,0b001},   {775,0,0b011},   {776,0,0b011},   {777,0,0b101},   {778,0,0b101},   {779,0,0b111},   {780,1,0b111},   {781,0,0b001},   {782,0,0b001},   {783,0,0b011},   {784,0,0b011},   {785,0,0b101},   {786,0,0b101},   {787,0,0b111},   {788,1,0b111},   {789,0,0b001},   {790,0,0b001},   {791,0,0b011},   {792,0,0b011},   {793,0,0b101},   {794,0,0b101},   {795,0,0b111},   {796,0,0b111},   {797,1,0b111},   {798,0,0b001},   {799,0,0b001},   {800,0,0b011},   {801,0,0b011},   {802,1,0b101},   {803,1,0b011},   {804,1,0b111},   {805,1,0b011},   {806,1,0b101},   {817,1,0b001},   {827,1,0b101},   {839,1,0b001},   {849,1,0b101},   {861,1,0b001},   {870,1,0b101},   {880,1,0b111},   {892,1,0b011},   {902,1,0b111},   {914,1,0b011},   {924,1,0b111},   {935,1,0b011},   {945,1,0b101},   {957,1,0b001},   {967,1,0b101},   {979,1,0b001},   {989,1,0b101},   {1001,1,0b001},   {1010,1,0b011},   {1020,1,0b111},   {1032,1,0b011},   {1042,1,0b111},   {1054,1,0b011},   {1064,1,0b111}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1552,7 +1552,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1569,7 +1569,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b101},   { 21,1,0b001},   { 31,1,0b101},   { 41,1,0b111},   { 53,1,0b011},   { 63,1,0b111},   { 74,1,0b011},   { 84,1,0b111},   { 96,1,0b011},   {106,0,0b101},   {107,1,0b101},   {118,1,0b001},   {128,0,0b101},   {129,1,0b101},   {139,1,0b001},   {149,0,0b101},   {150,1,0b101},   {161,1,0b001},   {171,0,0b101},   {172,1,0b101},   {181,1,0b111},   {193,0,0b011},   {194,1,0b011},   {202,1,0b111},   {214,0,0b011},   {215,1,0b011},   {224,1,0b111},   {236,0,0b011},   {237,1,0b011},   {246,1,0b101},   {258,0,0b001},   {259,1,0b001},   {267,1,0b101},   {279,0,0b001},   {280,1,0b001},   {289,1,0b101},   {301,0,0b001},   {302,1,0b001},   {311,1,0b101},   {321,0,0b111},   {322,1,0b111},   {333,1,0b011},   {342,1,0b111},   {354,1,0b011},   {364,1,0b111},   {376,1,0b011},   {386,1,0b101},   {398,1,0b001},   {407,1,0b101},   {419,1,0b001},   {429,1,0b101},   {441,1,0b001},   {451,1,0b101},   {461,1,0b111},   {472,1,0b011},   {482,1,0b111},   {494,1,0b011},   {504,1,0b111},   {516,1,0b011},   {526,1,0b101},   {537,1,0b001},   {547,1,0b101},   {559,1,0b001},   {569,1,0b101},   {581,1,0b001},   {591,1,0b101},   {601,1,0b111},   {612,1,0b011},   {622,1,0b111},   {634,1,0b011},   {644,1,0b111},   {656,1,0b011},   {666,1,0b101},   {677,1,0b001},   {687,1,0b101},   {699,1,0b001},   {709,1,0b101},   {721,1,0b001},   {731,1,0b101},   {740,1,0b111},   {752,0,0b011},   {753,0,0b101},   {754,0,0b101},   {755,0,0b111},   {756,1,0b111},   {757,0,0b001},   {758,0,0b001},   {759,0,0b011},   {760,0,0b011},   {761,0,0b101},   {762,0,0b101},   {763,0,0b111},   {764,1,0b111},   {765,0,0b001},   {766,0,0b001},   {767,0,0b011},   {768,0,0b011},   {769,0,0b101},   {770,0,0b101},   {771,0,0b111},   {772,1,0b111},   {773,0,0b001},   {774,0,0b001},   {775,0,0b011},   {776,0,0b011},   {777,0,0b101},   {778,0,0b101},   {779,0,0b111},   {780,1,0b111},   {781,0,0b001},   {782,0,0b001},   {783,0,0b011},   {784,0,0b011},   {785,0,0b101},   {786,0,0b101},   {787,0,0b111},   {788,1,0b111},   {789,0,0b001},   {790,0,0b001},   {791,0,0b011},   {792,0,0b011},   {793,0,0b101},   {794,0,0b101},   {795,0,0b111},   {796,0,0b111},   {797,1,0b111},   {798,0,0b001},   {799,0,0b001},   {800,0,0b011},   {801,0,0b011},   {802,1,0b101},   {803,1,0b011},   {804,1,0b111},   {805,1,0b011},   {806,1,0b101},   {817,1,0b001},   {827,1,0b101},   {839,1,0b001},   {849,1,0b101},   {861,1,0b001},   {870,1,0b101},   {880,1,0b111},   {892,1,0b011},   {902,1,0b111},   {914,1,0b011},   {924,1,0b111},   {935,1,0b011},   {945,1,0b101},   {957,1,0b001},   {967,1,0b101},   {979,1,0b001},   {989,1,0b101},   {1001,1,0b001},   {1010,1,0b011},   {1020,1,0b111},   {1032,1,0b011},   {1042,1,0b111},   {1054,1,0b011},   {1064,1,0b111}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1585,7 +1585,7 @@ public:
     }
 
 
-        template <bool O>
+    template <DivaType diva_type>
     static void BulkLoad() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -1601,14 +1601,14 @@ public:
             for (int32_t i = 0; i < n_keys; i++)
                 keys.push_back(rng());
             std::sort(keys.begin(), keys.end());
-            if constexpr (!O) {
+            if constexpr (diva_type != DivaType::Int) {
                 for (int32_t i = 0; i < n_keys; i++)
                     keys[i] = to_big_endian_order(keys[i]);
             }
 
-            Diva<O> s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
+            Diva<diva_type> s(infix_size, keys.begin(), keys.end(), sizeof(uint64_t), seed, load_factor);
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, nullptr, 0, check_it_write);
                 {
@@ -1618,7 +1618,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1635,7 +1635,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,0,0b00001},   {  2,0,0b01101},   {  3,0,0b10011},   {  4,0,0b10101},   {  5,1,0b11111},   {  6,1,0b11011},   {  7,0,0b10101},   {  8,1,0b10111},   {  9,1,0b01101},   { 10,0,0b00011},   { 11,0,0b10101},   { 12,1,0b11101},   { 13,1,0b00011},   { 14,0,0b00001},   { 15,0,0b00001},   { 16,1,0b01101},   { 17,1,0b10011},   { 18,0,0b10101},   { 19,1,0b11011},   { 20,1,0b00011},   { 21,1,0b01011},   { 22,0,0b00111},   { 23,0,0b01011},   { 24,0,0b11011},   { 25,1,0b11111},   { 26,0,0b00101},   { 27,1,0b11101},   { 28,1,0b01001},   { 29,1,0b10001},   { 30,1,0b10011},   { 31,1,0b11011},   { 32,0,0b00001},   { 33,0,0b00111},   { 34,0,0b11011},   { 35,0,0b11011},   { 36,1,0b11101},   { 37,1,0b00101},   { 38,1,0b11111},   { 39,0,0b01001},   { 40,0,0b10011},   { 41,0,0b10011},   { 42,1,0b11111},   { 43,1,0b11101},   { 44,0,0b01101},   { 45,0,0b01101},   { 46,1,0b11101},   { 47,1,0b01101},   { 48,0,0b00011},   { 49,0,0b11001},   { 50,1,0b11011},   { 51,1,0b01001},   { 52,1,0b00111},   { 53,0,0b00011},   { 54,1,0b00111},   { 55,1,0b10011},   { 56,0,0b00001},   { 57,1,0b11001},   { 58,0,0b00001},   { 59,0,0b00001},   { 60,1,0b01001},   { 61,0,0b00101},   { 62,0,0b10011},   { 63,1,0b10111},   { 64,1,0b00011},   { 65,1,0b00111},   { 66,0,0b10001},   { 67,1,0b10001},   { 68,1,0b01101},   { 69,0,0b00001},   { 70,0,0b01101},   { 71,1,0b11011},   { 72,0,0b01101},   { 73,0,0b10111},   { 74,0,0b11001},   { 75,1,0b11101},   { 76,0,0b00111},   { 77,0,0b00111},   { 78,0,0b01011},   { 79,1,0b11011},   { 80,0,0b01001},   { 81,0,0b01101},   { 82,0,0b01101},   { 83,1,0b11111},   { 84,1,0b11111},   { 85,0,0b10011},   { 86,0,0b11001},   { 87,1,0b11001},   { 88,1,0b00101},   { 89,0,0b00001},   { 90,1,0b00111},   { 91,1,0b01011},   { 92,0,0b01011},   { 93,0,0b11011},   { 94,1,0b11011},   { 95,1,0b10111},   { 96,0,0b01001},   { 97,1,0b10111},   { 98,0,0b10011},   { 99,1,0b11011},   {100,1,0b11001},   {101,1,0b00101},   {102,1,0b11001},   {103,1,0b01101},   {104,0,0b10111},   {105,1,0b11111},   {106,1,0b11001},   {109,0,0b00101},   {110,1,0b01111},   {111,1,0b01001},   {112,0,0b11101},   {113,1,0b11101},   {114,0,0b01111},   {115,0,0b10001},   {116,1,0b11101},   {117,0,0b00101},   {118,1,0b11001},   {119,1,0b11011},   {120,1,0b00111},   {121,0,0b01011},   {122,0,0b01011},   {123,0,0b01101},   {124,1,0b11111},   {125,1,0b10101},   {126,0,0b10011},   {127,1,0b10101},   {128,1,0b11001},   {129,0,0b00011},   {130,1,0b10111},   {131,1,0b01111},   {134,1,0b01011},   {135,1,0b00111},   {137,1,0b10111},   {138,0,0b01001},   {139,1,0b01111},   {140,1,0b00101},   {141,0,0b01001},   {142,1,0b01011},   {143,0,0b01111},   {144,1,0b10011},   {146,1,0b01011},   {148,0,0b00001},   {149,0,0b10011},   {150,1,0b11001},   {152,1,0b01011},   {154,0,0b10001},   {155,0,0b10101},   {156,1,0b10101},   {157,1,0b10011},   {158,1,0b11001},   {159,0,0b10001},   {160,0,0b10101},   {161,1,0b11111},   {162,0,0b00001},   {163,0,0b00111},   {164,1,0b01011},   {165,1,0b01011},   {166,1,0b11101},   {167,0,0b00111},   {168,1,0b01011},   {169,0,0b00101},   {170,1,0b10101},   {171,1,0b11101},   {172,0,0b00101},   {173,1,0b11001},   {174,0,0b00111},   {175,1,0b11101},   {176,0,0b00111},   {177,1,0b11001},   {179,0,0b01001},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b11111},   {183,1,0b11111},   {184,0,0b10111},   {185,1,0b10111},   {186,0,0b00101},   {187,1,0b11101},   {188,0,0b10001},   {189,0,0b10101},   {190,1,0b11111},   {191,0,0b01111},   {192,0,0b10111},   {193,1,0b11111},   {194,1,0b10111},   {195,1,0b01011},   {197,0,0b01011},   {198,1,0b10101},   {199,1,0b10111},   {200,0,0b10101},   {201,1,0b11001},   {202,1,0b00101},   {203,1,0b11011},   {204,1,0b01011},   {207,0,0b00001},   {208,0,0b01011},   {209,0,0b01011},   {210,1,0b01111},   {211,1,0b11111},   {212,1,0b10111},   {213,1,0b01111},   {214,1,0b11011},   {215,0,0b01011},   {216,1,0b01101},   {218,1,0b01001},   {219,0,0b11011},   {220,0,0b11011},   {221,1,0b11111},   {222,1,0b10101},   {224,1,0b01011},   {226,1,0b11111},   {229,1,0b11001},   {230,1,0b01011},   {233,0,0b01011},   {234,1,0b10111},   {238,1,0b01111},   {239,0,0b11101},   {240,0,0b11101},   {241,0,0b11111},   {242,1,0b11111},   {243,0,0b00001},   {244,0,0b01001},   {245,1,0b10101},   {246,1,0b01111},   {247,0,0b00011},   {248,1,0b11001},   {249,0,0b00011},   {250,0,0b00101},   {251,1,0b11011},   {252,0,0b00101},   {253,1,0b01111},   {254,0,0b00001},   {255,0,0b11001},   {256,1,0b11111},   {257,0,0b00001},   {258,0,0b01011},   {259,1,0b11101},   {260,1,0b01011},   {261,0,0b01101},   {262,1,0b01111},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b00011},   {266,0,0b00011},   {267,1,0b11011},   {268,0,0b00101},   {269,1,0b10001},   {270,1,0b11101},   {271,1,0b11001},   {272,0,0b01101},   {273,1,0b11001},   {275,1,0b10101},   {277,0,0b11001},   {278,1,0b11001},   {279,1,0b10101},   {280,0,0b00011},   {281,1,0b00101},   {282,1,0b00101},   {283,0,0b10001},   {284,1,0b11111},   {285,1,0b10101},   {286,1,0b10111},   {287,0,0b00101},   {288,1,0b01101},   {290,1,0b01011},   {292,1,0b01111},   {293,1,0b00111},   {296,0,0b01011},   {297,1,0b01101},   {298,1,0b11001},   {301,0,0b00001},   {302,1,0b10101},   {303,0,0b00001},   {304,1,0b01011},   {305,1,0b11001},   {306,1,0b01011},   {308,0,0b01001},   {309,1,0b10001},   {310,1,0b01001},   {312,0,0b01011},   {313,1,0b01011},   {314,0,0b01011},   {315,0,0b01011},   {316,1,0b01111},   {317,0,0b00011},   {318,1,0b11011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11001},   {322,1,0b00001},   {325,0,0b01101},   {326,0,0b01101},   {327,1,0b11001},   {328,0,0b01101},   {329,1,0b10111},   {330,0,0b00001},   {331,1,0b10011},   {332,0,0b00011},   {333,1,0b10111},   {334,1,0b11101},   {335,0,0b01111},   {336,0,0b10111},   {337,1,0b11001},   {338,1,0b10011},   {339,1,0b01101},   {340,1,0b01011},   {341,1,0b11111},   {342,0,0b01001},   {343,1,0b11001},   {344,1,0b00001},   {346,0,0b10001},   {347,0,0b10111},   {348,1,0b11101},   {349,0,0b00111},   {350,1,0b10001},   {351,1,0b10001},   {352,0,0b01011},   {353,1,0b11001},   {354,1,0b00011},   {355,1,0b00111},   {357,0,0b10011},   {358,1,0b11101},   {359,1,0b00011},   {360,0,0b01111},   {361,1,0b10001},   {362,1,0b01111},   {363,1,0b10101},   {366,1,0b11111},   {367,1,0b00111},   {370,1,0b11001},   {371,1,0b11101},   {373,1,0b00011},   {375,1,0b00101},   {378,1,0b00111},   {379,1,0b11111},   {381,0,0b01001},   {382,0,0b10011},   {383,0,0b11001},   {384,1,0b11011},   {385,0,0b00111},   {386,1,0b01101},   {387,0,0b00011},   {388,0,0b00101},   {389,0,0b01101},   {390,0,0b10111},   {391,0,0b11001},   {392,1,0b11111},   {393,1,0b10111},   {394,1,0b00001},   {395,0,0b01101},   {396,1,0b01101},   {397,0,0b00001},   {398,0,0b01011},   {399,1,0b10111},   {400,1,0b11111},   {401,0,0b00101},   {402,1,0b01001},   {403,1,0b01101},   {404,0,0b10001},   {405,0,0b10011},   {406,1,0b10101},   {407,1,0b01011},   {408,1,0b10001},   {409,0,0b01011},   {410,1,0b01111},   {411,1,0b11011},   {412,0,0b00101},   {413,1,0b10001},   {414,0,0b00111},   {415,0,0b11001},   {416,0,0b11001},   {417,1,0b11101},   {418,1,0b01001},   {419,0,0b00111},   {420,1,0b11011},   {421,1,0b11101},   {422,1,0b01111},   {423,1,0b11001},   {424,0,0b00011},   {425,1,0b10111},   {426,0,0b00101},   {427,1,0b11001},   {428,0,0b10011},   {429,1,0b10111},   {430,1,0b10011},   {431,1,0b01011},   {432,0,0b01111},   {433,1,0b11111},   {438,1,0b10111},   {440,1,0b00011},   {441,1,0b10011},   {442,1,0b01111},   {445,1,0b11111},   {446,1,0b01001},   {447,0,0b00001},   {448,0,0b00001},   {449,0,0b01101},   {450,0,0b01111},   {451,0,0b10101},   {452,0,0b11101},   {453,1,0b11111},   {454,0,0b10001},   {455,1,0b11111},   {456,0,0b10001},   {457,1,0b11101},   {458,0,0b00101},   {459,1,0b01001},   {460,0,0b00101},   {461,0,0b10011},   {462,0,0b11001},   {463,0,0b11101},   {464,1,0b11101},   {465,1,0b01111},   {466,0,0b00011},   {467,1,0b10111},   {468,1,0b00001},   {469,1,0b01111},   {470,1,0b00111},   {471,1,0b10011},   {472,0,0b11001},   {473,0,0b11001},   {474,1,0b11101},   {475,1,0b10111},   {476,1,0b11111},   {477,0,0b00011},   {478,1,0b01001},   {479,0,0b00001},   {480,0,0b10101},   {481,1,0b11101},   {482,0,0b10001},   {483,1,0b10011},   {484,1,0b00001},   {485,1,0b00001},   {486,0,0b01111},   {487,1,0b01111},   {488,1,0b00111},   {489,0,0b00011},   {490,0,0b00101},   {491,0,0b01101},   {492,1,0b10001},   {493,0,0b00011},   {494,1,0b10111},   {495,0,0b01001},   {496,1,0b10101},   {497,0,0b00111},   {498,1,0b01011},   {499,0,0b00001},   {500,1,0b10001},   {501,0,0b01011},   {502,0,0b10011},   {503,1,0b11111},   {504,1,0b11011},   {505,1,0b10011},   {506,1,0b10001},   {507,0,0b00111},   {508,1,0b10001},   {509,1,0b01101},   {510,0,0b10111},   {511,1,0b11101},   {512,1,0b11101},   {513,0,0b00111},   {514,0,0b11001},   {515,1,0b11101},   {516,1,0b01011},   {517,0,0b10001},   {518,1,0b10111},   {519,0,0b00011},   {520,1,0b00111},   {521,1,0b00101},   {522,0,0b10101},   {523,1,0b11001},   {524,0,0b00101},   {525,1,0b10101},   {526,1,0b10001},   {527,0,0b01001},   {528,1,0b11111},   {529,0,0b01101},   {530,1,0b01111},   {531,1,0b11001},   {532,0,0b00101},   {533,1,0b00111},   {534,1,0b01011},   {535,0,0b00111},   {536,0,0b10001},   {537,0,0b10101},   {538,1,0b10111},   {539,0,0b00011},   {540,0,0b01001},   {541,1,0b10011},   {542,1,0b11101},   {543,0,0b01001},   {544,0,0b01001},   {545,0,0b01011},   {546,1,0b11011},   {547,0,0b01101},   {548,0,0b10101},   {549,1,0b10101},   {550,0,0b00001},   {551,0,0b00101},   {552,1,0b01111},   {553,1,0b01011},   {554,0,0b10101},   {555,1,0b11101},   {556,1,0b10011},   {557,0,0b01001},   {558,0,0b10001},   {559,1,0b10101},   {560,0,0b00101},   {561,0,0b01111},   {562,0,0b10101},   {563,0,0b10111},   {564,1,0b11101},   {565,1,0b01111},   {566,1,0b00101},   {567,0,0b00101},   {568,0,0b00111},   {569,1,0b01001},   {570,1,0b01011},   {571,1,0b01111},   {572,1,0b00101},   {573,1,0b00111},   {574,1,0b11011},   {575,0,0b00111},   {576,1,0b10101},   {577,1,0b01111},   {578,1,0b11001},   {579,1,0b00001},   {580,1,0b00001},   {581,1,0b00001},   {582,0,0b01011},   {583,1,0b11011},   {584,0,0b00011},   {585,0,0b01001},   {586,0,0b10011},   {587,1,0b11011},   {588,0,0b10001},   {589,1,0b11001},   {590,1,0b00101},   {591,1,0b10111},   {592,0,0b10011},   {593,0,0b10101},   {594,1,0b11001},   {595,0,0b10011},   {596,1,0b10101},   {597,1,0b10011},   {598,1,0b11001},   {599,0,0b00111},   {600,0,0b10101},   {601,0,0b10101},   {602,1,0b11101},   {603,0,0b10011},   {604,1,0b10011},   {605,1,0b01001},   {606,1,0b01011},   {607,1,0b00111},   {608,0,0b00001},   {609,0,0b00011},   {610,0,0b10001},   {611,1,0b11001},   {612,0,0b00001},   {613,0,0b01011},   {614,1,0b11001},   {615,1,0b00111},   {616,1,0b11001},   {617,0,0b00111},   {618,0,0b01101},   {619,0,0b10001},   {620,1,0b10001},   {621,1,0b11011},   {622,0,0b01101},   {623,1,0b11101},   {624,0,0b00011},   {625,1,0b01111},   {626,1,0b11101},   {627,0,0b00111},   {628,1,0b01001},   {629,0,0b00001},   {630,1,0b11011},   {631,0,0b00101},   {632,1,0b10111},   {633,0,0b00111},   {634,1,0b11011},   {635,1,0b11101},   {636,1,0b00011},   {637,1,0b01111},   {638,0,0b00011},   {639,0,0b01101},   {640,1,0b11011},   {641,1,0b00011},   {642,0,0b00111},   {643,0,0b01001},   {644,0,0b01011},   {645,0,0b10111},   {646,0,0b11001},   {647,1,0b11101},   {648,1,0b01011},   {649,1,0b10111},   {650,1,0b00011},   {651,0,0b00101},   {652,0,0b10111},   {653,0,0b10111},   {654,1,0b11011},   {655,0,0b01011},   {656,1,0b11011},   {657,0,0b00111},   {658,0,0b01101},   {659,0,0b10011},   {660,1,0b11111},   {661,1,0b01011},   {662,0,0b10101},   {663,1,0b11011},   {664,0,0b01011},   {665,0,0b01111},   {666,1,0b11001},   {667,1,0b11011},   {668,1,0b00111},   {669,1,0b00101},   {670,1,0b01001},   {671,1,0b01011},   {672,1,0b11101},   {673,1,0b10011},   {674,0,0b01001},   {675,1,0b11001},   {676,0,0b00101},   {677,1,0b01111},   {678,0,0b00001},   {679,1,0b10001},   {680,0,0b00101},   {681,1,0b11011},   {682,1,0b10101},   {683,0,0b01111},   {684,0,0b10111},   {685,1,0b11111},   {686,0,0b00101},   {687,0,0b01011},   {688,0,0b10011},   {689,1,0b11011},   {690,1,0b01001},   {691,0,0b00101},   {692,1,0b11001},   {693,0,0b10011},   {694,1,0b10101},   {695,1,0b10001},   {696,1,0b10111},   {697,1,0b00111},   {698,1,0b11001},   {699,1,0b00001},   {700,1,0b01101},   {701,1,0b11111},   {702,1,0b00001},   {703,0,0b00111},   {704,1,0b11001},   {705,1,0b10001},   {706,0,0b11101},   {707,1,0b11101},   {708,0,0b10111},   {709,1,0b11111},   {710,0,0b00001},   {711,0,0b00101},   {712,1,0b01011},   {713,0,0b00011},   {714,1,0b10111},   {715,0,0b00011},   {716,1,0b00101},   {717,0,0b01001},   {718,0,0b10101},   {719,1,0b11111},   {720,0,0b01011},   {721,1,0b10111},   {722,1,0b01111},   {723,0,0b01011},   {724,1,0b10101},   {725,0,0b01111},   {726,1,0b11011},   {727,0,0b00111},   {728,0,0b10011},   {729,1,0b10111},   {730,0,0b00111},   {731,0,0b10001},   {732,1,0b10011},   {733,1,0b00001},   {734,0,0b01111},   {735,0,0b01111},   {736,1,0b10001},   {737,1,0b01001},   {738,0,0b00001},   {739,1,0b00111},   {740,1,0b11011},   {741,0,0b10001},   {742,0,0b10001},   {743,0,0b10001},   {744,1,0b10111},   {745,1,0b10001},   {746,1,0b10001},   {747,0,0b01001},   {748,0,0b01101},   {749,0,0b11001},   {750,1,0b11011},   {751,1,0b10001},   {752,0,0b00001},   {753,0,0b00011},   {754,1,0b00101},   {755,1,0b00111},   {756,0,0b00011},   {757,1,0b01001},   {758,1,0b00111},   {759,0,0b00001},   {760,1,0b11101},   {761,1,0b01111},   {762,1,0b00111},   {763,0,0b01001},   {764,1,0b10001},   {765,1,0b00111},   {766,1,0b01011},   {767,1,0b10011},   {768,0,0b01101},   {769,1,0b10001},   {770,1,0b10001},   {771,0,0b00011},   {772,0,0b00101},   {773,1,0b11101},   {774,1,0b10111},   {775,1,0b10101},   {776,1,0b10001},   {777,1,0b11101},   {778,0,0b11001},   {779,1,0b11101},   {780,0,0b01011},   {781,1,0b11001},   {782,0,0b10001},   {783,1,0b10101},   {784,1,0b00001},   {785,0,0b10001},   {786,1,0b11101},   {787,1,0b11111},   {788,0,0b00011},   {789,1,0b10001},   {790,1,0b01011},   {791,1,0b10101},   {792,0,0b11001},   {793,1,0b11101},   {794,0,0b10001},   {795,1,0b10101},   {796,1,0b01001},   {797,1,0b11011},   {798,0,0b00111},   {799,0,0b01001},   {800,0,0b10111},   {801,1,0b11111},   {802,1,0b11101},   {803,1,0b10101},   {804,0,0b00011},   {805,1,0b10001},   {806,1,0b11111},   {807,1,0b10111},   {808,1,0b01111},   {809,0,0b01011},   {810,1,0b11011},   {811,1,0b10101},   {812,0,0b00011},   {813,1,0b01101},   {814,0,0b00101},   {815,0,0b01001},   {816,1,0b10001},   {817,0,0b01101},   {818,1,0b11111},   {819,1,0b01001},   {820,0,0b10101},   {821,0,0b10111},   {822,1,0b11111},   {823,0,0b00001},   {824,1,0b10011},   {825,1,0b00011},   {826,1,0b01101},   {827,1,0b11011},   {828,1,0b00001},   {829,1,0b11011},   {830,1,0b10011},   {831,0,0b01101},   {832,1,0b10001},   {833,0,0b00011},   {834,1,0b10011},   {835,0,0b00101},   {836,1,0b01001},   {837,0,0b01111},   {838,1,0b10011},   {839,0,0b10011},   {840,1,0b11111},   {841,1,0b01001},   {842,1,0b01101},   {843,0,0b01111},   {844,1,0b10101},   {845,0,0b00011},   {846,1,0b11111},   {847,1,0b00111},   {848,0,0b00001},   {849,0,0b00111},   {850,0,0b10101},   {851,0,0b10111},   {852,1,0b11101},   {853,0,0b01111},   {854,1,0b11001},   {855,1,0b10001},   {856,1,0b01111},   {857,0,0b10111},   {858,0,0b11001},   {859,1,0b11001},   {860,0,0b10101},   {861,1,0b11111},   {862,1,0b10011},   {863,0,0b01011},   {864,1,0b11011},   {865,1,0b11011},   {866,0,0b10011},   {867,1,0b10101},   {868,0,0b00101},   {869,1,0b00101},   {870,0,0b00011},   {871,0,0b10111},   {872,1,0b11011},   {873,0,0b01001},   {874,0,0b01001},   {875,1,0b11101},   {876,0,0b01001},   {877,0,0b10101},   {878,1,0b11101},   {879,0,0b11001},   {880,0,0b11111},   {881,1,0b11111},   {882,0,0b01011},   {883,1,0b11101},   {884,0,0b00111},   {885,1,0b10111},   {886,0,0b00101},   {887,1,0b01011},   {888,0,0b00001},   {889,1,0b00011},   {890,0,0b00111},   {891,0,0b01001},   {892,1,0b01101},   {893,0,0b00011},   {894,1,0b10011},   {895,1,0b01111},   {896,1,0b10111},   {897,0,0b01001},   {898,0,0b01111},   {899,0,0b10011},   {900,1,0b11111},   {901,1,0b11001},   {902,0,0b00011},   {903,1,0b10001},   {904,1,0b01011},   {905,0,0b00101},   {906,1,0b01001},   {907,0,0b10011},   {908,0,0b10111},   {909,0,0b11011},   {910,1,0b11111},   {911,1,0b11111},   {912,1,0b00111},   {913,1,0b01101},   {914,1,0b11101},   {915,0,0b10101},   {916,0,0b11011},   {917,1,0b11011},   {918,0,0b01111},   {919,0,0b10001},   {920,1,0b11101},   {921,0,0b01011},   {922,1,0b10111},   {923,0,0b00001},   {924,0,0b01011},   {925,1,0b10001},   {926,0,0b00011},   {927,1,0b01101},   {928,1,0b11001},   {929,0,0b00111},   {930,0,0b01101},   {931,0,0b11011},   {932,1,0b11111},   {933,1,0b11011},   {934,1,0b11011},   {935,0,0b10101},   {936,1,0b11001},   {937,1,0b00111},   {938,1,0b01011},   {939,0,0b00101},   {940,1,0b00111},   {941,1,0b01001},   {942,1,0b11111},   {943,0,0b01101},   {944,1,0b11101},   {945,0,0b00001},   {946,1,0b11001},   {947,0,0b01001},   {948,1,0b01111},   {949,1,0b00001},   {950,0,0b00101},   {951,0,0b01111},   {952,0,0b11001},   {953,1,0b11001},   {954,0,0b10001},   {955,1,0b11011},   {956,0,0b01101},   {957,1,0b01101},   {958,1,0b01101},   {959,0,0b00111},   {960,0,0b01011},   {961,1,0b10011},   {962,0,0b00111},   {963,0,0b10001},   {964,0,0b10101},   {965,1,0b11001},   {966,1,0b11011},   {967,1,0b11101},   {968,1,0b01001},   {969,0,0b00101},   {970,0,0b00111},   {971,1,0b10111},   {972,1,0b00001},   {973,0,0b01101},   {974,1,0b10101},   {975,1,0b11111},   {976,1,0b01111},   {977,0,0b00101},   {978,0,0b10001},   {979,1,0b11111},   {980,1,0b10111},   {981,0,0b01011},   {982,0,0b01101},   {983,1,0b10101},   {984,1,0b11101},   {985,1,0b10011},   {986,0,0b10101},   {987,1,0b11111},   {988,0,0b10011},   {989,1,0b11111},   {990,0,0b00111},   {991,1,0b10111},   {992,0,0b10101},   {993,0,0b10101},   {994,1,0b11011},   {995,0,0b01001},   {996,1,0b10101},   {997,1,0b01011},   {998,1,0b10101},   {999,1,0b11001},   {1000,1,0b01111},   {1001,1,0b00011},   {1002,0,0b00001},   {1003,0,0b00011},   {1004,0,0b00101},   {1005,1,0b01011},   {1006,1,0b00101},   {1007,1,0b00101},   {1008,0,0b00111},   {1009,1,0b01011},   {1010,0,0b11001},   {1011,1,0b11111},   {1012,0,0b10101},   {1013,0,0b11101},   {1014,1,0b11111},   {1015,1,0b10101},   {1016,0,0b01011},   {1017,0,0b10111},   {1018,1,0b11111},   {1019,1,0b11011},   {1020,1,0b10101},   {1021,0,0b01001},   {1022,0,0b10001},   {1023,1,0b11111},   {1024,1,0b11001},   {1025,0,0b00101},   {1026,0,0b10001},   {1027,1,0b11001},   {1028,0,0b10111},   {1029,1,0b10111},   {1030,0,0b11011},   {1031,1,0b11111},   {1032,1,0b11111},   {1033,0,0b01011},   {1034,0,0b01011},   {1035,1,0b10011},   {1036,0,0b01101},   {1037,1,0b10011},   {1038,0,0b00001},   {1039,1,0b01111},   {1040,1,0b00011},   {1041,0,0b10101},   {1042,1,0b11101},   {1043,0,0b11001},   {1044,1,0b11011},   {1045,1,0b01101},   {1046,0,0b00101},   {1047,0,0b01011},   {1048,0,0b10101},   {1049,0,0b11101},   {1050,1,0b11101},   {1051,0,0b00001},   {1052,0,0b01101},   {1053,1,0b10001},   {1054,0,0b00101},   {1055,0,0b00111},   {1056,1,0b01001},   {1057,0,0b11101},   {1058,1,0b11101},   {1059,1,0b10001},   {1060,1,0b10101},   {1061,0,0b00101},   {1062,1,0b10101},   {1063,0,0b00011},   {1064,0,0b00101},   {1065,1,0b10111},   {1066,0,0b01011},   {1067,1,0b01011},   {1068,0,0b00101},   {1069,1,0b01011},   {1070,1,0b01001},   {1071,0,0b00011},   {1072,1,0b00101},   {1073,0,0b10001},   {1074,1,0b11101},   {1075,1,0b01011},   {1076,1,0b11001}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1652,7 +1652,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11101},   {  1,1,0b11111},   {  2,0,0b10101},   {  3,1,0b11011},   {  5,0,0b01001},   {  6,0,0b01011},   {  7,1,0b10011},   {  8,0,0b00101},   {  9,1,0b10001},   { 10,0,0b01101},   { 11,1,0b11001},   { 12,0,0b00001},   { 13,1,0b11111},   { 14,1,0b10001},   { 15,1,0b00001},   { 16,0,0b01001},   { 17,1,0b11111},   { 18,0,0b01101},   { 19,1,0b01111},   { 20,0,0b01111},   { 21,0,0b10111},   { 22,1,0b11111},   { 23,1,0b01111},   { 24,0,0b00001},   { 25,0,0b01001},   { 26,1,0b11001},   { 27,1,0b10001},   { 28,1,0b10111},   { 29,1,0b01011},   { 30,0,0b00011},   { 31,1,0b11001},   { 34,0,0b01001},   { 35,0,0b01111},   { 36,0,0b10101},   { 37,1,0b11001},   { 38,0,0b00011},   { 39,0,0b00101},   { 40,0,0b01101},   { 41,0,0b10011},   { 42,1,0b11011},   { 43,1,0b11001},   { 44,1,0b00011},   { 45,1,0b01111},   { 46,1,0b11011},   { 47,1,0b11111},   { 48,1,0b10011},   { 49,1,0b11111},   { 50,1,0b00001},   { 51,1,0b10001},   { 52,0,0b01101},   { 53,0,0b01111},   { 54,1,0b10101},   { 55,1,0b10101},   { 56,0,0b10111},   { 57,1,0b11101},   { 58,1,0b10101},   { 59,0,0b00001},   { 60,1,0b10001},   { 61,1,0b01111},   { 62,0,0b01101},   { 63,0,0b10111},   { 64,1,0b11001},   { 65,0,0b01001},   { 66,0,0b01011},   { 67,1,0b01111},   { 68,1,0b00111},   { 69,1,0b00111},   { 70,0,0b00111},   { 71,1,0b01101},   { 72,1,0b11101},   { 73,1,0b10101},   { 74,0,0b10001},   { 75,1,0b11111},   { 76,1,0b11111},   { 77,0,0b01001},   { 78,0,0b10111},   { 79,1,0b11001},   { 80,0,0b00111},   { 81,1,0b11111},   { 83,0,0b01011},   { 84,1,0b10101},   { 85,0,0b00001},   { 86,0,0b01101},   { 87,0,0b10011},   { 88,1,0b10101},   { 89,1,0b01011},   { 90,0,0b01101},   { 91,1,0b01111},   { 92,1,0b00101},   { 93,1,0b11101},   { 94,0,0b00111},   { 95,1,0b01001},   { 96,0,0b00101},   { 97,1,0b10001},   { 98,0,0b10001},   { 99,0,0b10001},   {100,1,0b11001},   {101,1,0b01101},   {102,1,0b01001},   {103,0,0b00101},   {104,0,0b00111},   {105,0,0b00111},   {106,1,0b10011},   {107,1,0b00001},   {108,0,0b01101},   {109,1,0b10101},   {110,0,0b10101},   {111,1,0b11001},   {112,0,0b01111},   {113,1,0b01111},   {114,1,0b00101},   {115,0,0b10001},   {116,0,0b10101},   {117,0,0b10111},   {118,1,0b11011},   {119,1,0b10111},   {120,1,0b10101},   {121,0,0b01111},   {122,0,0b01111},   {123,0,0b10101},   {124,1,0b10101},   {125,0,0b00111},   {126,0,0b01011},   {127,1,0b10001},   {128,0,0b01011},   {129,1,0b11101},   {130,0,0b01001},   {131,1,0b10111},   {132,0,0b10111},   {133,1,0b11001},   {134,0,0b01111},   {135,1,0b11001},   {136,0,0b00101},   {137,1,0b11101},   {138,1,0b00011},   {139,1,0b11011},   {140,1,0b00011},   {141,0,0b10001},   {142,1,0b10111},   {143,0,0b00001},   {144,0,0b01101},   {145,0,0b10001},   {146,1,0b11011},   {147,0,0b00101},   {148,0,0b10111},   {149,1,0b11011},   {150,0,0b01111},   {151,1,0b11001},   {152,0,0b10011},   {153,1,0b10101},   {154,1,0b10111},   {155,0,0b01011},   {156,1,0b01111},   {157,0,0b00111},   {158,0,0b10001},   {159,1,0b11011},   {160,1,0b00001},   {161,0,0b11111},   {162,1,0b11111},   {163,0,0b01001},   {164,0,0b10001},   {165,1,0b10011},   {166,1,0b01111},   {167,0,0b00111},   {168,0,0b01111},   {169,1,0b10101},   {170,0,0b01101},   {171,1,0b11001},   {172,1,0b11011},   {173,1,0b01011},   {174,1,0b10101},   {175,1,0b01101},   {176,1,0b01101},   {177,0,0b00111},   {178,1,0b11001},   {179,0,0b01011},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b01001},   {183,0,0b01101},   {184,0,0b11001},   {185,1,0b11101},   {186,1,0b10011},   {187,0,0b00011},   {188,1,0b00011},   {189,0,0b00011},   {190,0,0b00101},   {191,1,0b10101},   {192,1,0b00001},   {193,1,0b10001},   {194,1,0b11011},   {195,0,0b10001},   {196,0,0b10111},   {197,0,0b11101},   {198,1,0b11101},   {199,1,0b00101},   {200,0,0b01101},   {201,1,0b11111},   {202,1,0b01101},   {203,1,0b00101},   {204,1,0b01001},   {205,1,0b10001},   {206,0,0b01001},   {207,1,0b01011},   {208,0,0b10111},   {209,1,0b10111},   {210,1,0b01101},   {211,0,0b01011},   {212,1,0b10101},   {213,0,0b01011},   {214,1,0b10001},   {215,0,0b00001},   {216,0,0b11011},   {217,0,0b11011},   {218,1,0b11011},   {219,1,0b11101},   {220,0,0b00001},   {221,1,0b00101},   {222,0,0b00011},   {223,1,0b01001},   {224,1,0b10101},   {225,1,0b11001},   {226,1,0b11101},   {227,1,0b00001},   {228,1,0b01001},   {229,0,0b00111},   {230,0,0b01001},   {231,1,0b11011},   {232,1,0b01111},   {233,0,0b01001},   {234,0,0b01011},   {235,1,0b01111},   {236,0,0b00111},   {237,0,0b00111},   {238,1,0b11011},   {239,1,0b10101},   {240,0,0b00001},   {241,0,0b10001},   {242,1,0b11011},   {243,0,0b00101},   {244,1,0b10011},   {245,0,0b00111},   {246,1,0b10001},   {247,1,0b11001},   {248,1,0b11001},   {249,1,0b00111},   {250,1,0b10111},   {251,0,0b00001},   {252,1,0b10101},   {253,1,0b10011},   {254,1,0b00101},   {255,1,0b10101},   {256,1,0b01111},   {257,0,0b01001},   {258,1,0b10001},   {259,0,0b00011},   {260,0,0b10001},   {261,1,0b11111},   {262,0,0b00011},   {263,0,0b01011},   {264,1,0b10011},   {265,1,0b00011},   {266,0,0b01101},   {267,1,0b11001},   {268,0,0b00101},   {269,0,0b10111},   {270,1,0b11011},   {271,1,0b11101},   {272,1,0b10001},   {273,0,0b00001},   {274,1,0b11101},   {275,0,0b10111},   {276,1,0b11111},   {277,0,0b01101},   {278,0,0b10111},   {279,1,0b11111},   {280,0,0b00111},   {281,1,0b11101},   {282,0,0b01011},   {283,1,0b10101},   {284,0,0b01101},   {285,1,0b10001},   {286,0,0b00101},   {287,0,0b10001},   {288,0,0b11001},   {289,1,0b11101},   {290,1,0b00111},   {291,0,0b01011},   {292,1,0b11001},   {293,0,0b01011},   {294,1,0b11001},   {295,0,0b00001},   {296,0,0b00011},   {297,0,0b00101},   {298,1,0b11011},   {299,0,0b00011},   {300,0,0b00111},   {301,1,0b10001},   {302,1,0b11011},   {303,0,0b11001},   {304,1,0b11111},   {305,1,0b11101},   {306,0,0b11001},   {307,1,0b11111},   {308,0,0b01001},   {309,1,0b01101},   {310,1,0b11011},   {311,1,0b10101},   {312,0,0b00101},   {313,0,0b01101},   {314,1,0b10111},   {315,0,0b00111},   {316,0,0b11011},   {317,1,0b11011},   {318,1,0b00011},   {319,0,0b01111},   {320,0,0b11001},   {321,1,0b11111},   {322,1,0b10011},   {323,1,0b01101},   {324,1,0b11101},   {325,1,0b00001},   {326,1,0b01101},   {327,0,0b01001},   {328,1,0b11011},   {329,0,0b00111},   {330,1,0b10001},   {331,1,0b10011},   {332,0,0b01111},   {333,0,0b10101},   {334,1,0b11101},   {335,1,0b11001},   {336,0,0b01101},   {337,1,0b10111},   {338,1,0b00001},   {339,1,0b00011},   {340,1,0b01111},   {341,1,0b11011},   {342,0,0b10101},   {343,1,0b10111},   {344,1,0b10101},   {345,1,0b11011},   {346,0,0b01011},   {347,1,0b11001},   {348,1,0b01001},   {349,1,0b01101},   {350,0,0b11001},   {351,1,0b11111},   {352,1,0b01001},   {353,1,0b11011},   {354,1,0b00101},   {355,1,0b00111},   {356,0,0b01111},   {357,1,0b11001},   {358,0,0b10011},   {359,1,0b11011},   {360,0,0b01001},   {361,1,0b10001},   {362,1,0b10101},   {363,0,0b01101},   {364,1,0b11101},   {365,1,0b01111},   {366,1,0b01101},   {367,0,0b00111},   {368,0,0b01101},   {369,1,0b11001},   {370,0,0b10011},   {371,1,0b11101},   {372,0,0b01001},   {373,0,0b01011},   {374,1,0b01111},   {375,0,0b10101},   {376,1,0b11101},   {377,0,0b00101},   {378,0,0b01011},   {379,1,0b11001},   {380,1,0b10001},   {381,0,0b00101},   {382,1,0b11101},   {383,0,0b01111},   {384,1,0b11111},   {385,0,0b10111},   {386,1,0b11111},   {387,1,0b01101},   {388,0,0b10011},   {389,1,0b10101},   {390,0,0b00001},   {391,0,0b00011},   {392,1,0b10011},   {393,0,0b01001},   {394,0,0b10011},   {395,1,0b11001},   {396,0,0b01011},   {397,1,0b01111},   {398,0,0b00111},   {399,1,0b11011},   {400,1,0b10111},   {401,0,0b01111},   {402,1,0b01111},   {403,1,0b00101},   {404,1,0b11111},   {405,1,0b11101},   {406,1,0b10101},   {407,1,0b01101},   {408,0,0b01111},   {409,0,0b10001},   {410,1,0b10001},   {411,0,0b10101},   {412,1,0b11111},   {413,0,0b01111},   {414,1,0b11101},   {415,0,0b00111},   {416,0,0b01001},   {417,1,0b10001},   {418,0,0b10011},   {419,1,0b11101},   {420,0,0b00001},   {421,1,0b01111},   {422,0,0b11001},   {423,1,0b11101},   {424,1,0b01101},   {425,1,0b11111},   {426,1,0b01101},   {427,0,0b00011},   {428,0,0b00101},   {429,0,0b11101},   {430,1,0b11111},   {431,0,0b00011},   {432,0,0b01001},   {433,1,0b11011},   {434,0,0b01101},   {435,1,0b11111},   {436,1,0b11001},   {437,0,0b01111},   {438,1,0b11101},   {439,1,0b11101},   {440,1,0b00101},   {441,0,0b01011},   {442,1,0b11011},   {443,0,0b00011},   {444,1,0b00101},   {445,1,0b11011},   {446,0,0b11111},   {447,1,0b11111},   {448,1,0b10101},   {449,0,0b00011},   {450,0,0b01111},   {451,0,0b10001},   {452,1,0b11011},   {453,0,0b01101},   {454,0,0b10101},   {455,1,0b11111},   {456,1,0b10111},   {457,1,0b01111},   {458,0,0b01101},   {459,1,0b10101},   {460,0,0b10101},   {461,1,0b11101},   {462,1,0b00111},   {463,1,0b11101},   {464,1,0b01101},   {465,0,0b00001},   {466,0,0b10001},   {467,1,0b10101},   {468,1,0b10001},   {469,0,0b00011},   {470,1,0b01101},   {471,1,0b00001},   {472,0,0b00001},   {473,1,0b01101},   {474,1,0b10011},   {475,1,0b11101},   {476,0,0b00001},   {477,1,0b11011},   {478,1,0b00001},   {479,1,0b01101},   {480,1,0b10011},   {481,1,0b00111},   {482,1,0b01111},   {483,1,0b01001},   {484,0,0b00111},   {485,1,0b11101},   {486,0,0b01011},   {487,1,0b10101},   {488,1,0b00111},   {489,0,0b00111},   {490,1,0b01001},   {491,1,0b11101},   {492,0,0b10001},   {493,1,0b11101},   {494,1,0b01001},   {495,1,0b10001},   {496,1,0b10101},   {497,0,0b00011},   {498,1,0b00111},   {500,0,0b00011},   {501,1,0b01101},   {502,1,0b10001},   {504,0,0b01111},   {505,1,0b10111},   {507,1,0b00011},   {508,1,0b10001},   {509,1,0b10101},   {513,0,0b01101},   {514,1,0b10001},   {515,0,0b00101},   {516,0,0b00111},   {517,1,0b11101},   {518,1,0b11111},   {519,0,0b00011},   {520,1,0b00011},   {521,0,0b00101},   {522,1,0b01111},   {523,0,0b00001},   {524,1,0b10111},   {525,0,0b00001},   {526,1,0b00101},   {527,1,0b01001},   {528,0,0b00101},   {529,1,0b01111},   {530,1,0b10111},   {531,1,0b00011},   {532,0,0b10001},   {533,1,0b11101},   {534,1,0b01001},   {535,0,0b00111},   {536,0,0b10111},   {537,1,0b11111},   {538,1,0b11001},   {539,0,0b00001},   {540,1,0b01101},   {542,1,0b11001},   {544,1,0b00011},   {545,0,0b00111},   {546,1,0b10111},   {548,0,0b00101},   {549,0,0b10101},   {550,1,0b11011},   {551,1,0b01101},   {553,0,0b01011},   {554,0,0b10001},   {555,1,0b11011},   {556,0,0b01111},   {557,1,0b11111},   {558,0,0b00011},   {559,0,0b01101},   {560,0,0b10011},   {561,1,0b10011},   {562,0,0b00001},   {563,1,0b11111},   {564,1,0b11001},   {565,1,0b01001},   {569,1,0b10101},   {570,0,0b10011},   {571,1,0b11001},   {572,1,0b10011},   {573,1,0b01011},   {574,1,0b01111},   {576,0,0b00011},   {577,0,0b01101},   {578,1,0b11111},   {579,0,0b00111},   {580,1,0b01001},   {581,1,0b01001},   {582,1,0b11001},   {583,1,0b10001},   {584,1,0b10011},   {586,0,0b01001},   {587,1,0b10101},   {588,0,0b10111},   {589,1,0b11111},   {590,1,0b10111},   {591,0,0b00001},   {592,0,0b00001},   {593,1,0b01011},   {594,1,0b01001},   {595,0,0b00011},   {596,1,0b10001},   {597,0,0b11101},   {598,1,0b11111},   {599,1,0b11111},   {600,1,0b11101},   {601,1,0b10111},   {602,1,0b01011},   {603,0,0b11101},   {604,1,0b11111},   {605,1,0b01011},   {606,1,0b11011},   {607,1,0b01011},   {608,0,0b10111},   {609,1,0b11011},   {610,0,0b01101},   {611,1,0b01111},   {612,1,0b01001},   {613,0,0b01111},   {614,1,0b10111},   {615,0,0b10011},   {616,0,0b10111},   {617,1,0b11001},   {618,1,0b01111},   {619,0,0b10011},   {620,1,0b10011},   {621,0,0b00101},   {622,1,0b01111},   {625,1,0b00011},   {626,0,0b00001},   {627,1,0b11011},   {629,1,0b11111},   {630,1,0b00101},   {633,0,0b01011},   {634,1,0b01101},   {635,0,0b01111},   {636,1,0b10101},   {637,1,0b10111},   {638,0,0b10101},   {639,0,0b11011},   {640,1,0b11011},   {641,1,0b00111},   {642,0,0b01111},   {643,1,0b01111},   {644,0,0b00011},   {645,0,0b00011},   {646,0,0b01111},   {647,0,0b10011},   {648,1,0b11011},   {649,1,0b01111},   {650,1,0b01111},   {651,1,0b00111},   {652,0,0b00001},   {653,1,0b00011},   {654,1,0b10011},   {655,0,0b11011},   {656,1,0b11101},   {657,0,0b00001},   {658,1,0b00011},   {659,1,0b00101},   {660,1,0b01011},   {661,1,0b00101},   {662,0,0b00011},   {663,1,0b01001},   {664,0,0b01101},   {665,1,0b11011},   {666,0,0b10001},   {667,1,0b10011},   {668,1,0b11101},   {670,1,0b11111},   {671,1,0b11001},   {673,0,0b10001},   {674,1,0b11011},   {675,0,0b00111},   {676,1,0b11001},   {677,0,0b00101},   {678,0,0b00101},   {679,1,0b01101},   {680,1,0b00011},   {681,1,0b10001},   {682,0,0b01111},   {683,1,0b01111},   {684,1,0b00001},   {686,1,0b10001},   {691,0,0b10001},   {692,1,0b11001},   {694,1,0b11001},   {696,0,0b10001},   {697,0,0b10001},   {698,1,0b10111},   {699,1,0b11011},   {700,1,0b11111},   {701,1,0b11111},   {703,1,0b00001},   {706,0,0b00111},   {707,0,0b01111},   {708,1,0b10111},   {712,0,0b00101},   {713,1,0b01101},   {714,1,0b01101},   {715,1,0b00011},   {718,0,0b10011},   {719,0,0b11011},   {720,1,0b11111},   {721,1,0b00001},   {722,0,0b00001},   {723,0,0b10011},   {724,1,0b11011},   {725,1,0b01001},   {726,0,0b00001},   {727,1,0b00011},   {728,1,0b10111},   {731,1,0b00101},   {732,1,0b11101},   {734,1,0b01111},   {735,0,0b10011},   {736,1,0b10111},   {738,0,0b00101},   {739,0,0b01101},   {740,1,0b10011},   {741,0,0b01101},   {742,1,0b01111},   {743,0,0b00101},   {744,1,0b01111},   {745,0,0b10101},   {746,1,0b10111},   {747,0,0b00111},   {748,1,0b10011},   {749,0,0b00011},   {750,1,0b10001},   {751,0,0b00011},   {752,1,0b10001},   {753,1,0b01111},   {754,1,0b11001},   {756,1,0b01101},   {760,0,0b00001},   {761,0,0b01001},   {762,0,0b11111},   {763,1,0b11111},   {764,0,0b01101},   {765,1,0b10101},   {766,1,0b01011},   {767,0,0b00111},   {768,0,0b01101},   {769,1,0b11011},   {770,1,0b00001},   {771,0,0b01011},   {772,0,0b01111},   {773,1,0b11001},   {774,0,0b00111},   {775,0,0b01011},   {776,0,0b11011},   {777,1,0b11011},   {778,0,0b01011},   {779,1,0b01011},   {780,0,0b01101},   {781,0,0b10001},   {782,1,0b11001},   {783,1,0b00101},   {784,1,0b10011},   {785,0,0b01101},   {786,1,0b11111},   {787,0,0b00111},   {788,0,0b01011},   {789,1,0b11001},   {790,1,0b11111},   {791,1,0b10111},   {792,0,0b00011},   {793,1,0b11011},   {794,0,0b11001},   {795,1,0b11011},   {796,0,0b00101},   {797,0,0b00101},   {798,1,0b11111},   {799,0,0b01011},   {800,1,0b10111},   {801,1,0b01101},   {802,1,0b01001},   {803,0,0b01001},   {804,1,0b10011},   {805,1,0b11001},   {806,0,0b10111},   {807,1,0b11011},   {808,0,0b10101},   {809,1,0b11101},   {810,1,0b11101},   {811,0,0b00111},   {812,0,0b01011},   {813,1,0b10001},   {814,0,0b00001},   {815,0,0b00011},   {816,1,0b00011},   {817,1,0b10111},   {818,1,0b00111},   {819,0,0b01001},   {820,1,0b01011},   {821,0,0b00011},   {822,1,0b10011},   {823,0,0b01001},   {824,0,0b11001},   {825,1,0b11001},   {826,1,0b10111},   {827,1,0b01011},   {828,0,0b00011},   {829,1,0b10001},   {830,0,0b00101},   {831,1,0b11001},   {832,1,0b10011},   {833,1,0b10111},   {834,0,0b00001},   {835,0,0b01001},   {836,1,0b11011},   {837,0,0b00101},   {838,0,0b01011},   {839,1,0b10001},   {840,0,0b01111},   {841,1,0b11001},   {842,1,0b00101},   {843,1,0b10011},   {844,1,0b11001},   {845,1,0b10011},   {846,1,0b10011},   {847,1,0b01111},   {848,1,0b01101},   {849,1,0b10101},   {850,0,0b00011},   {851,0,0b00111},   {852,1,0b10001},   {853,1,0b00101},   {854,0,0b00001},   {855,0,0b01101},   {856,1,0b10111},   {857,1,0b11001},   {858,0,0b11001},   {859,1,0b11011},   {860,1,0b10111},   {861,1,0b10011},   {862,1,0b00001},   {863,0,0b00111},   {864,1,0b11001},   {865,0,0b00011},   {866,1,0b10111},   {867,0,0b01101},   {868,1,0b10001},   {869,1,0b01001},   {870,0,0b10111},   {871,1,0b10111},   {872,1,0b10001},   {873,1,0b00011},   {874,1,0b01011},   {875,1,0b01101},   {876,0,0b00011},   {877,1,0b11111},   {878,1,0b11101},   {879,1,0b10111},   {880,1,0b00101},   {881,0,0b01001},   {882,1,0b11101},   {883,1,0b00111},   {884,0,0b10011},   {885,1,0b11101},   {886,0,0b00111},   {887,1,0b10101},   {888,0,0b00011},   {889,1,0b01111},   {890,0,0b01001},   {891,1,0b01111},   {892,0,0b00011},   {893,1,0b10011},   {894,0,0b01011},   {895,1,0b11001},   {896,0,0b00001},   {897,1,0b00101},   {898,1,0b01011},   {899,0,0b00011},   {900,0,0b00011},   {901,1,0b01111},   {902,0,0b01011},   {903,1,0b01101},   {904,0,0b00001},   {905,1,0b10011},   {906,0,0b00001},   {907,0,0b00001},   {908,0,0b00111},   {909,0,0b10011},   {910,0,0b11001},   {911,1,0b11001},   {912,1,0b10001},   {913,1,0b10111},   {914,0,0b00001},   {915,0,0b00011},   {916,1,0b11011},   {917,1,0b11101},   {918,0,0b00011},   {919,0,0b10001},   {920,1,0b10111},   {921,0,0b01001},   {922,0,0b10011},   {923,1,0b10111},   {924,0,0b00111},   {925,1,0b11101},   {926,1,0b00111},   {927,0,0b00001},   {928,1,0b00011},   {929,0,0b00011},   {930,1,0b11011},   {931,0,0b00001},   {932,0,0b01011},   {933,1,0b01011},   {934,0,0b00001},   {935,0,0b00111},   {936,0,0b01011},   {937,0,0b11101},   {938,1,0b11111},   {939,1,0b11101},   {940,0,0b00101},   {941,1,0b00111},   {942,1,0b00111},   {943,0,0b11001},   {944,1,0b11111},   {945,0,0b00111},   {946,1,0b11101},   {947,1,0b10101},   {948,1,0b11011},   {949,0,0b00101},   {950,1,0b11011},   {951,1,0b01001},   {952,1,0b00001},   {953,1,0b11011},   {954,1,0b11101},   {955,0,0b00001},   {956,1,0b00001},   {957,0,0b00101},   {958,0,0b00101},   {959,1,0b01111},   {960,1,0b00111},   {961,1,0b11101},   {962,0,0b11011},   {963,1,0b11111},   {964,0,0b00001},   {965,1,0b01101},   {966,0,0b00101},   {967,0,0b00111},   {968,1,0b10101},   {969,1,0b11001},   {970,0,0b00001},   {971,1,0b01011},   {972,0,0b00011},   {973,0,0b01011},   {974,1,0b10001},   {975,0,0b01111},   {976,0,0b10011},   {977,1,0b11011},   {978,0,0b01101},   {979,1,0b11101},   {980,0,0b10001},   {981,1,0b11101},   {982,0,0b01111},   {983,1,0b01111},   {984,0,0b01001},   {985,0,0b01001},   {986,0,0b01101},   {987,1,0b11111},   {988,1,0b10111},   {989,1,0b00111},   {990,0,0b00101},   {991,1,0b01101},   {992,0,0b01001},   {993,0,0b10101},   {994,1,0b11001},   {995,1,0b00101},   {996,1,0b00101},   {997,0,0b01011},   {998,0,0b01011},   {999,1,0b01011},   {1000,1,0b10111},   {1001,0,0b01001},   {1002,1,0b01111},   {1003,0,0b00001},   {1004,0,0b01001},   {1005,0,0b01001},   {1006,0,0b01011},   {1007,1,0b11011},   {1008,1,0b10101},   {1009,1,0b11111},   {1010,0,0b01001},   {1011,1,0b01101},   {1012,0,0b00001},   {1013,1,0b11101},   {1014,1,0b00001},   {1015,1,0b10111},   {1016,1,0b00001},   {1017,1,0b11011},   {1018,1,0b10011},   {1019,0,0b00001},   {1020,1,0b11101},   {1021,0,0b01001},   {1022,1,0b10101},   {1023,0,0b11001},   {1024,1,0b11101},   {1025,0,0b00001},   {1026,1,0b01011},   {1027,0,0b01111},   {1028,1,0b10101},   {1029,1,0b01001},   {1030,1,0b01101},   {1031,0,0b01111},   {1032,0,0b11011},   {1033,0,0b11101},   {1034,1,0b11111},   {1035,0,0b00001},   {1036,0,0b00011},   {1037,1,0b01111},   {1038,0,0b11001},   {1039,1,0b11111},   {1040,1,0b00111},   {1041,0,0b00001},   {1042,1,0b00011},   {1043,0,0b01011},   {1044,0,0b10011},   {1045,1,0b11101},   {1046,1,0b11011},   {1047,1,0b01001},   {1048,1,0b00101},   {1049,1,0b11001},   {1050,1,0b01011},   {1051,1,0b01111},   {1052,1,0b10101},   {1056,1,0b11011},   {1057,0,0b01011},   {1058,0,0b01101},   {1059,1,0b11011},   {1061,0,0b00111},   {1062,0,0b11011},   {1063,1,0b11101},   {1064,0,0b00101},   {1065,1,0b00101},   {1066,0,0b00101},   {1067,1,0b11001},   {1068,0,0b00011},   {1069,1,0b01101},   {1070,0,0b01101},   {1071,1,0b11011},   {1073,0,0b00101},   {1074,0,0b10001},   {1075,1,0b11001},   {1076,1,0b00011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1669,7 +1669,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b00101},   {  1,0,0b01111},   {  2,0,0b10101},   {  3,1,0b11011},   {  4,1,0b00101},   {  5,1,0b01001},   {  6,1,0b10111},   {  7,1,0b00101},   {  8,1,0b10111},   {  9,1,0b10001},   { 10,1,0b10001},   { 12,0,0b00011},   { 13,0,0b00101},   { 14,0,0b11011},   { 15,1,0b11101},   { 16,0,0b00011},   { 17,1,0b11001},   { 18,0,0b10101},   { 19,1,0b11101},   { 20,1,0b11111},   { 21,1,0b11011},   { 22,1,0b11011},   { 23,0,0b00001},   { 24,1,0b10011},   { 25,1,0b01111},   { 26,1,0b11101},   { 27,1,0b00101},   { 28,1,0b10101},   { 29,0,0b11001},   { 30,1,0b11011},   { 31,1,0b11111},   { 32,0,0b01011},   { 33,1,0b01111},   { 34,0,0b00001},   { 35,1,0b01001},   { 36,1,0b00111},   { 37,0,0b10001},   { 38,1,0b10001},   { 39,1,0b11001},   { 40,0,0b10011},   { 41,1,0b11001},   { 42,0,0b00101},   { 43,1,0b11011},   { 44,1,0b01101},   { 46,1,0b11001},   { 47,1,0b10111},   { 48,1,0b10011},   { 50,1,0b10111},   { 51,1,0b00111},   { 52,1,0b01111},   { 53,1,0b01011},   { 54,1,0b10001},   { 55,1,0b01111},   { 56,1,0b11111},   { 57,1,0b10011},   { 58,1,0b01101},   { 59,1,0b11101},   { 60,1,0b00011},   { 61,1,0b11011},   { 62,1,0b11011},   { 63,1,0b00001},   { 64,1,0b11011},   { 65,1,0b11011},   { 66,1,0b01101},   { 67,1,0b00001},   { 68,1,0b10001},   { 69,1,0b00001},   { 70,1,0b01001},   { 71,1,0b00111},   { 72,1,0b11111},   { 73,1,0b00011},   { 74,0,0b01011},   { 75,1,0b10011},   { 76,1,0b10111},   { 77,1,0b10011},   { 78,1,0b01111},   { 79,1,0b00001},   { 80,1,0b01111},   { 81,1,0b00101},   { 82,1,0b10111},   { 83,1,0b10011},   { 84,0,0b10001},   { 85,1,0b10111},   { 86,0,0b10111},   { 87,1,0b11001},   { 88,1,0b10001},   { 89,0,0b11011},   { 90,1,0b11111},   { 91,0,0b00011},   { 92,1,0b10111},   { 93,1,0b10101},   { 94,1,0b10001},   { 95,1,0b10011},   { 96,1,0b01001},   { 97,1,0b10001},   { 98,1,0b11101},   { 99,1,0b10011},   {100,0,0b01011},   {101,1,0b10111},   {102,1,0b00001},   {103,1,0b01101},   {104,1,0b10101},   {105,1,0b11001},   {106,1,0b00111},   {107,1,0b11001},   {108,1,0b10111},   {109,1,0b00011},   {110,1,0b01011},   {111,1,0b10001},   {112,0,0b01101},   {113,0,0b10001},   {114,1,0b11101},   {115,1,0b01011},   {116,1,0b11101},   {117,0,0b01111},   {118,1,0b10001},   {119,0,0b00001},   {120,1,0b00011},   {121,1,0b10011},   {122,1,0b01001},   {123,1,0b10111},   {124,1,0b00101},   {125,1,0b00001},   {126,0,0b01011},   {127,1,0b10111},   {128,1,0b10111},   {129,1,0b00111},   {130,1,0b11111},   {131,1,0b11111},   {132,0,0b01001},   {133,1,0b11011},   {134,1,0b01101},   {135,1,0b00101},   {136,1,0b10111},   {137,1,0b00101},   {138,1,0b01101},   {139,1,0b10101},   {140,1,0b11011},   {141,0,0b01011},   {142,0,0b01101},   {143,1,0b01101},   {144,0,0b01011},   {145,1,0b11011},   {146,0,0b00011},   {147,1,0b10101},   {148,1,0b11101},   {149,0,0b01001},   {150,1,0b01101},   {151,0,0b01111},   {152,1,0b10111},   {153,0,0b10101},   {154,0,0b11011},   {155,1,0b11101},   {156,1,0b00111},   {157,0,0b00101},   {158,1,0b11111},   {159,1,0b10111},   {160,1,0b10111},   {161,1,0b10111},   {162,1,0b11111},   {163,0,0b00011},   {164,1,0b11101},   {165,0,0b10001},   {166,0,0b10111},   {167,1,0b11001},   {168,0,0b10111},   {169,1,0b11111},   {170,1,0b11011},   {171,1,0b00011},   {172,0,0b00011},   {173,0,0b00111},   {174,1,0b10101},   {175,0,0b10011},   {176,1,0b10101},   {177,1,0b01001},   {178,1,0b10011},   {179,0,0b01001},   {180,1,0b11111},   {181,1,0b11011},   {182,1,0b00111},   {183,1,0b10001},   {184,1,0b11111},   {185,1,0b10101},   {186,1,0b00001},   {187,1,0b01011},   {188,0,0b00001},   {189,1,0b01001},   {190,1,0b11001},   {191,0,0b01001},   {192,1,0b01011},   {193,1,0b00111},   {194,0,0b00101},   {195,1,0b01101},   {196,0,0b00001},   {197,1,0b11001},   {198,1,0b10101},   {199,1,0b11101},   {200,1,0b01101},   {201,1,0b01101},   {202,1,0b00001},   {203,1,0b01001},   {204,1,0b11101},   {205,1,0b01011},   {206,1,0b11101},   {207,1,0b11111},   {208,1,0b00111},   {209,1,0b00111},   {210,1,0b11011},   {211,1,0b11111},   {212,0,0b01001},   {213,1,0b10101},   {214,1,0b10111},   {215,1,0b11011},   {216,0,0b00101},   {217,1,0b01101},   {218,0,0b10001},   {219,1,0b10111},   {220,1,0b11101},   {221,1,0b11111},   {222,1,0b01011},   {223,0,0b01001},   {224,0,0b10101},   {225,1,0b10111},   {226,1,0b01111},   {227,0,0b00101},   {228,0,0b01001},   {229,0,0b11011},   {230,1,0b11101},   {231,1,0b10011},   {232,1,0b00101},   {233,1,0b10111},   {234,1,0b11011},   {235,0,0b01111},   {236,1,0b01111},   {237,0,0b00101},   {238,0,0b11001},   {239,1,0b11111},   {240,1,0b10001},   {241,1,0b10001},   {242,1,0b01101},   {243,1,0b01111},   {244,0,0b00011},   {245,1,0b01001},   {246,1,0b01111},   {247,1,0b01101},   {248,1,0b01101},   {249,1,0b10101},   {250,1,0b00011},   {251,0,0b10111},   {252,1,0b11111},   {253,1,0b10101},   {254,1,0b10001},   {255,0,0b10101},   {256,1,0b11001},   {257,1,0b01111},   {258,1,0b10111},   {259,0,0b00001},   {260,1,0b11001},   {261,0,0b00001},   {262,0,0b10101},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b11111},   {266,1,0b10001},   {267,1,0b11001},   {268,1,0b10111},   {269,0,0b01101},   {270,1,0b10101},   {271,0,0b10101},   {272,1,0b11101},   {273,1,0b00001},   {274,1,0b01001},   {275,1,0b11111},   {276,1,0b11101},   {277,0,0b01111},   {278,0,0b10111},   {279,1,0b11111},   {280,1,0b00011},   {281,0,0b01011},   {282,0,0b10001},   {283,1,0b11101},   {284,1,0b00111},   {285,1,0b10001},   {286,1,0b10011},   {287,1,0b00011},   {288,0,0b00101},   {289,1,0b01011},   {290,1,0b10111},   {291,1,0b01001},   {292,1,0b11111},   {293,1,0b10001},   {294,1,0b00101},   {295,0,0b00101},   {296,0,0b11111},   {297,1,0b11111},   {298,1,0b11101},   {299,1,0b11011},   {300,1,0b01101},   {301,1,0b00111},   {302,1,0b01001},   {303,1,0b11001},   {304,1,0b01101},   {305,1,0b11111},   {306,0,0b01101},   {307,1,0b01111},   {308,1,0b01001},   {309,1,0b11001},   {310,1,0b00001},   {311,1,0b01011},   {312,1,0b00101},   {313,0,0b00011},   {314,1,0b11111},   {315,0,0b00101},   {316,1,0b10101},   {317,1,0b01001},   {318,1,0b10011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11111},   {322,1,0b00101},   {323,1,0b00101},   {324,1,0b11111},   {325,1,0b11111},   {326,1,0b10011},   {327,1,0b11001},   {328,0,0b10011},   {329,1,0b11011},   {330,1,0b10001},   {331,0,0b00001},   {332,1,0b01011},   {333,1,0b11101},   {334,1,0b10011},   {335,1,0b11111},   {336,1,0b11011},   {337,1,0b11001},   {338,0,0b10101},   {339,1,0b11111},   {340,1,0b01111},   {341,1,0b10011},   {342,1,0b10001},   {343,0,0b00111},   {344,1,0b10001},   {345,1,0b10101},   {346,1,0b01011},   {347,1,0b11111},   {348,0,0b11001},   {349,1,0b11011},   {350,1,0b10001},   {351,0,0b10101},   {352,1,0b11111},   {353,1,0b01111},   {354,1,0b11101},   {355,0,0b00101},   {356,1,0b00111},   {357,1,0b00101},   {358,0,0b00011},   {359,1,0b01111},   {360,1,0b01011},   {361,0,0b00001},   {362,1,0b01101},   {363,1,0b10101},   {364,1,0b11111},   {365,1,0b00001},   {366,0,0b10001},   {367,1,0b10101},   {368,1,0b10001},   {369,1,0b10001},   {370,1,0b11101},   {371,1,0b11011},   {372,1,0b10011},   {373,0,0b00111},   {374,1,0b01101},   {375,0,0b00001},   {376,1,0b00111},   {377,1,0b01011},   {378,1,0b00001},   {379,1,0b11001},   {380,0,0b10101},   {381,1,0b10101},   {382,1,0b00111},   {383,1,0b01111},   {384,1,0b10001},   {385,0,0b00001},   {386,1,0b00101},   {387,0,0b10111},   {388,1,0b10111},   {389,0,0b00101},   {390,0,0b01001},   {391,1,0b11111},   {392,1,0b01011},   {393,0,0b10011},   {394,0,0b10011},   {395,1,0b11111},   {396,1,0b11101},   {397,0,0b00001},   {398,1,0b11111},   {399,1,0b01101},   {400,1,0b01001},   {401,1,0b01011},   {402,0,0b01001},   {403,0,0b01011},   {404,1,0b11101},   {405,0,0b01001},   {406,1,0b10001},   {407,1,0b10011},   {408,1,0b10111},   {409,0,0b01101},   {410,1,0b11111},   {411,1,0b01001},   {412,1,0b10111},   {413,0,0b00111},   {414,1,0b10001},   {415,0,0b01001},   {416,0,0b01011},   {417,1,0b10111},   {418,1,0b10001},   {419,0,0b01001},   {420,1,0b10101},   {421,1,0b00011},   {422,1,0b11011},   {423,1,0b11101},   {424,1,0b00001},   {425,0,0b11011},   {426,1,0b11111},   {427,1,0b01101},   {428,1,0b00101},   {429,1,0b01101},   {430,1,0b10011},   {431,1,0b00011},   {432,1,0b10101},   {433,1,0b01011},   {434,1,0b00001},   {435,1,0b10001},   {436,1,0b10001},   {437,1,0b01101},   {438,1,0b00111},   {439,1,0b10111},   {440,1,0b00011},   {441,0,0b00101},   {442,0,0b10101},   {443,1,0b11011},   {444,1,0b01101},   {445,1,0b00001},   {446,1,0b00001},   {447,1,0b00001},   {448,0,0b01011},   {449,1,0b10001},   {450,0,0b00011},   {451,0,0b00111},   {452,1,0b11001},   {453,1,0b00101},   {454,0,0b00111},   {455,1,0b11111},   {456,0,0b10011},   {457,0,0b10011},   {458,1,0b11101},   {459,0,0b10101},   {460,1,0b10101},   {461,1,0b11011},   {462,1,0b01111},   {463,0,0b00101},   {464,1,0b01001},   {465,1,0b00111},   {466,0,0b00111},   {467,1,0b10101},   {468,1,0b11111},   {469,1,0b11101},   {470,1,0b10001},   {471,1,0b00001},   {472,0,0b01111},   {473,1,0b01111},   {474,1,0b10111},   {475,0,0b10001},   {476,1,0b10011},   {477,0,0b00101},   {478,1,0b11001},   {479,1,0b10101},   {480,0,0b11011},   {481,1,0b11111},   {482,1,0b11111},   {483,0,0b00101},   {484,1,0b10001},   {485,1,0b10101},   {486,1,0b11001},   {487,1,0b01101},   {488,1,0b11001},   {489,0,0b10101},   {490,1,0b11111},   {491,1,0b00001},   {492,1,0b10011},   {493,1,0b01001},   {494,1,0b01101},   {495,1,0b00101},   {496,1,0b10111},   {497,0,0b00011},   {498,1,0b01111},   {499,1,0b10011},   {500,0,0b11111},   {501,1,0b11111},   {502,1,0b10011},   {503,1,0b10001},   {504,0,0b00111},   {505,0,0b01111},   {506,1,0b10011},   {507,1,0b11111},   {508,1,0b01001},   {509,1,0b10011},   {510,0,0b00111},   {511,1,0b01111},   {512,1,0b01111},   {513,1,0b01011},   {514,1,0b11101},   {515,0,0b10001},   {516,1,0b10011},   {517,1,0b00011},   {518,0,0b11011},   {519,1,0b11101},   {520,1,0b00011},   {521,1,0b00101},   {522,0,0b01011},   {523,1,0b10011},   {524,1,0b10011},   {525,1,0b11001},   {526,1,0b10011},   {527,1,0b01101},   {528,1,0b01001},   {529,0,0b00101},   {530,1,0b10111},   {531,1,0b00101},   {532,1,0b00001},   {533,0,0b00001},   {534,0,0b10101},   {535,1,0b11001},   {536,0,0b01011},   {537,0,0b01011},   {538,1,0b11001},   {539,1,0b10001},   {540,0,0b00101},   {541,0,0b10011},   {542,1,0b10011},   {543,1,0b00111},   {544,1,0b11011},   {545,1,0b01111},   {546,1,0b11111},   {547,1,0b01101},   {548,0,0b01101},   {549,1,0b11101},   {550,1,0b11111},   {551,0,0b00111},   {552,1,0b01011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1687,7 +1687,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1705,7 +1705,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1726,7 +1726,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1743,7 +1743,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,0,0b00001},   {  2,0,0b01101},   {  3,0,0b10011},   {  4,0,0b10101},   {  5,1,0b11111},   {  6,1,0b11011},   {  7,0,0b10101},   {  8,1,0b10111},   {  9,1,0b01101},   { 10,0,0b00011},   { 11,0,0b10101},   { 12,1,0b11101},   { 13,1,0b00011},   { 14,0,0b00001},   { 15,0,0b00001},   { 16,1,0b01101},   { 17,1,0b10011},   { 18,0,0b10101},   { 19,1,0b11011},   { 20,1,0b00011},   { 21,1,0b01011},   { 22,0,0b00111},   { 23,0,0b01011},   { 24,0,0b11011},   { 25,1,0b11111},   { 26,0,0b00101},   { 27,1,0b11101},   { 28,1,0b01001},   { 29,1,0b10001},   { 30,1,0b10011},   { 31,1,0b11011},   { 32,0,0b00001},   { 33,0,0b00111},   { 34,0,0b11011},   { 35,0,0b11011},   { 36,1,0b11101},   { 37,1,0b00101},   { 38,1,0b11111},   { 39,0,0b01001},   { 40,0,0b10011},   { 41,0,0b10011},   { 42,1,0b11111},   { 43,1,0b11101},   { 44,0,0b01101},   { 45,0,0b01101},   { 46,1,0b11101},   { 47,1,0b01101},   { 48,0,0b00011},   { 49,0,0b11001},   { 50,1,0b11011},   { 51,1,0b01001},   { 52,1,0b00111},   { 53,0,0b00011},   { 54,1,0b00111},   { 55,1,0b10011},   { 56,0,0b00001},   { 57,1,0b11001},   { 58,0,0b00001},   { 59,0,0b00001},   { 60,1,0b01001},   { 61,0,0b00101},   { 62,0,0b10011},   { 63,1,0b10111},   { 64,1,0b00011},   { 65,1,0b00111},   { 66,0,0b10001},   { 67,1,0b10001},   { 68,1,0b01101},   { 69,0,0b00001},   { 70,0,0b01101},   { 71,1,0b11011},   { 72,0,0b01101},   { 73,0,0b10111},   { 74,0,0b11001},   { 75,1,0b11101},   { 76,0,0b00111},   { 77,0,0b00111},   { 78,0,0b01011},   { 79,1,0b11011},   { 80,0,0b01001},   { 81,0,0b01101},   { 82,0,0b01101},   { 83,1,0b11111},   { 84,1,0b11111},   { 85,0,0b10011},   { 86,0,0b11001},   { 87,1,0b11001},   { 88,1,0b00101},   { 89,0,0b00001},   { 90,1,0b00111},   { 91,1,0b01011},   { 92,0,0b01011},   { 93,0,0b11011},   { 94,1,0b11011},   { 95,1,0b10111},   { 96,0,0b01001},   { 97,1,0b10111},   { 98,0,0b10011},   { 99,1,0b11011},   {100,1,0b11001},   {101,1,0b00101},   {102,1,0b11001},   {103,1,0b01101},   {104,0,0b10111},   {105,1,0b11111},   {106,1,0b11001},   {109,0,0b00101},   {110,1,0b01111},   {111,1,0b01001},   {112,0,0b11101},   {113,1,0b11101},   {114,0,0b01111},   {115,0,0b10001},   {116,1,0b11101},   {117,0,0b00101},   {118,1,0b11001},   {119,1,0b11011},   {120,1,0b00111},   {121,0,0b01011},   {122,0,0b01011},   {123,0,0b01101},   {124,1,0b11111},   {125,1,0b10101},   {126,0,0b10011},   {127,1,0b10101},   {128,1,0b11001},   {129,0,0b00011},   {130,1,0b10111},   {131,1,0b01111},   {134,1,0b01011},   {135,1,0b00111},   {137,1,0b10111},   {138,0,0b01001},   {139,1,0b01111},   {140,1,0b00101},   {141,0,0b01001},   {142,1,0b01011},   {143,0,0b01111},   {144,1,0b10011},   {146,1,0b01011},   {148,0,0b00001},   {149,0,0b10011},   {150,1,0b11001},   {152,1,0b01011},   {154,0,0b10001},   {155,0,0b10101},   {156,1,0b10101},   {157,1,0b10011},   {158,1,0b11001},   {159,0,0b10001},   {160,0,0b10101},   {161,1,0b11111},   {162,0,0b00001},   {163,0,0b00111},   {164,1,0b01011},   {165,1,0b01011},   {166,1,0b11101},   {167,0,0b00111},   {168,1,0b01011},   {169,0,0b00101},   {170,1,0b10101},   {171,1,0b11101},   {172,0,0b00101},   {173,1,0b11001},   {174,0,0b00111},   {175,1,0b11101},   {176,0,0b00111},   {177,1,0b11001},   {179,0,0b01001},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b11111},   {183,1,0b11111},   {184,0,0b10111},   {185,1,0b10111},   {186,0,0b00101},   {187,1,0b11101},   {188,0,0b10001},   {189,0,0b10101},   {190,1,0b11111},   {191,0,0b01111},   {192,0,0b10111},   {193,1,0b11111},   {194,1,0b10111},   {195,1,0b01011},   {197,0,0b01011},   {198,1,0b10101},   {199,1,0b10111},   {200,0,0b10101},   {201,1,0b11001},   {202,1,0b00101},   {203,1,0b11011},   {204,1,0b01011},   {207,0,0b00001},   {208,0,0b01011},   {209,0,0b01011},   {210,1,0b01111},   {211,1,0b11111},   {212,1,0b10111},   {213,1,0b01111},   {214,1,0b11011},   {215,0,0b01011},   {216,1,0b01101},   {218,1,0b01001},   {219,0,0b11011},   {220,0,0b11011},   {221,1,0b11111},   {222,1,0b10101},   {224,1,0b01011},   {226,1,0b11111},   {229,1,0b11001},   {230,1,0b01011},   {233,0,0b01011},   {234,1,0b10111},   {238,1,0b01111},   {239,0,0b11101},   {240,0,0b11101},   {241,0,0b11111},   {242,1,0b11111},   {243,0,0b00001},   {244,0,0b01001},   {245,1,0b10101},   {246,1,0b01111},   {247,0,0b00011},   {248,1,0b11001},   {249,0,0b00011},   {250,0,0b00101},   {251,1,0b11011},   {252,0,0b00101},   {253,1,0b01111},   {254,0,0b00001},   {255,0,0b11001},   {256,1,0b11111},   {257,0,0b00001},   {258,0,0b01011},   {259,1,0b11101},   {260,1,0b01011},   {261,0,0b01101},   {262,1,0b01111},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b00011},   {266,0,0b00011},   {267,1,0b11011},   {268,0,0b00101},   {269,1,0b10001},   {270,1,0b11101},   {271,1,0b11001},   {272,0,0b01101},   {273,1,0b11001},   {275,1,0b10101},   {277,0,0b11001},   {278,1,0b11001},   {279,1,0b10101},   {280,0,0b00011},   {281,1,0b00101},   {282,1,0b00101},   {283,0,0b10001},   {284,1,0b11111},   {285,1,0b10101},   {286,1,0b10111},   {287,0,0b00101},   {288,1,0b01101},   {290,1,0b01011},   {292,1,0b01111},   {293,1,0b00111},   {296,0,0b01011},   {297,1,0b01101},   {298,1,0b11001},   {301,0,0b00001},   {302,1,0b10101},   {303,0,0b00001},   {304,1,0b01011},   {305,1,0b11001},   {306,1,0b01011},   {308,0,0b01001},   {309,1,0b10001},   {310,1,0b01001},   {312,0,0b01011},   {313,1,0b01011},   {314,0,0b01011},   {315,0,0b01011},   {316,1,0b01111},   {317,0,0b00011},   {318,1,0b11011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11001},   {322,1,0b00001},   {325,0,0b01101},   {326,0,0b01101},   {327,1,0b11001},   {328,0,0b01101},   {329,1,0b10111},   {330,0,0b00001},   {331,1,0b10011},   {332,0,0b00011},   {333,1,0b10111},   {334,1,0b11101},   {335,0,0b01111},   {336,0,0b10111},   {337,1,0b11001},   {338,1,0b10011},   {339,1,0b01101},   {340,1,0b01011},   {341,1,0b11111},   {342,0,0b01001},   {343,1,0b11001},   {344,1,0b00001},   {346,0,0b10001},   {347,0,0b10111},   {348,1,0b11101},   {349,0,0b00111},   {350,1,0b10001},   {351,1,0b10001},   {352,0,0b01011},   {353,1,0b11001},   {354,1,0b00011},   {355,1,0b00111},   {357,0,0b10011},   {358,1,0b11101},   {359,1,0b00011},   {360,0,0b01111},   {361,1,0b10001},   {362,1,0b01111},   {363,1,0b10101},   {366,1,0b11111},   {367,1,0b00111},   {370,1,0b11001},   {371,1,0b11101},   {373,1,0b00011},   {375,1,0b00101},   {378,1,0b00111},   {379,1,0b11111},   {381,0,0b01001},   {382,0,0b10011},   {383,0,0b11001},   {384,1,0b11011},   {385,0,0b00111},   {386,1,0b01101},   {387,0,0b00011},   {388,0,0b00101},   {389,0,0b01101},   {390,0,0b10111},   {391,0,0b11001},   {392,1,0b11111},   {393,1,0b10111},   {394,1,0b00001},   {395,0,0b01101},   {396,1,0b01101},   {397,0,0b00001},   {398,0,0b01011},   {399,1,0b10111},   {400,1,0b11111},   {401,0,0b00101},   {402,1,0b01001},   {403,1,0b01101},   {404,0,0b10001},   {405,0,0b10011},   {406,1,0b10101},   {407,1,0b01011},   {408,1,0b10001},   {409,0,0b01011},   {410,1,0b01111},   {411,1,0b11011},   {412,0,0b00101},   {413,1,0b10001},   {414,0,0b00111},   {415,0,0b11001},   {416,0,0b11001},   {417,1,0b11101},   {418,1,0b01001},   {419,0,0b00111},   {420,1,0b11011},   {421,1,0b11101},   {422,1,0b01111},   {423,1,0b11001},   {424,0,0b00011},   {425,1,0b10111},   {426,0,0b00101},   {427,1,0b11001},   {428,0,0b10011},   {429,1,0b10111},   {430,1,0b10011},   {431,1,0b01011},   {432,0,0b01111},   {433,1,0b11111},   {438,1,0b10111},   {440,1,0b00011},   {441,1,0b10011},   {442,1,0b01111},   {445,1,0b11111},   {446,1,0b01001},   {447,0,0b00001},   {448,0,0b00001},   {449,0,0b01101},   {450,0,0b01111},   {451,0,0b10101},   {452,0,0b11101},   {453,1,0b11111},   {454,0,0b10001},   {455,1,0b11111},   {456,0,0b10001},   {457,1,0b11101},   {458,0,0b00101},   {459,1,0b01001},   {460,0,0b00101},   {461,0,0b10011},   {462,0,0b11001},   {463,0,0b11101},   {464,1,0b11101},   {465,1,0b01111},   {466,0,0b00011},   {467,1,0b10111},   {468,1,0b00001},   {469,1,0b01111},   {470,1,0b00111},   {471,1,0b10011},   {472,0,0b11001},   {473,0,0b11001},   {474,1,0b11101},   {475,1,0b10111},   {476,1,0b11111},   {477,0,0b00011},   {478,1,0b01001},   {479,0,0b00001},   {480,0,0b10101},   {481,1,0b11101},   {482,0,0b10001},   {483,1,0b10011},   {484,1,0b00001},   {485,1,0b00001},   {486,0,0b01111},   {487,1,0b01111},   {488,1,0b00111},   {489,0,0b00011},   {490,0,0b00101},   {491,0,0b01101},   {492,1,0b10001},   {493,0,0b00011},   {494,1,0b10111},   {495,0,0b01001},   {496,1,0b10101},   {497,0,0b00111},   {498,1,0b01011},   {499,0,0b00001},   {500,1,0b10001},   {501,0,0b01011},   {502,0,0b10011},   {503,1,0b11111},   {504,1,0b11011},   {505,1,0b10011},   {506,1,0b10001},   {507,0,0b00111},   {508,1,0b10001},   {509,1,0b01101},   {510,0,0b10111},   {511,1,0b11101},   {512,1,0b11101},   {513,0,0b00111},   {514,0,0b11001},   {515,1,0b11101},   {516,1,0b01011},   {517,0,0b10001},   {518,1,0b10111},   {519,0,0b00011},   {520,1,0b00111},   {521,1,0b00101},   {522,0,0b10101},   {523,1,0b11001},   {524,0,0b00101},   {525,1,0b10101},   {526,1,0b10001},   {527,0,0b01001},   {528,1,0b11111},   {529,0,0b01101},   {530,1,0b01111},   {531,1,0b11001},   {532,0,0b00101},   {533,1,0b00111},   {534,1,0b01011},   {535,0,0b00111},   {536,0,0b10001},   {537,0,0b10101},   {538,1,0b10111},   {539,0,0b00011},   {540,0,0b01001},   {541,1,0b10011},   {542,1,0b11101},   {543,0,0b01001},   {544,0,0b01001},   {545,0,0b01011},   {546,1,0b11011},   {547,0,0b01101},   {548,0,0b10101},   {549,1,0b10101},   {550,0,0b00001},   {551,0,0b00101},   {552,1,0b01111},   {553,1,0b01011},   {554,0,0b10101},   {555,1,0b11101},   {556,1,0b10011},   {557,0,0b01001},   {558,0,0b10001},   {559,1,0b10101},   {560,0,0b00101},   {561,0,0b01111},   {562,0,0b10101},   {563,0,0b10111},   {564,1,0b11101},   {565,1,0b01111},   {566,1,0b00101},   {567,0,0b00101},   {568,0,0b00111},   {569,1,0b01001},   {570,1,0b01011},   {571,1,0b01111},   {572,1,0b00101},   {573,1,0b00111},   {574,1,0b11011},   {575,0,0b00111},   {576,1,0b10101},   {577,1,0b01111},   {578,1,0b11001},   {579,1,0b00001},   {580,1,0b00001},   {581,1,0b00001},   {582,0,0b01011},   {583,1,0b11011},   {584,0,0b00011},   {585,0,0b01001},   {586,0,0b10011},   {587,1,0b11011},   {588,0,0b10001},   {589,1,0b11001},   {590,1,0b00101},   {591,1,0b10111},   {592,0,0b10011},   {593,0,0b10101},   {594,1,0b11001},   {595,0,0b10011},   {596,1,0b10101},   {597,1,0b10011},   {598,1,0b11001},   {599,0,0b00111},   {600,0,0b10101},   {601,0,0b10101},   {602,1,0b11101},   {603,0,0b10011},   {604,1,0b10011},   {605,1,0b01001},   {606,1,0b01011},   {607,1,0b00111},   {608,0,0b00001},   {609,0,0b00011},   {610,0,0b10001},   {611,1,0b11001},   {612,0,0b00001},   {613,0,0b01011},   {614,1,0b11001},   {615,1,0b00111},   {616,1,0b11001},   {617,0,0b00111},   {618,0,0b01101},   {619,0,0b10001},   {620,1,0b10001},   {621,1,0b11011},   {622,0,0b01101},   {623,1,0b11101},   {624,0,0b00011},   {625,1,0b01111},   {626,1,0b11101},   {627,0,0b00111},   {628,1,0b01001},   {629,0,0b00001},   {630,1,0b11011},   {631,0,0b00101},   {632,1,0b10111},   {633,0,0b00111},   {634,1,0b11011},   {635,1,0b11101},   {636,1,0b00011},   {637,1,0b01111},   {638,0,0b00011},   {639,0,0b01101},   {640,1,0b11011},   {641,1,0b00011},   {642,0,0b00111},   {643,0,0b01001},   {644,0,0b01011},   {645,0,0b10111},   {646,0,0b11001},   {647,1,0b11101},   {648,1,0b01011},   {649,1,0b10111},   {650,1,0b00011},   {651,0,0b00101},   {652,0,0b10111},   {653,0,0b10111},   {654,1,0b11011},   {655,0,0b01011},   {656,1,0b11011},   {657,0,0b00111},   {658,0,0b01101},   {659,0,0b10011},   {660,1,0b11111},   {661,1,0b01011},   {662,0,0b10101},   {663,1,0b11011},   {664,0,0b01011},   {665,0,0b01111},   {666,1,0b11001},   {667,1,0b11011},   {668,1,0b00111},   {669,1,0b00101},   {670,1,0b01001},   {671,1,0b01011},   {672,1,0b11101},   {673,1,0b10011},   {674,0,0b01001},   {675,1,0b11001},   {676,0,0b00101},   {677,1,0b01111},   {678,0,0b00001},   {679,1,0b10001},   {680,0,0b00101},   {681,1,0b11011},   {682,1,0b10101},   {683,0,0b01111},   {684,0,0b10111},   {685,1,0b11111},   {686,0,0b00101},   {687,0,0b01011},   {688,0,0b10011},   {689,1,0b11011},   {690,1,0b01001},   {691,0,0b00101},   {692,1,0b11001},   {693,0,0b10011},   {694,1,0b10101},   {695,1,0b10001},   {696,1,0b10111},   {697,1,0b00111},   {698,1,0b11001},   {699,1,0b00001},   {700,1,0b01101},   {701,1,0b11111},   {702,1,0b00001},   {703,0,0b00111},   {704,1,0b11001},   {705,1,0b10001},   {706,0,0b11101},   {707,1,0b11101},   {708,0,0b10111},   {709,1,0b11111},   {710,0,0b00001},   {711,0,0b00101},   {712,1,0b01011},   {713,0,0b00011},   {714,1,0b10111},   {715,0,0b00011},   {716,1,0b00101},   {717,0,0b01001},   {718,0,0b10101},   {719,1,0b11111},   {720,0,0b01011},   {721,1,0b10111},   {722,1,0b01111},   {723,0,0b01011},   {724,1,0b10101},   {725,0,0b01111},   {726,1,0b11011},   {727,0,0b00111},   {728,0,0b10011},   {729,1,0b10111},   {730,0,0b00111},   {731,0,0b10001},   {732,1,0b10011},   {733,1,0b00001},   {734,0,0b01111},   {735,0,0b01111},   {736,1,0b10001},   {737,1,0b01001},   {738,0,0b00001},   {739,1,0b00111},   {740,1,0b11011},   {741,0,0b10001},   {742,0,0b10001},   {743,0,0b10001},   {744,1,0b10111},   {745,1,0b10001},   {746,1,0b10001},   {747,0,0b01001},   {748,0,0b01101},   {749,0,0b11001},   {750,1,0b11011},   {751,1,0b10001},   {752,0,0b00001},   {753,0,0b00011},   {754,1,0b00101},   {755,1,0b00111},   {756,0,0b00011},   {757,1,0b01001},   {758,1,0b00111},   {759,0,0b00001},   {760,1,0b11101},   {761,1,0b01111},   {762,1,0b00111},   {763,0,0b01001},   {764,1,0b10001},   {765,1,0b00111},   {766,1,0b01011},   {767,1,0b10011},   {768,0,0b01101},   {769,1,0b10001},   {770,1,0b10001},   {771,0,0b00011},   {772,0,0b00101},   {773,1,0b11101},   {774,1,0b10111},   {775,1,0b10101},   {776,1,0b10001},   {777,1,0b11101},   {778,0,0b11001},   {779,1,0b11101},   {780,0,0b01011},   {781,1,0b11001},   {782,0,0b10001},   {783,1,0b10101},   {784,1,0b00001},   {785,0,0b10001},   {786,1,0b11101},   {787,1,0b11111},   {788,0,0b00011},   {789,1,0b10001},   {790,1,0b01011},   {791,1,0b10101},   {792,0,0b11001},   {793,1,0b11101},   {794,0,0b10001},   {795,1,0b10101},   {796,1,0b01001},   {797,1,0b11011},   {798,0,0b00111},   {799,0,0b01001},   {800,0,0b10111},   {801,1,0b11111},   {802,1,0b11101},   {803,1,0b10101},   {804,0,0b00011},   {805,1,0b10001},   {806,1,0b11111},   {807,1,0b10111},   {808,1,0b01111},   {809,0,0b01011},   {810,1,0b11011},   {811,1,0b10101},   {812,0,0b00011},   {813,1,0b01101},   {814,0,0b00101},   {815,0,0b01001},   {816,1,0b10001},   {817,0,0b01101},   {818,1,0b11111},   {819,1,0b01001},   {820,0,0b10101},   {821,0,0b10111},   {822,1,0b11111},   {823,0,0b00001},   {824,1,0b10011},   {825,1,0b00011},   {826,1,0b01101},   {827,1,0b11011},   {828,1,0b00001},   {829,1,0b11011},   {830,1,0b10011},   {831,0,0b01101},   {832,1,0b10001},   {833,0,0b00011},   {834,1,0b10011},   {835,0,0b00101},   {836,1,0b01001},   {837,0,0b01111},   {838,1,0b10011},   {839,0,0b10011},   {840,1,0b11111},   {841,1,0b01001},   {842,1,0b01101},   {843,0,0b01111},   {844,1,0b10101},   {845,0,0b00011},   {846,1,0b11111},   {847,1,0b00111},   {848,0,0b00001},   {849,0,0b00111},   {850,0,0b10101},   {851,0,0b10111},   {852,1,0b11101},   {853,0,0b01111},   {854,1,0b11001},   {855,1,0b10001},   {856,1,0b01111},   {857,0,0b10111},   {858,0,0b11001},   {859,1,0b11001},   {860,0,0b10101},   {861,1,0b11111},   {862,1,0b10011},   {863,0,0b01011},   {864,1,0b11011},   {865,1,0b11011},   {866,0,0b10011},   {867,1,0b10101},   {868,0,0b00101},   {869,1,0b00101},   {870,0,0b00011},   {871,0,0b10111},   {872,1,0b11011},   {873,0,0b01001},   {874,0,0b01001},   {875,1,0b11101},   {876,0,0b01001},   {877,0,0b10101},   {878,1,0b11101},   {879,0,0b11001},   {880,0,0b11111},   {881,1,0b11111},   {882,0,0b01011},   {883,1,0b11101},   {884,0,0b00111},   {885,1,0b10111},   {886,0,0b00101},   {887,1,0b01011},   {888,0,0b00001},   {889,1,0b00011},   {890,0,0b00111},   {891,0,0b01001},   {892,1,0b01101},   {893,0,0b00011},   {894,1,0b10011},   {895,1,0b01111},   {896,1,0b10111},   {897,0,0b01001},   {898,0,0b01111},   {899,0,0b10011},   {900,1,0b11111},   {901,1,0b11001},   {902,0,0b00011},   {903,1,0b10001},   {904,1,0b01011},   {905,0,0b00101},   {906,1,0b01001},   {907,0,0b10011},   {908,0,0b10111},   {909,0,0b11011},   {910,1,0b11111},   {911,1,0b11111},   {912,1,0b00111},   {913,1,0b01101},   {914,1,0b11101},   {915,0,0b10101},   {916,0,0b11011},   {917,1,0b11011},   {918,0,0b01111},   {919,0,0b10001},   {920,1,0b11101},   {921,0,0b01011},   {922,1,0b10111},   {923,0,0b00001},   {924,0,0b01011},   {925,1,0b10001},   {926,0,0b00011},   {927,1,0b01101},   {928,1,0b11001},   {929,0,0b00111},   {930,0,0b01101},   {931,0,0b11011},   {932,1,0b11111},   {933,1,0b11011},   {934,1,0b11011},   {935,0,0b10101},   {936,1,0b11001},   {937,1,0b00111},   {938,1,0b01011},   {939,0,0b00101},   {940,1,0b00111},   {941,1,0b01001},   {942,1,0b11111},   {943,0,0b01101},   {944,1,0b11101},   {945,0,0b00001},   {946,1,0b11001},   {947,0,0b01001},   {948,1,0b01111},   {949,1,0b00001},   {950,0,0b00101},   {951,0,0b01111},   {952,0,0b11001},   {953,1,0b11001},   {954,0,0b10001},   {955,1,0b11011},   {956,0,0b01101},   {957,1,0b01101},   {958,1,0b01101},   {959,0,0b00111},   {960,0,0b01011},   {961,1,0b10011},   {962,0,0b00111},   {963,0,0b10001},   {964,0,0b10101},   {965,1,0b11001},   {966,1,0b11011},   {967,1,0b11101},   {968,1,0b01001},   {969,0,0b00101},   {970,0,0b00111},   {971,1,0b10111},   {972,1,0b00001},   {973,0,0b01101},   {974,1,0b10101},   {975,1,0b11111},   {976,1,0b01111},   {977,0,0b00101},   {978,0,0b10001},   {979,1,0b11111},   {980,1,0b10111},   {981,0,0b01011},   {982,0,0b01101},   {983,1,0b10101},   {984,1,0b11101},   {985,1,0b10011},   {986,0,0b10101},   {987,1,0b11111},   {988,0,0b10011},   {989,1,0b11111},   {990,0,0b00111},   {991,1,0b10111},   {992,0,0b10101},   {993,0,0b10101},   {994,1,0b11011},   {995,0,0b01001},   {996,1,0b10101},   {997,1,0b01011},   {998,1,0b10101},   {999,1,0b11001},   {1000,1,0b01111},   {1001,1,0b00011},   {1002,0,0b00001},   {1003,0,0b00011},   {1004,0,0b00101},   {1005,1,0b01011},   {1006,1,0b00101},   {1007,1,0b00101},   {1008,0,0b00111},   {1009,1,0b01011},   {1010,0,0b11001},   {1011,1,0b11111},   {1012,0,0b10101},   {1013,0,0b11101},   {1014,1,0b11111},   {1015,1,0b10101},   {1016,0,0b01011},   {1017,0,0b10111},   {1018,1,0b11111},   {1019,1,0b11011},   {1020,1,0b10101},   {1021,0,0b01001},   {1022,0,0b10001},   {1023,1,0b11111},   {1024,1,0b11001},   {1025,0,0b00101},   {1026,0,0b10001},   {1027,1,0b11001},   {1028,0,0b10111},   {1029,1,0b10111},   {1030,0,0b11011},   {1031,1,0b11111},   {1032,1,0b11111},   {1033,0,0b01011},   {1034,0,0b01011},   {1035,1,0b10011},   {1036,0,0b01101},   {1037,1,0b10011},   {1038,0,0b00001},   {1039,1,0b01111},   {1040,1,0b00011},   {1041,0,0b10101},   {1042,1,0b11101},   {1043,0,0b11001},   {1044,1,0b11011},   {1045,1,0b01101},   {1046,0,0b00101},   {1047,0,0b01011},   {1048,0,0b10101},   {1049,0,0b11101},   {1050,1,0b11101},   {1051,0,0b00001},   {1052,0,0b01101},   {1053,1,0b10001},   {1054,0,0b00101},   {1055,0,0b00111},   {1056,1,0b01001},   {1057,0,0b11101},   {1058,1,0b11101},   {1059,1,0b10001},   {1060,1,0b10101},   {1061,0,0b00101},   {1062,1,0b10101},   {1063,0,0b00011},   {1064,0,0b00101},   {1065,1,0b10111},   {1066,0,0b01011},   {1067,1,0b01011},   {1068,0,0b00101},   {1069,1,0b01011},   {1070,1,0b01001},   {1071,0,0b00011},   {1072,1,0b00101},   {1073,0,0b10001},   {1074,1,0b11101},   {1075,1,0b01011},   {1076,1,0b11001}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1760,7 +1760,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11101},   {  1,1,0b11111},   {  2,0,0b10101},   {  3,1,0b11011},   {  5,0,0b01001},   {  6,0,0b01011},   {  7,1,0b10011},   {  8,0,0b00101},   {  9,1,0b10001},   { 10,0,0b01101},   { 11,1,0b11001},   { 12,0,0b00001},   { 13,1,0b11111},   { 14,1,0b10001},   { 15,1,0b00001},   { 16,0,0b01001},   { 17,1,0b11111},   { 18,0,0b01101},   { 19,1,0b01111},   { 20,0,0b01111},   { 21,0,0b10111},   { 22,1,0b11111},   { 23,1,0b01111},   { 24,0,0b00001},   { 25,0,0b01001},   { 26,1,0b11001},   { 27,1,0b10001},   { 28,1,0b10111},   { 29,1,0b01011},   { 30,0,0b00011},   { 31,1,0b11001},   { 34,0,0b01001},   { 35,0,0b01111},   { 36,0,0b10101},   { 37,1,0b11001},   { 38,0,0b00011},   { 39,0,0b00101},   { 40,0,0b01101},   { 41,0,0b10011},   { 42,1,0b11011},   { 43,1,0b11001},   { 44,1,0b00011},   { 45,1,0b01111},   { 46,1,0b11011},   { 47,1,0b11111},   { 48,1,0b10011},   { 49,1,0b11111},   { 50,1,0b00001},   { 51,1,0b10001},   { 52,0,0b01101},   { 53,0,0b01111},   { 54,1,0b10101},   { 55,1,0b10101},   { 56,0,0b10111},   { 57,1,0b11101},   { 58,1,0b10101},   { 59,0,0b00001},   { 60,1,0b10001},   { 61,1,0b01111},   { 62,0,0b01101},   { 63,0,0b10111},   { 64,1,0b11001},   { 65,0,0b01001},   { 66,0,0b01011},   { 67,1,0b01111},   { 68,1,0b00111},   { 69,1,0b00111},   { 70,0,0b00111},   { 71,1,0b01101},   { 72,1,0b11101},   { 73,1,0b10101},   { 74,0,0b10001},   { 75,1,0b11111},   { 76,1,0b11111},   { 77,0,0b01001},   { 78,0,0b10111},   { 79,1,0b11001},   { 80,0,0b00111},   { 81,1,0b11111},   { 83,0,0b01011},   { 84,1,0b10101},   { 85,0,0b00001},   { 86,0,0b01101},   { 87,0,0b10011},   { 88,1,0b10101},   { 89,1,0b01011},   { 90,0,0b01101},   { 91,1,0b01111},   { 92,1,0b00101},   { 93,1,0b11101},   { 94,0,0b00111},   { 95,1,0b01001},   { 96,0,0b00101},   { 97,1,0b10001},   { 98,0,0b10001},   { 99,0,0b10001},   {100,1,0b11001},   {101,1,0b01101},   {102,1,0b01001},   {103,0,0b00101},   {104,0,0b00111},   {105,0,0b00111},   {106,1,0b10011},   {107,1,0b00001},   {108,0,0b01101},   {109,1,0b10101},   {110,0,0b10101},   {111,1,0b11001},   {112,0,0b01111},   {113,1,0b01111},   {114,1,0b00101},   {115,0,0b10001},   {116,0,0b10101},   {117,0,0b10111},   {118,1,0b11011},   {119,1,0b10111},   {120,1,0b10101},   {121,0,0b01111},   {122,0,0b01111},   {123,0,0b10101},   {124,1,0b10101},   {125,0,0b00111},   {126,0,0b01011},   {127,1,0b10001},   {128,0,0b01011},   {129,1,0b11101},   {130,0,0b01001},   {131,1,0b10111},   {132,0,0b10111},   {133,1,0b11001},   {134,0,0b01111},   {135,1,0b11001},   {136,0,0b00101},   {137,1,0b11101},   {138,1,0b00011},   {139,1,0b11011},   {140,1,0b00011},   {141,0,0b10001},   {142,1,0b10111},   {143,0,0b00001},   {144,0,0b01101},   {145,0,0b10001},   {146,1,0b11011},   {147,0,0b00101},   {148,0,0b10111},   {149,1,0b11011},   {150,0,0b01111},   {151,1,0b11001},   {152,0,0b10011},   {153,1,0b10101},   {154,1,0b10111},   {155,0,0b01011},   {156,1,0b01111},   {157,0,0b00111},   {158,0,0b10001},   {159,1,0b11011},   {160,1,0b00001},   {161,0,0b11111},   {162,1,0b11111},   {163,0,0b01001},   {164,0,0b10001},   {165,1,0b10011},   {166,1,0b01111},   {167,0,0b00111},   {168,0,0b01111},   {169,1,0b10101},   {170,0,0b01101},   {171,1,0b11001},   {172,1,0b11011},   {173,1,0b01011},   {174,1,0b10101},   {175,1,0b01101},   {176,1,0b01101},   {177,0,0b00111},   {178,1,0b11001},   {179,0,0b01011},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b01001},   {183,0,0b01101},   {184,0,0b11001},   {185,1,0b11101},   {186,1,0b10011},   {187,0,0b00011},   {188,1,0b00011},   {189,0,0b00011},   {190,0,0b00101},   {191,1,0b10101},   {192,1,0b00001},   {193,1,0b10001},   {194,1,0b11011},   {195,0,0b10001},   {196,0,0b10111},   {197,0,0b11101},   {198,1,0b11101},   {199,1,0b00101},   {200,0,0b01101},   {201,1,0b11111},   {202,1,0b01101},   {203,1,0b00101},   {204,1,0b01001},   {205,1,0b10001},   {206,0,0b01001},   {207,1,0b01011},   {208,0,0b10111},   {209,1,0b10111},   {210,1,0b01101},   {211,0,0b01011},   {212,1,0b10101},   {213,0,0b01011},   {214,1,0b10001},   {215,0,0b00001},   {216,0,0b11011},   {217,0,0b11011},   {218,1,0b11011},   {219,1,0b11101},   {220,0,0b00001},   {221,1,0b00101},   {222,0,0b00011},   {223,1,0b01001},   {224,1,0b10101},   {225,1,0b11001},   {226,1,0b11101},   {227,1,0b00001},   {228,1,0b01001},   {229,0,0b00111},   {230,0,0b01001},   {231,1,0b11011},   {232,1,0b01111},   {233,0,0b01001},   {234,0,0b01011},   {235,1,0b01111},   {236,0,0b00111},   {237,0,0b00111},   {238,1,0b11011},   {239,1,0b10101},   {240,0,0b00001},   {241,0,0b10001},   {242,1,0b11011},   {243,0,0b00101},   {244,1,0b10011},   {245,0,0b00111},   {246,1,0b10001},   {247,1,0b11001},   {248,1,0b11001},   {249,1,0b00111},   {250,1,0b10111},   {251,0,0b00001},   {252,1,0b10101},   {253,1,0b10011},   {254,1,0b00101},   {255,1,0b10101},   {256,1,0b01111},   {257,0,0b01001},   {258,1,0b10001},   {259,0,0b00011},   {260,0,0b10001},   {261,1,0b11111},   {262,0,0b00011},   {263,0,0b01011},   {264,1,0b10011},   {265,1,0b00011},   {266,0,0b01101},   {267,1,0b11001},   {268,0,0b00101},   {269,0,0b10111},   {270,1,0b11011},   {271,1,0b11101},   {272,1,0b10001},   {273,0,0b00001},   {274,1,0b11101},   {275,0,0b10111},   {276,1,0b11111},   {277,0,0b01101},   {278,0,0b10111},   {279,1,0b11111},   {280,0,0b00111},   {281,1,0b11101},   {282,0,0b01011},   {283,1,0b10101},   {284,0,0b01101},   {285,1,0b10001},   {286,0,0b00101},   {287,0,0b10001},   {288,0,0b11001},   {289,1,0b11101},   {290,1,0b00111},   {291,0,0b01011},   {292,1,0b11001},   {293,0,0b01011},   {294,1,0b11001},   {295,0,0b00001},   {296,0,0b00011},   {297,0,0b00101},   {298,1,0b11011},   {299,0,0b00011},   {300,0,0b00111},   {301,1,0b10001},   {302,1,0b11011},   {303,0,0b11001},   {304,1,0b11111},   {305,1,0b11101},   {306,0,0b11001},   {307,1,0b11111},   {308,0,0b01001},   {309,1,0b01101},   {310,1,0b11011},   {311,1,0b10101},   {312,0,0b00101},   {313,0,0b01101},   {314,1,0b10111},   {315,0,0b00111},   {316,0,0b11011},   {317,1,0b11011},   {318,1,0b00011},   {319,0,0b01111},   {320,0,0b11001},   {321,1,0b11111},   {322,1,0b10011},   {323,1,0b01101},   {324,1,0b11101},   {325,1,0b00001},   {326,1,0b01101},   {327,0,0b01001},   {328,1,0b11011},   {329,0,0b00111},   {330,1,0b10001},   {331,1,0b10011},   {332,0,0b01111},   {333,0,0b10101},   {334,1,0b11101},   {335,1,0b11001},   {336,0,0b01101},   {337,1,0b10111},   {338,1,0b00001},   {339,1,0b00011},   {340,1,0b01111},   {341,1,0b11011},   {342,0,0b10101},   {343,1,0b10111},   {344,1,0b10101},   {345,1,0b11011},   {346,0,0b01011},   {347,1,0b11001},   {348,1,0b01001},   {349,1,0b01101},   {350,0,0b11001},   {351,1,0b11111},   {352,1,0b01001},   {353,1,0b11011},   {354,1,0b00101},   {355,1,0b00111},   {356,0,0b01111},   {357,1,0b11001},   {358,0,0b10011},   {359,1,0b11011},   {360,0,0b01001},   {361,1,0b10001},   {362,1,0b10101},   {363,0,0b01101},   {364,1,0b11101},   {365,1,0b01111},   {366,1,0b01101},   {367,0,0b00111},   {368,0,0b01101},   {369,1,0b11001},   {370,0,0b10011},   {371,1,0b11101},   {372,0,0b01001},   {373,0,0b01011},   {374,1,0b01111},   {375,0,0b10101},   {376,1,0b11101},   {377,0,0b00101},   {378,0,0b01011},   {379,1,0b11001},   {380,1,0b10001},   {381,0,0b00101},   {382,1,0b11101},   {383,0,0b01111},   {384,1,0b11111},   {385,0,0b10111},   {386,1,0b11111},   {387,1,0b01101},   {388,0,0b10011},   {389,1,0b10101},   {390,0,0b00001},   {391,0,0b00011},   {392,1,0b10011},   {393,0,0b01001},   {394,0,0b10011},   {395,1,0b11001},   {396,0,0b01011},   {397,1,0b01111},   {398,0,0b00111},   {399,1,0b11011},   {400,1,0b10111},   {401,0,0b01111},   {402,1,0b01111},   {403,1,0b00101},   {404,1,0b11111},   {405,1,0b11101},   {406,1,0b10101},   {407,1,0b01101},   {408,0,0b01111},   {409,0,0b10001},   {410,1,0b10001},   {411,0,0b10101},   {412,1,0b11111},   {413,0,0b01111},   {414,1,0b11101},   {415,0,0b00111},   {416,0,0b01001},   {417,1,0b10001},   {418,0,0b10011},   {419,1,0b11101},   {420,0,0b00001},   {421,1,0b01111},   {422,0,0b11001},   {423,1,0b11101},   {424,1,0b01101},   {425,1,0b11111},   {426,1,0b01101},   {427,0,0b00011},   {428,0,0b00101},   {429,0,0b11101},   {430,1,0b11111},   {431,0,0b00011},   {432,0,0b01001},   {433,1,0b11011},   {434,0,0b01101},   {435,1,0b11111},   {436,1,0b11001},   {437,0,0b01111},   {438,1,0b11101},   {439,1,0b11101},   {440,1,0b00101},   {441,0,0b01011},   {442,1,0b11011},   {443,0,0b00011},   {444,1,0b00101},   {445,1,0b11011},   {446,0,0b11111},   {447,1,0b11111},   {448,1,0b10101},   {449,0,0b00011},   {450,0,0b01111},   {451,0,0b10001},   {452,1,0b11011},   {453,0,0b01101},   {454,0,0b10101},   {455,1,0b11111},   {456,1,0b10111},   {457,1,0b01111},   {458,0,0b01101},   {459,1,0b10101},   {460,0,0b10101},   {461,1,0b11101},   {462,1,0b00111},   {463,1,0b11101},   {464,1,0b01101},   {465,0,0b00001},   {466,0,0b10001},   {467,1,0b10101},   {468,1,0b10001},   {469,0,0b00011},   {470,1,0b01101},   {471,1,0b00001},   {472,0,0b00001},   {473,1,0b01101},   {474,1,0b10011},   {475,1,0b11101},   {476,0,0b00001},   {477,1,0b11011},   {478,1,0b00001},   {479,1,0b01101},   {480,1,0b10011},   {481,1,0b00111},   {482,1,0b01111},   {483,1,0b01001},   {484,0,0b00111},   {485,1,0b11101},   {486,0,0b01011},   {487,1,0b10101},   {488,1,0b00111},   {489,0,0b00111},   {490,1,0b01001},   {491,1,0b11101},   {492,0,0b10001},   {493,1,0b11101},   {494,1,0b01001},   {495,1,0b10001},   {496,1,0b10101},   {497,0,0b00011},   {498,1,0b00111},   {500,0,0b00011},   {501,1,0b01101},   {502,1,0b10001},   {504,0,0b01111},   {505,1,0b10111},   {507,1,0b00011},   {508,1,0b10001},   {509,1,0b10101},   {513,0,0b01101},   {514,1,0b10001},   {515,0,0b00101},   {516,0,0b00111},   {517,1,0b11101},   {518,1,0b11111},   {519,0,0b00011},   {520,1,0b00011},   {521,0,0b00101},   {522,1,0b01111},   {523,0,0b00001},   {524,1,0b10111},   {525,0,0b00001},   {526,1,0b00101},   {527,1,0b01001},   {528,0,0b00101},   {529,1,0b01111},   {530,1,0b10111},   {531,1,0b00011},   {532,0,0b10001},   {533,1,0b11101},   {534,1,0b01001},   {535,0,0b00111},   {536,0,0b10111},   {537,1,0b11111},   {538,1,0b11001},   {539,0,0b00001},   {540,1,0b01101},   {542,1,0b11001},   {544,1,0b00011},   {545,0,0b00111},   {546,1,0b10111},   {548,0,0b00101},   {549,0,0b10101},   {550,1,0b11011},   {551,1,0b01101},   {553,0,0b01011},   {554,0,0b10001},   {555,1,0b11011},   {556,0,0b01111},   {557,1,0b11111},   {558,0,0b00011},   {559,0,0b01101},   {560,0,0b10011},   {561,1,0b10011},   {562,0,0b00001},   {563,1,0b11111},   {564,1,0b11001},   {565,1,0b01001},   {569,1,0b10101},   {570,0,0b10011},   {571,1,0b11001},   {572,1,0b10011},   {573,1,0b01011},   {574,1,0b01111},   {576,0,0b00011},   {577,0,0b01101},   {578,1,0b11111},   {579,0,0b00111},   {580,1,0b01001},   {581,1,0b01001},   {582,1,0b11001},   {583,1,0b10001},   {584,1,0b10011},   {586,0,0b01001},   {587,1,0b10101},   {588,0,0b10111},   {589,1,0b11111},   {590,1,0b10111},   {591,0,0b00001},   {592,0,0b00001},   {593,1,0b01011},   {594,1,0b01001},   {595,0,0b00011},   {596,1,0b10001},   {597,0,0b11101},   {598,1,0b11111},   {599,1,0b11111},   {600,1,0b11101},   {601,1,0b10111},   {602,1,0b01011},   {603,0,0b11101},   {604,1,0b11111},   {605,1,0b01011},   {606,1,0b11011},   {607,1,0b01011},   {608,0,0b10111},   {609,1,0b11011},   {610,0,0b01101},   {611,1,0b01111},   {612,1,0b01001},   {613,0,0b01111},   {614,1,0b10111},   {615,0,0b10011},   {616,0,0b10111},   {617,1,0b11001},   {618,1,0b01111},   {619,0,0b10011},   {620,1,0b10011},   {621,0,0b00101},   {622,1,0b01111},   {625,1,0b00011},   {626,0,0b00001},   {627,1,0b11011},   {629,1,0b11111},   {630,1,0b00101},   {633,0,0b01011},   {634,1,0b01101},   {635,0,0b01111},   {636,1,0b10101},   {637,1,0b10111},   {638,0,0b10101},   {639,0,0b11011},   {640,1,0b11011},   {641,1,0b00111},   {642,0,0b01111},   {643,1,0b01111},   {644,0,0b00011},   {645,0,0b00011},   {646,0,0b01111},   {647,0,0b10011},   {648,1,0b11011},   {649,1,0b01111},   {650,1,0b01111},   {651,1,0b00111},   {652,0,0b00001},   {653,1,0b00011},   {654,1,0b10011},   {655,0,0b11011},   {656,1,0b11101},   {657,0,0b00001},   {658,1,0b00011},   {659,1,0b00101},   {660,1,0b01011},   {661,1,0b00101},   {662,0,0b00011},   {663,1,0b01001},   {664,0,0b01101},   {665,1,0b11011},   {666,0,0b10001},   {667,1,0b10011},   {668,1,0b11101},   {670,1,0b11111},   {671,1,0b11001},   {673,0,0b10001},   {674,1,0b11011},   {675,0,0b00111},   {676,1,0b11001},   {677,0,0b00101},   {678,0,0b00101},   {679,1,0b01101},   {680,1,0b00011},   {681,1,0b10001},   {682,0,0b01111},   {683,1,0b01111},   {684,1,0b00001},   {686,1,0b10001},   {691,0,0b10001},   {692,1,0b11001},   {694,1,0b11001},   {696,0,0b10001},   {697,0,0b10001},   {698,1,0b10111},   {699,1,0b11011},   {700,1,0b11111},   {701,1,0b11111},   {703,1,0b00001},   {706,0,0b00111},   {707,0,0b01111},   {708,1,0b10111},   {712,0,0b00101},   {713,1,0b01101},   {714,1,0b01101},   {715,1,0b00011},   {718,0,0b10011},   {719,0,0b11011},   {720,1,0b11111},   {721,1,0b00001},   {722,0,0b00001},   {723,0,0b10011},   {724,1,0b11011},   {725,1,0b01001},   {726,0,0b00001},   {727,1,0b00011},   {728,1,0b10111},   {731,1,0b00101},   {732,1,0b11101},   {734,1,0b01111},   {735,0,0b10011},   {736,1,0b10111},   {738,0,0b00101},   {739,0,0b01101},   {740,1,0b10011},   {741,0,0b01101},   {742,1,0b01111},   {743,0,0b00101},   {744,1,0b01111},   {745,0,0b10101},   {746,1,0b10111},   {747,0,0b00111},   {748,1,0b10011},   {749,0,0b00011},   {750,1,0b10001},   {751,0,0b00011},   {752,1,0b10001},   {753,1,0b01111},   {754,1,0b11001},   {756,1,0b01101},   {760,0,0b00001},   {761,0,0b01001},   {762,0,0b11111},   {763,1,0b11111},   {764,0,0b01101},   {765,1,0b10101},   {766,1,0b01011},   {767,0,0b00111},   {768,0,0b01101},   {769,1,0b11011},   {770,1,0b00001},   {771,0,0b01011},   {772,0,0b01111},   {773,1,0b11001},   {774,0,0b00111},   {775,0,0b01011},   {776,0,0b11011},   {777,1,0b11011},   {778,0,0b01011},   {779,1,0b01011},   {780,0,0b01101},   {781,0,0b10001},   {782,1,0b11001},   {783,1,0b00101},   {784,1,0b10011},   {785,0,0b01101},   {786,1,0b11111},   {787,0,0b00111},   {788,0,0b01011},   {789,1,0b11001},   {790,1,0b11111},   {791,1,0b10111},   {792,0,0b00011},   {793,1,0b11011},   {794,0,0b11001},   {795,1,0b11011},   {796,0,0b00101},   {797,0,0b00101},   {798,1,0b11111},   {799,0,0b01011},   {800,1,0b10111},   {801,1,0b01101},   {802,1,0b01001},   {803,0,0b01001},   {804,1,0b10011},   {805,1,0b11001},   {806,0,0b10111},   {807,1,0b11011},   {808,0,0b10101},   {809,1,0b11101},   {810,1,0b11101},   {811,0,0b00111},   {812,0,0b01011},   {813,1,0b10001},   {814,0,0b00001},   {815,0,0b00011},   {816,1,0b00011},   {817,1,0b10111},   {818,1,0b00111},   {819,0,0b01001},   {820,1,0b01011},   {821,0,0b00011},   {822,1,0b10011},   {823,0,0b01001},   {824,0,0b11001},   {825,1,0b11001},   {826,1,0b10111},   {827,1,0b01011},   {828,0,0b00011},   {829,1,0b10001},   {830,0,0b00101},   {831,1,0b11001},   {832,1,0b10011},   {833,1,0b10111},   {834,0,0b00001},   {835,0,0b01001},   {836,1,0b11011},   {837,0,0b00101},   {838,0,0b01011},   {839,1,0b10001},   {840,0,0b01111},   {841,1,0b11001},   {842,1,0b00101},   {843,1,0b10011},   {844,1,0b11001},   {845,1,0b10011},   {846,1,0b10011},   {847,1,0b01111},   {848,1,0b01101},   {849,1,0b10101},   {850,0,0b00011},   {851,0,0b00111},   {852,1,0b10001},   {853,1,0b00101},   {854,0,0b00001},   {855,0,0b01101},   {856,1,0b10111},   {857,1,0b11001},   {858,0,0b11001},   {859,1,0b11011},   {860,1,0b10111},   {861,1,0b10011},   {862,1,0b00001},   {863,0,0b00111},   {864,1,0b11001},   {865,0,0b00011},   {866,1,0b10111},   {867,0,0b01101},   {868,1,0b10001},   {869,1,0b01001},   {870,0,0b10111},   {871,1,0b10111},   {872,1,0b10001},   {873,1,0b00011},   {874,1,0b01011},   {875,1,0b01101},   {876,0,0b00011},   {877,1,0b11111},   {878,1,0b11101},   {879,1,0b10111},   {880,1,0b00101},   {881,0,0b01001},   {882,1,0b11101},   {883,1,0b00111},   {884,0,0b10011},   {885,1,0b11101},   {886,0,0b00111},   {887,1,0b10101},   {888,0,0b00011},   {889,1,0b01111},   {890,0,0b01001},   {891,1,0b01111},   {892,0,0b00011},   {893,1,0b10011},   {894,0,0b01011},   {895,1,0b11001},   {896,0,0b00001},   {897,1,0b00101},   {898,1,0b01011},   {899,0,0b00011},   {900,0,0b00011},   {901,1,0b01111},   {902,0,0b01011},   {903,1,0b01101},   {904,0,0b00001},   {905,1,0b10011},   {906,0,0b00001},   {907,0,0b00001},   {908,0,0b00111},   {909,0,0b10011},   {910,0,0b11001},   {911,1,0b11001},   {912,1,0b10001},   {913,1,0b10111},   {914,0,0b00001},   {915,0,0b00011},   {916,1,0b11011},   {917,1,0b11101},   {918,0,0b00011},   {919,0,0b10001},   {920,1,0b10111},   {921,0,0b01001},   {922,0,0b10011},   {923,1,0b10111},   {924,0,0b00111},   {925,1,0b11101},   {926,1,0b00111},   {927,0,0b00001},   {928,1,0b00011},   {929,0,0b00011},   {930,1,0b11011},   {931,0,0b00001},   {932,0,0b01011},   {933,1,0b01011},   {934,0,0b00001},   {935,0,0b00111},   {936,0,0b01011},   {937,0,0b11101},   {938,1,0b11111},   {939,1,0b11101},   {940,0,0b00101},   {941,1,0b00111},   {942,1,0b00111},   {943,0,0b11001},   {944,1,0b11111},   {945,0,0b00111},   {946,1,0b11101},   {947,1,0b10101},   {948,1,0b11011},   {949,0,0b00101},   {950,1,0b11011},   {951,1,0b01001},   {952,1,0b00001},   {953,1,0b11011},   {954,1,0b11101},   {955,0,0b00001},   {956,1,0b00001},   {957,0,0b00101},   {958,0,0b00101},   {959,1,0b01111},   {960,1,0b00111},   {961,1,0b11101},   {962,0,0b11011},   {963,1,0b11111},   {964,0,0b00001},   {965,1,0b01101},   {966,0,0b00101},   {967,0,0b00111},   {968,1,0b10101},   {969,1,0b11001},   {970,0,0b00001},   {971,1,0b01011},   {972,0,0b00011},   {973,0,0b01011},   {974,1,0b10001},   {975,0,0b01111},   {976,0,0b10011},   {977,1,0b11011},   {978,0,0b01101},   {979,1,0b11101},   {980,0,0b10001},   {981,1,0b11101},   {982,0,0b01111},   {983,1,0b01111},   {984,0,0b01001},   {985,0,0b01001},   {986,0,0b01101},   {987,1,0b11111},   {988,1,0b10111},   {989,1,0b00111},   {990,0,0b00101},   {991,1,0b01101},   {992,0,0b01001},   {993,0,0b10101},   {994,1,0b11001},   {995,1,0b00101},   {996,1,0b00101},   {997,0,0b01011},   {998,0,0b01011},   {999,1,0b01011},   {1000,1,0b10111},   {1001,0,0b01001},   {1002,1,0b01111},   {1003,0,0b00001},   {1004,0,0b01001},   {1005,0,0b01001},   {1006,0,0b01011},   {1007,1,0b11011},   {1008,1,0b10101},   {1009,1,0b11111},   {1010,0,0b01001},   {1011,1,0b01101},   {1012,0,0b00001},   {1013,1,0b11101},   {1014,1,0b00001},   {1015,1,0b10111},   {1016,1,0b00001},   {1017,1,0b11011},   {1018,1,0b10011},   {1019,0,0b00001},   {1020,1,0b11101},   {1021,0,0b01001},   {1022,1,0b10101},   {1023,0,0b11001},   {1024,1,0b11101},   {1025,0,0b00001},   {1026,1,0b01011},   {1027,0,0b01111},   {1028,1,0b10101},   {1029,1,0b01001},   {1030,1,0b01101},   {1031,0,0b01111},   {1032,0,0b11011},   {1033,0,0b11101},   {1034,1,0b11111},   {1035,0,0b00001},   {1036,0,0b00011},   {1037,1,0b01111},   {1038,0,0b11001},   {1039,1,0b11111},   {1040,1,0b00111},   {1041,0,0b00001},   {1042,1,0b00011},   {1043,0,0b01011},   {1044,0,0b10011},   {1045,1,0b11101},   {1046,1,0b11011},   {1047,1,0b01001},   {1048,1,0b00101},   {1049,1,0b11001},   {1050,1,0b01011},   {1051,1,0b01111},   {1052,1,0b10101},   {1056,1,0b11011},   {1057,0,0b01011},   {1058,0,0b01101},   {1059,1,0b11011},   {1061,0,0b00111},   {1062,0,0b11011},   {1063,1,0b11101},   {1064,0,0b00101},   {1065,1,0b00101},   {1066,0,0b00101},   {1067,1,0b11001},   {1068,0,0b00011},   {1069,1,0b01101},   {1070,0,0b01101},   {1071,1,0b11011},   {1073,0,0b00101},   {1074,0,0b10001},   {1075,1,0b11001},   {1076,1,0b00011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1777,7 +1777,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b00101},   {  1,0,0b01111},   {  2,0,0b10101},   {  3,1,0b11011},   {  4,1,0b00101},   {  5,1,0b01001},   {  6,1,0b10111},   {  7,1,0b00101},   {  8,1,0b10111},   {  9,1,0b10001},   { 10,1,0b10001},   { 12,0,0b00011},   { 13,0,0b00101},   { 14,0,0b11011},   { 15,1,0b11101},   { 16,0,0b00011},   { 17,1,0b11001},   { 18,0,0b10101},   { 19,1,0b11101},   { 20,1,0b11111},   { 21,1,0b11011},   { 22,1,0b11011},   { 23,0,0b00001},   { 24,1,0b10011},   { 25,1,0b01111},   { 26,1,0b11101},   { 27,1,0b00101},   { 28,1,0b10101},   { 29,0,0b11001},   { 30,1,0b11011},   { 31,1,0b11111},   { 32,0,0b01011},   { 33,1,0b01111},   { 34,0,0b00001},   { 35,1,0b01001},   { 36,1,0b00111},   { 37,0,0b10001},   { 38,1,0b10001},   { 39,1,0b11001},   { 40,0,0b10011},   { 41,1,0b11001},   { 42,0,0b00101},   { 43,1,0b11011},   { 44,1,0b01101},   { 46,1,0b11001},   { 47,1,0b10111},   { 48,1,0b10011},   { 50,1,0b10111},   { 51,1,0b00111},   { 52,1,0b01111},   { 53,1,0b01011},   { 54,1,0b10001},   { 55,1,0b01111},   { 56,1,0b11111},   { 57,1,0b10011},   { 58,1,0b01101},   { 59,1,0b11101},   { 60,1,0b00011},   { 61,1,0b11011},   { 62,1,0b11011},   { 63,1,0b00001},   { 64,1,0b11011},   { 65,1,0b11011},   { 66,1,0b01101},   { 67,1,0b00001},   { 68,1,0b10001},   { 69,1,0b00001},   { 70,1,0b01001},   { 71,1,0b00111},   { 72,1,0b11111},   { 73,1,0b00011},   { 74,0,0b01011},   { 75,1,0b10011},   { 76,1,0b10111},   { 77,1,0b10011},   { 78,1,0b01111},   { 79,1,0b00001},   { 80,1,0b01111},   { 81,1,0b00101},   { 82,1,0b10111},   { 83,1,0b10011},   { 84,0,0b10001},   { 85,1,0b10111},   { 86,0,0b10111},   { 87,1,0b11001},   { 88,1,0b10001},   { 89,0,0b11011},   { 90,1,0b11111},   { 91,0,0b00011},   { 92,1,0b10111},   { 93,1,0b10101},   { 94,1,0b10001},   { 95,1,0b10011},   { 96,1,0b01001},   { 97,1,0b10001},   { 98,1,0b11101},   { 99,1,0b10011},   {100,0,0b01011},   {101,1,0b10111},   {102,1,0b00001},   {103,1,0b01101},   {104,1,0b10101},   {105,1,0b11001},   {106,1,0b00111},   {107,1,0b11001},   {108,1,0b10111},   {109,1,0b00011},   {110,1,0b01011},   {111,1,0b10001},   {112,0,0b01101},   {113,0,0b10001},   {114,1,0b11101},   {115,1,0b01011},   {116,1,0b11101},   {117,0,0b01111},   {118,1,0b10001},   {119,0,0b00001},   {120,1,0b00011},   {121,1,0b10011},   {122,1,0b01001},   {123,1,0b10111},   {124,1,0b00101},   {125,1,0b00001},   {126,0,0b01011},   {127,1,0b10111},   {128,1,0b10111},   {129,1,0b00111},   {130,1,0b11111},   {131,1,0b11111},   {132,0,0b01001},   {133,1,0b11011},   {134,1,0b01101},   {135,1,0b00101},   {136,1,0b10111},   {137,1,0b00101},   {138,1,0b01101},   {139,1,0b10101},   {140,1,0b11011},   {141,0,0b01011},   {142,0,0b01101},   {143,1,0b01101},   {144,0,0b01011},   {145,1,0b11011},   {146,0,0b00011},   {147,1,0b10101},   {148,1,0b11101},   {149,0,0b01001},   {150,1,0b01101},   {151,0,0b01111},   {152,1,0b10111},   {153,0,0b10101},   {154,0,0b11011},   {155,1,0b11101},   {156,1,0b00111},   {157,0,0b00101},   {158,1,0b11111},   {159,1,0b10111},   {160,1,0b10111},   {161,1,0b10111},   {162,1,0b11111},   {163,0,0b00011},   {164,1,0b11101},   {165,0,0b10001},   {166,0,0b10111},   {167,1,0b11001},   {168,0,0b10111},   {169,1,0b11111},   {170,1,0b11011},   {171,1,0b00011},   {172,0,0b00011},   {173,0,0b00111},   {174,1,0b10101},   {175,0,0b10011},   {176,1,0b10101},   {177,1,0b01001},   {178,1,0b10011},   {179,0,0b01001},   {180,1,0b11111},   {181,1,0b11011},   {182,1,0b00111},   {183,1,0b10001},   {184,1,0b11111},   {185,1,0b10101},   {186,1,0b00001},   {187,1,0b01011},   {188,0,0b00001},   {189,1,0b01001},   {190,1,0b11001},   {191,0,0b01001},   {192,1,0b01011},   {193,1,0b00111},   {194,0,0b00101},   {195,1,0b01101},   {196,0,0b00001},   {197,1,0b11001},   {198,1,0b10101},   {199,1,0b11101},   {200,1,0b01101},   {201,1,0b01101},   {202,1,0b00001},   {203,1,0b01001},   {204,1,0b11101},   {205,1,0b01011},   {206,1,0b11101},   {207,1,0b11111},   {208,1,0b00111},   {209,1,0b00111},   {210,1,0b11011},   {211,1,0b11111},   {212,0,0b01001},   {213,1,0b10101},   {214,1,0b10111},   {215,1,0b11011},   {216,0,0b00101},   {217,1,0b01101},   {218,0,0b10001},   {219,1,0b10111},   {220,1,0b11101},   {221,1,0b11111},   {222,1,0b01011},   {223,0,0b01001},   {224,0,0b10101},   {225,1,0b10111},   {226,1,0b01111},   {227,0,0b00101},   {228,0,0b01001},   {229,0,0b11011},   {230,1,0b11101},   {231,1,0b10011},   {232,1,0b00101},   {233,1,0b10111},   {234,1,0b11011},   {235,0,0b01111},   {236,1,0b01111},   {237,0,0b00101},   {238,0,0b11001},   {239,1,0b11111},   {240,1,0b10001},   {241,1,0b10001},   {242,1,0b01101},   {243,1,0b01111},   {244,0,0b00011},   {245,1,0b01001},   {246,1,0b01111},   {247,1,0b01101},   {248,1,0b01101},   {249,1,0b10101},   {250,1,0b00011},   {251,0,0b10111},   {252,1,0b11111},   {253,1,0b10101},   {254,1,0b10001},   {255,0,0b10101},   {256,1,0b11001},   {257,1,0b01111},   {258,1,0b10111},   {259,0,0b00001},   {260,1,0b11001},   {261,0,0b00001},   {262,0,0b10101},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b11111},   {266,1,0b10001},   {267,1,0b11001},   {268,1,0b10111},   {269,0,0b01101},   {270,1,0b10101},   {271,0,0b10101},   {272,1,0b11101},   {273,1,0b00001},   {274,1,0b01001},   {275,1,0b11111},   {276,1,0b11101},   {277,0,0b01111},   {278,0,0b10111},   {279,1,0b11111},   {280,1,0b00011},   {281,0,0b01011},   {282,0,0b10001},   {283,1,0b11101},   {284,1,0b00111},   {285,1,0b10001},   {286,1,0b10011},   {287,1,0b00011},   {288,0,0b00101},   {289,1,0b01011},   {290,1,0b10111},   {291,1,0b01001},   {292,1,0b11111},   {293,1,0b10001},   {294,1,0b00101},   {295,0,0b00101},   {296,0,0b11111},   {297,1,0b11111},   {298,1,0b11101},   {299,1,0b11011},   {300,1,0b01101},   {301,1,0b00111},   {302,1,0b01001},   {303,1,0b11001},   {304,1,0b01101},   {305,1,0b11111},   {306,0,0b01101},   {307,1,0b01111},   {308,1,0b01001},   {309,1,0b11001},   {310,1,0b00001},   {311,1,0b01011},   {312,1,0b00101},   {313,0,0b00011},   {314,1,0b11111},   {315,0,0b00101},   {316,1,0b10101},   {317,1,0b01001},   {318,1,0b10011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11111},   {322,1,0b00101},   {323,1,0b00101},   {324,1,0b11111},   {325,1,0b11111},   {326,1,0b10011},   {327,1,0b11001},   {328,0,0b10011},   {329,1,0b11011},   {330,1,0b10001},   {331,0,0b00001},   {332,1,0b01011},   {333,1,0b11101},   {334,1,0b10011},   {335,1,0b11111},   {336,1,0b11011},   {337,1,0b11001},   {338,0,0b10101},   {339,1,0b11111},   {340,1,0b01111},   {341,1,0b10011},   {342,1,0b10001},   {343,0,0b00111},   {344,1,0b10001},   {345,1,0b10101},   {346,1,0b01011},   {347,1,0b11111},   {348,0,0b11001},   {349,1,0b11011},   {350,1,0b10001},   {351,0,0b10101},   {352,1,0b11111},   {353,1,0b01111},   {354,1,0b11101},   {355,0,0b00101},   {356,1,0b00111},   {357,1,0b00101},   {358,0,0b00011},   {359,1,0b01111},   {360,1,0b01011},   {361,0,0b00001},   {362,1,0b01101},   {363,1,0b10101},   {364,1,0b11111},   {365,1,0b00001},   {366,0,0b10001},   {367,1,0b10101},   {368,1,0b10001},   {369,1,0b10001},   {370,1,0b11101},   {371,1,0b11011},   {372,1,0b10011},   {373,0,0b00111},   {374,1,0b01101},   {375,0,0b00001},   {376,1,0b00111},   {377,1,0b01011},   {378,1,0b00001},   {379,1,0b11001},   {380,0,0b10101},   {381,1,0b10101},   {382,1,0b00111},   {383,1,0b01111},   {384,1,0b10001},   {385,0,0b00001},   {386,1,0b00101},   {387,0,0b10111},   {388,1,0b10111},   {389,0,0b00101},   {390,0,0b01001},   {391,1,0b11111},   {392,1,0b01011},   {393,0,0b10011},   {394,0,0b10011},   {395,1,0b11111},   {396,1,0b11101},   {397,0,0b00001},   {398,1,0b11111},   {399,1,0b01101},   {400,1,0b01001},   {401,1,0b01011},   {402,0,0b01001},   {403,0,0b01011},   {404,1,0b11101},   {405,0,0b01001},   {406,1,0b10001},   {407,1,0b10011},   {408,1,0b10111},   {409,0,0b01101},   {410,1,0b11111},   {411,1,0b01001},   {412,1,0b10111},   {413,0,0b00111},   {414,1,0b10001},   {415,0,0b01001},   {416,0,0b01011},   {417,1,0b10111},   {418,1,0b10001},   {419,0,0b01001},   {420,1,0b10101},   {421,1,0b00011},   {422,1,0b11011},   {423,1,0b11101},   {424,1,0b00001},   {425,0,0b11011},   {426,1,0b11111},   {427,1,0b01101},   {428,1,0b00101},   {429,1,0b01101},   {430,1,0b10011},   {431,1,0b00011},   {432,1,0b10101},   {433,1,0b01011},   {434,1,0b00001},   {435,1,0b10001},   {436,1,0b10001},   {437,1,0b01101},   {438,1,0b00111},   {439,1,0b10111},   {440,1,0b00011},   {441,0,0b00101},   {442,0,0b10101},   {443,1,0b11011},   {444,1,0b01101},   {445,1,0b00001},   {446,1,0b00001},   {447,1,0b00001},   {448,0,0b01011},   {449,1,0b10001},   {450,0,0b00011},   {451,0,0b00111},   {452,1,0b11001},   {453,1,0b00101},   {454,0,0b00111},   {455,1,0b11111},   {456,0,0b10011},   {457,0,0b10011},   {458,1,0b11101},   {459,0,0b10101},   {460,1,0b10101},   {461,1,0b11011},   {462,1,0b01111},   {463,0,0b00101},   {464,1,0b01001},   {465,1,0b00111},   {466,0,0b00111},   {467,1,0b10101},   {468,1,0b11111},   {469,1,0b11101},   {470,1,0b10001},   {471,1,0b00001},   {472,0,0b01111},   {473,1,0b01111},   {474,1,0b10111},   {475,0,0b10001},   {476,1,0b10011},   {477,0,0b00101},   {478,1,0b11001},   {479,1,0b10101},   {480,0,0b11011},   {481,1,0b11111},   {482,1,0b11111},   {483,0,0b00101},   {484,1,0b10001},   {485,1,0b10101},   {486,1,0b11001},   {487,1,0b01101},   {488,1,0b11001},   {489,0,0b10101},   {490,1,0b11111},   {491,1,0b00001},   {492,1,0b10011},   {493,1,0b01001},   {494,1,0b01101},   {495,1,0b00101},   {496,1,0b10111},   {497,0,0b00011},   {498,1,0b01111},   {499,1,0b10011},   {500,0,0b11111},   {501,1,0b11111},   {502,1,0b10011},   {503,1,0b10001},   {504,0,0b00111},   {505,0,0b01111},   {506,1,0b10011},   {507,1,0b11111},   {508,1,0b01001},   {509,1,0b10011},   {510,0,0b00111},   {511,1,0b01111},   {512,1,0b01111},   {513,1,0b01011},   {514,1,0b11101},   {515,0,0b10001},   {516,1,0b10011},   {517,1,0b00011},   {518,0,0b11011},   {519,1,0b11101},   {520,1,0b00011},   {521,1,0b00101},   {522,0,0b01011},   {523,1,0b10011},   {524,1,0b10011},   {525,1,0b11001},   {526,1,0b10011},   {527,1,0b01101},   {528,1,0b01001},   {529,0,0b00101},   {530,1,0b10111},   {531,1,0b00101},   {532,1,0b00001},   {533,0,0b00001},   {534,0,0b10101},   {535,1,0b11001},   {536,0,0b01011},   {537,0,0b01011},   {538,1,0b11001},   {539,1,0b10001},   {540,0,0b00101},   {541,0,0b10011},   {542,1,0b10011},   {543,1,0b00111},   {544,1,0b11011},   {545,1,0b01111},   {546,1,0b11111},   {547,1,0b01101},   {548,0,0b01101},   {549,1,0b11101},   {550,1,0b11111},   {551,0,0b00111},   {552,1,0b01011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1795,7 +1795,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1813,7 +1813,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1838,9 +1838,9 @@ public:
                 string_keys.emplace_back(reinterpret_cast<const char *>(&value), str_length);
             }
 
-            Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+            Diva<diva_type> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, nullptr, 0, check_it_write);
                 {
@@ -1851,7 +1851,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1869,7 +1869,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,0,0b00001},   {  2,0,0b01101},   {  3,0,0b10011},   {  4,0,0b10101},   {  5,1,0b11111},   {  6,1,0b11011},   {  7,0,0b10101},   {  8,1,0b10111},   {  9,1,0b01101},   { 10,0,0b00011},   { 11,0,0b10101},   { 12,1,0b11101},   { 13,1,0b00011},   { 14,0,0b00001},   { 15,0,0b00001},   { 16,1,0b01101},   { 17,1,0b10011},   { 18,0,0b10101},   { 19,1,0b11011},   { 20,1,0b00011},   { 21,1,0b01011},   { 22,0,0b00111},   { 23,0,0b01011},   { 24,0,0b11011},   { 25,1,0b11111},   { 26,0,0b00101},   { 27,1,0b11101},   { 28,1,0b01001},   { 29,1,0b10001},   { 30,1,0b10011},   { 31,1,0b11011},   { 32,0,0b00001},   { 33,0,0b00111},   { 34,0,0b11011},   { 35,0,0b11011},   { 36,1,0b11101},   { 37,1,0b00101},   { 38,1,0b11111},   { 39,0,0b01001},   { 40,0,0b10011},   { 41,0,0b10011},   { 42,1,0b11111},   { 43,1,0b11101},   { 44,0,0b01101},   { 45,0,0b01101},   { 46,1,0b11101},   { 47,1,0b01101},   { 48,0,0b00011},   { 49,0,0b11001},   { 50,1,0b11011},   { 51,1,0b01001},   { 52,1,0b00111},   { 53,0,0b00011},   { 54,1,0b00111},   { 55,1,0b10011},   { 56,0,0b00001},   { 57,1,0b11001},   { 58,0,0b00001},   { 59,0,0b00001},   { 60,1,0b01001},   { 61,0,0b00101},   { 62,0,0b10011},   { 63,1,0b10111},   { 64,1,0b00011},   { 65,1,0b00111},   { 66,0,0b10001},   { 67,1,0b10001},   { 68,1,0b01101},   { 69,0,0b00001},   { 70,0,0b01101},   { 71,1,0b11011},   { 72,0,0b01101},   { 73,0,0b10111},   { 74,0,0b11001},   { 75,1,0b11101},   { 76,0,0b00111},   { 77,0,0b00111},   { 78,0,0b01011},   { 79,1,0b11011},   { 80,0,0b01001},   { 81,0,0b01101},   { 82,0,0b01101},   { 83,1,0b11111},   { 84,1,0b11111},   { 85,0,0b10011},   { 86,0,0b11001},   { 87,1,0b11001},   { 88,1,0b00101},   { 89,0,0b00001},   { 90,1,0b00111},   { 91,1,0b01011},   { 92,0,0b01011},   { 93,0,0b11011},   { 94,1,0b11011},   { 95,1,0b10111},   { 96,0,0b01001},   { 97,1,0b10111},   { 98,0,0b10011},   { 99,1,0b11011},   {100,1,0b11001},   {101,1,0b00101},   {102,1,0b11001},   {103,1,0b01101},   {104,0,0b10111},   {105,1,0b11111},   {106,1,0b11001},   {109,0,0b00101},   {110,1,0b01111},   {111,1,0b01001},   {112,0,0b11101},   {113,1,0b11101},   {114,0,0b01111},   {115,0,0b10001},   {116,1,0b11101},   {117,0,0b00101},   {118,1,0b11001},   {119,1,0b11011},   {120,1,0b00111},   {121,0,0b01011},   {122,0,0b01011},   {123,0,0b01101},   {124,1,0b11111},   {125,1,0b10101},   {126,0,0b10011},   {127,1,0b10101},   {128,1,0b11001},   {129,0,0b00011},   {130,1,0b10111},   {131,1,0b01111},   {134,1,0b01011},   {135,1,0b00111},   {137,1,0b10111},   {138,0,0b01001},   {139,1,0b01111},   {140,1,0b00101},   {141,0,0b01001},   {142,1,0b01011},   {143,0,0b01111},   {144,1,0b10011},   {146,1,0b01011},   {148,0,0b00001},   {149,0,0b10011},   {150,1,0b11001},   {152,1,0b01011},   {154,0,0b10001},   {155,0,0b10101},   {156,1,0b10101},   {157,1,0b10011},   {158,1,0b11001},   {159,0,0b10001},   {160,0,0b10101},   {161,1,0b11111},   {162,0,0b00001},   {163,0,0b00111},   {164,1,0b01011},   {165,1,0b01011},   {166,1,0b11101},   {167,0,0b00111},   {168,1,0b01011},   {169,0,0b00101},   {170,1,0b10101},   {171,1,0b11101},   {172,0,0b00101},   {173,1,0b11001},   {174,0,0b00111},   {175,1,0b11101},   {176,0,0b00111},   {177,1,0b11001},   {179,0,0b01001},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b11111},   {183,1,0b11111},   {184,0,0b10111},   {185,1,0b10111},   {186,0,0b00101},   {187,1,0b11101},   {188,0,0b10001},   {189,0,0b10101},   {190,1,0b11111},   {191,0,0b01111},   {192,0,0b10111},   {193,1,0b11111},   {194,1,0b10111},   {195,1,0b01011},   {197,0,0b01011},   {198,1,0b10101},   {199,1,0b10111},   {200,0,0b10101},   {201,1,0b11001},   {202,1,0b00101},   {203,1,0b11011},   {204,1,0b01011},   {207,0,0b00001},   {208,0,0b01011},   {209,0,0b01011},   {210,1,0b01111},   {211,1,0b11111},   {212,1,0b10111},   {213,1,0b01111},   {214,1,0b11011},   {215,0,0b01011},   {216,1,0b01101},   {218,1,0b01001},   {219,0,0b11011},   {220,0,0b11011},   {221,1,0b11111},   {222,1,0b10101},   {224,1,0b01011},   {226,1,0b11111},   {229,1,0b11001},   {230,1,0b01011},   {233,0,0b01011},   {234,1,0b10111},   {238,1,0b01111},   {239,0,0b11101},   {240,0,0b11101},   {241,0,0b11111},   {242,1,0b11111},   {243,0,0b00001},   {244,0,0b01001},   {245,1,0b10101},   {246,1,0b01111},   {247,0,0b00011},   {248,1,0b11001},   {249,0,0b00011},   {250,0,0b00101},   {251,1,0b11011},   {252,0,0b00101},   {253,1,0b01111},   {254,0,0b00001},   {255,0,0b11001},   {256,1,0b11111},   {257,0,0b00001},   {258,0,0b01011},   {259,1,0b11101},   {260,1,0b01011},   {261,0,0b01101},   {262,1,0b01111},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b00011},   {266,0,0b00011},   {267,1,0b11011},   {268,0,0b00101},   {269,1,0b10001},   {270,1,0b11101},   {271,1,0b11001},   {272,0,0b01101},   {273,1,0b11001},   {275,1,0b10101},   {277,0,0b11001},   {278,1,0b11001},   {279,1,0b10101},   {280,0,0b00011},   {281,1,0b00101},   {282,1,0b00101},   {283,0,0b10001},   {284,1,0b11111},   {285,1,0b10101},   {286,1,0b10111},   {287,0,0b00101},   {288,1,0b01101},   {290,1,0b01011},   {292,1,0b01111},   {293,1,0b00111},   {296,0,0b01011},   {297,1,0b01101},   {298,1,0b11001},   {301,0,0b00001},   {302,1,0b10101},   {303,0,0b00001},   {304,1,0b01011},   {305,1,0b11001},   {306,1,0b01011},   {308,0,0b01001},   {309,1,0b10001},   {310,1,0b01001},   {312,0,0b01011},   {313,1,0b01011},   {314,0,0b01011},   {315,0,0b01011},   {316,1,0b01111},   {317,0,0b00011},   {318,1,0b11011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11001},   {322,1,0b00001},   {325,0,0b01101},   {326,0,0b01101},   {327,1,0b11001},   {328,0,0b01101},   {329,1,0b10111},   {330,0,0b00001},   {331,1,0b10011},   {332,0,0b00011},   {333,1,0b10111},   {334,1,0b11101},   {335,0,0b01111},   {336,0,0b10111},   {337,1,0b11001},   {338,1,0b10011},   {339,1,0b01101},   {340,1,0b01011},   {341,1,0b11111},   {342,0,0b01001},   {343,1,0b11001},   {344,1,0b00001},   {346,0,0b10001},   {347,0,0b10111},   {348,1,0b11101},   {349,0,0b00111},   {350,1,0b10001},   {351,1,0b10001},   {352,0,0b01011},   {353,1,0b11001},   {354,1,0b00011},   {355,1,0b00111},   {357,0,0b10011},   {358,1,0b11101},   {359,1,0b00011},   {360,0,0b01111},   {361,1,0b10001},   {362,1,0b01111},   {363,1,0b10101},   {366,1,0b11111},   {367,1,0b00111},   {370,1,0b11001},   {371,1,0b11101},   {373,1,0b00011},   {375,1,0b00101},   {378,1,0b00111},   {379,1,0b11111},   {381,0,0b01001},   {382,0,0b10011},   {383,0,0b11001},   {384,1,0b11011},   {385,0,0b00111},   {386,1,0b01101},   {387,0,0b00011},   {388,0,0b00101},   {389,0,0b01101},   {390,0,0b10111},   {391,0,0b11001},   {392,1,0b11111},   {393,1,0b10111},   {394,1,0b00001},   {395,0,0b01101},   {396,1,0b01101},   {397,0,0b00001},   {398,0,0b01011},   {399,1,0b10111},   {400,1,0b11111},   {401,0,0b00101},   {402,1,0b01001},   {403,1,0b01101},   {404,0,0b10001},   {405,0,0b10011},   {406,1,0b10101},   {407,1,0b01011},   {408,1,0b10001},   {409,0,0b01011},   {410,1,0b01111},   {411,1,0b11011},   {412,0,0b00101},   {413,1,0b10001},   {414,0,0b00111},   {415,0,0b11001},   {416,0,0b11001},   {417,1,0b11101},   {418,1,0b01001},   {419,0,0b00111},   {420,1,0b11011},   {421,1,0b11101},   {422,1,0b01111},   {423,1,0b11001},   {424,0,0b00011},   {425,1,0b10111},   {426,0,0b00101},   {427,1,0b11001},   {428,0,0b10011},   {429,1,0b10111},   {430,1,0b10011},   {431,1,0b01011},   {432,0,0b01111},   {433,1,0b11111},   {438,1,0b10111},   {440,1,0b00011},   {441,1,0b10011},   {442,1,0b01111},   {445,1,0b11111},   {446,1,0b01001},   {447,0,0b00001},   {448,0,0b00001},   {449,0,0b01101},   {450,0,0b01111},   {451,0,0b10101},   {452,0,0b11101},   {453,1,0b11111},   {454,0,0b10001},   {455,1,0b11111},   {456,0,0b10001},   {457,1,0b11101},   {458,0,0b00101},   {459,1,0b01001},   {460,0,0b00101},   {461,0,0b10011},   {462,0,0b11001},   {463,0,0b11101},   {464,1,0b11101},   {465,1,0b01111},   {466,0,0b00011},   {467,1,0b10111},   {468,1,0b00001},   {469,1,0b01111},   {470,1,0b00111},   {471,1,0b10011},   {472,0,0b11001},   {473,0,0b11001},   {474,1,0b11101},   {475,1,0b10111},   {476,1,0b11111},   {477,0,0b00011},   {478,1,0b01001},   {479,0,0b00001},   {480,0,0b10101},   {481,1,0b11101},   {482,0,0b10001},   {483,1,0b10011},   {484,1,0b00001},   {485,1,0b00001},   {486,0,0b01111},   {487,1,0b01111},   {488,1,0b00111},   {489,0,0b00011},   {490,0,0b00101},   {491,0,0b01101},   {492,1,0b10001},   {493,0,0b00011},   {494,1,0b10111},   {495,0,0b01001},   {496,1,0b10101},   {497,0,0b00111},   {498,1,0b01011},   {499,0,0b00001},   {500,1,0b10001},   {501,0,0b01011},   {502,0,0b10011},   {503,1,0b11111},   {504,1,0b11011},   {505,1,0b10011},   {506,1,0b10001},   {507,0,0b00111},   {508,1,0b10001},   {509,1,0b01101},   {510,0,0b10111},   {511,1,0b11101},   {512,1,0b11101},   {513,0,0b00111},   {514,0,0b11001},   {515,1,0b11101},   {516,1,0b01011},   {517,0,0b10001},   {518,1,0b10111},   {519,0,0b00011},   {520,1,0b00111},   {521,1,0b00101},   {522,0,0b10101},   {523,1,0b11001},   {524,0,0b00101},   {525,1,0b10101},   {526,1,0b10001},   {527,0,0b01001},   {528,1,0b11111},   {529,0,0b01101},   {530,1,0b01111},   {531,1,0b11001},   {532,0,0b00101},   {533,1,0b00111},   {534,1,0b01011},   {535,0,0b00111},   {536,0,0b10001},   {537,0,0b10101},   {538,1,0b10111},   {539,0,0b00011},   {540,0,0b01001},   {541,1,0b10011},   {542,1,0b11101},   {543,0,0b01001},   {544,0,0b01001},   {545,0,0b01011},   {546,1,0b11011},   {547,0,0b01101},   {548,0,0b10101},   {549,1,0b10101},   {550,0,0b00001},   {551,0,0b00101},   {552,1,0b01111},   {553,1,0b01011},   {554,0,0b10101},   {555,1,0b11101},   {556,1,0b10011},   {557,0,0b01001},   {558,0,0b10001},   {559,1,0b10101},   {560,0,0b00101},   {561,0,0b01111},   {562,0,0b10101},   {563,0,0b10111},   {564,1,0b11101},   {565,1,0b01111},   {566,1,0b00101},   {567,0,0b00101},   {568,0,0b00111},   {569,1,0b01001},   {570,1,0b01011},   {571,1,0b01111},   {572,1,0b00101},   {573,1,0b00111},   {574,1,0b11011},   {575,0,0b00111},   {576,1,0b10101},   {577,1,0b01111},   {578,1,0b11001},   {579,1,0b00001},   {580,1,0b00001},   {581,1,0b00001},   {582,0,0b01011},   {583,1,0b11011},   {584,0,0b00011},   {585,0,0b01001},   {586,0,0b10011},   {587,1,0b11011},   {588,0,0b10001},   {589,1,0b11001},   {590,1,0b00101},   {591,1,0b10111},   {592,0,0b10011},   {593,0,0b10101},   {594,1,0b11001},   {595,0,0b10011},   {596,1,0b10101},   {597,1,0b10011},   {598,1,0b11001},   {599,0,0b00111},   {600,0,0b10101},   {601,0,0b10101},   {602,1,0b11101},   {603,0,0b10011},   {604,1,0b10011},   {605,1,0b01001},   {606,1,0b01011},   {607,1,0b00111},   {608,0,0b00001},   {609,0,0b00011},   {610,0,0b10001},   {611,1,0b11001},   {612,0,0b00001},   {613,0,0b01011},   {614,1,0b11001},   {615,1,0b00111},   {616,1,0b11001},   {617,0,0b00111},   {618,0,0b01101},   {619,0,0b10001},   {620,1,0b10001},   {621,1,0b11011},   {622,0,0b01101},   {623,1,0b11101},   {624,0,0b00011},   {625,1,0b01111},   {626,1,0b11101},   {627,0,0b00111},   {628,1,0b01001},   {629,0,0b00001},   {630,1,0b11011},   {631,0,0b00101},   {632,1,0b10111},   {633,0,0b00111},   {634,1,0b11011},   {635,1,0b11101},   {636,1,0b00011},   {637,1,0b01111},   {638,0,0b00011},   {639,0,0b01101},   {640,1,0b11011},   {641,1,0b00011},   {642,0,0b00111},   {643,0,0b01001},   {644,0,0b01011},   {645,0,0b10111},   {646,0,0b11001},   {647,1,0b11101},   {648,1,0b01011},   {649,1,0b10111},   {650,1,0b00011},   {651,0,0b00101},   {652,0,0b10111},   {653,0,0b10111},   {654,1,0b11011},   {655,0,0b01011},   {656,1,0b11011},   {657,0,0b00111},   {658,0,0b01101},   {659,0,0b10011},   {660,1,0b11111},   {661,1,0b01011},   {662,0,0b10101},   {663,1,0b11011},   {664,0,0b01011},   {665,0,0b01111},   {666,1,0b11001},   {667,1,0b11011},   {668,1,0b00111},   {669,1,0b00101},   {670,1,0b01001},   {671,1,0b01011},   {672,1,0b11101},   {673,1,0b10011},   {674,0,0b01001},   {675,1,0b11001},   {676,0,0b00101},   {677,1,0b01111},   {678,0,0b00001},   {679,1,0b10001},   {680,0,0b00101},   {681,1,0b11011},   {682,1,0b10101},   {683,0,0b01111},   {684,0,0b10111},   {685,1,0b11111},   {686,0,0b00101},   {687,0,0b01011},   {688,0,0b10011},   {689,1,0b11011},   {690,1,0b01001},   {691,0,0b00101},   {692,1,0b11001},   {693,0,0b10011},   {694,1,0b10101},   {695,1,0b10001},   {696,1,0b10111},   {697,1,0b00111},   {698,1,0b11001},   {699,1,0b00001},   {700,1,0b01101},   {701,1,0b11111},   {702,1,0b00001},   {703,0,0b00111},   {704,1,0b11001},   {705,1,0b10001},   {706,0,0b11101},   {707,1,0b11101},   {708,0,0b10111},   {709,1,0b11111},   {710,0,0b00001},   {711,0,0b00101},   {712,1,0b01011},   {713,0,0b00011},   {714,1,0b10111},   {715,0,0b00011},   {716,1,0b00101},   {717,0,0b01001},   {718,0,0b10101},   {719,1,0b11111},   {720,0,0b01011},   {721,1,0b10111},   {722,1,0b01111},   {723,0,0b01011},   {724,1,0b10101},   {725,0,0b01111},   {726,1,0b11011},   {727,0,0b00111},   {728,0,0b10011},   {729,1,0b10111},   {730,0,0b00111},   {731,0,0b10001},   {732,1,0b10011},   {733,1,0b00001},   {734,0,0b01111},   {735,0,0b01111},   {736,1,0b10001},   {737,1,0b01001},   {738,0,0b00001},   {739,1,0b00111},   {740,1,0b11011},   {741,0,0b10001},   {742,0,0b10001},   {743,0,0b10001},   {744,1,0b10111},   {745,1,0b10001},   {746,1,0b10001},   {747,0,0b01001},   {748,0,0b01101},   {749,0,0b11001},   {750,1,0b11011},   {751,1,0b10001},   {752,0,0b00001},   {753,0,0b00011},   {754,1,0b00101},   {755,1,0b00111},   {756,0,0b00011},   {757,1,0b01001},   {758,1,0b00111},   {759,0,0b00001},   {760,1,0b11101},   {761,1,0b01111},   {762,1,0b00111},   {763,0,0b01001},   {764,1,0b10001},   {765,1,0b00111},   {766,1,0b01011},   {767,1,0b10011},   {768,0,0b01101},   {769,1,0b10001},   {770,1,0b10001},   {771,0,0b00011},   {772,0,0b00101},   {773,1,0b11101},   {774,1,0b10111},   {775,1,0b10101},   {776,1,0b10001},   {777,1,0b11101},   {778,0,0b11001},   {779,1,0b11101},   {780,0,0b01011},   {781,1,0b11001},   {782,0,0b10001},   {783,1,0b10101},   {784,1,0b00001},   {785,0,0b10001},   {786,1,0b11101},   {787,1,0b11111},   {788,0,0b00011},   {789,1,0b10001},   {790,1,0b01011},   {791,1,0b10101},   {792,0,0b11001},   {793,1,0b11101},   {794,0,0b10001},   {795,1,0b10101},   {796,1,0b01001},   {797,1,0b11011},   {798,0,0b00111},   {799,0,0b01001},   {800,0,0b10111},   {801,1,0b11111},   {802,1,0b11101},   {803,1,0b10101},   {804,0,0b00011},   {805,1,0b10001},   {806,1,0b11111},   {807,1,0b10111},   {808,1,0b01111},   {809,0,0b01011},   {810,1,0b11011},   {811,1,0b10101},   {812,0,0b00011},   {813,1,0b01101},   {814,0,0b00101},   {815,0,0b01001},   {816,1,0b10001},   {817,0,0b01101},   {818,1,0b11111},   {819,1,0b01001},   {820,0,0b10101},   {821,0,0b10111},   {822,1,0b11111},   {823,0,0b00001},   {824,1,0b10011},   {825,1,0b00011},   {826,1,0b01101},   {827,1,0b11011},   {828,1,0b00001},   {829,1,0b11011},   {830,1,0b10011},   {831,0,0b01101},   {832,1,0b10001},   {833,0,0b00011},   {834,1,0b10011},   {835,0,0b00101},   {836,1,0b01001},   {837,0,0b01111},   {838,1,0b10011},   {839,0,0b10011},   {840,1,0b11111},   {841,1,0b01001},   {842,1,0b01101},   {843,0,0b01111},   {844,1,0b10101},   {845,0,0b00011},   {846,1,0b11111},   {847,1,0b00111},   {848,0,0b00001},   {849,0,0b00111},   {850,0,0b10101},   {851,0,0b10111},   {852,1,0b11101},   {853,0,0b01111},   {854,1,0b11001},   {855,1,0b10001},   {856,1,0b01111},   {857,0,0b10111},   {858,0,0b11001},   {859,1,0b11001},   {860,0,0b10101},   {861,1,0b11111},   {862,1,0b10011},   {863,0,0b01011},   {864,1,0b11011},   {865,1,0b11011},   {866,0,0b10011},   {867,1,0b10101},   {868,0,0b00101},   {869,1,0b00101},   {870,0,0b00011},   {871,0,0b10111},   {872,1,0b11011},   {873,0,0b01001},   {874,0,0b01001},   {875,1,0b11101},   {876,0,0b01001},   {877,0,0b10101},   {878,1,0b11101},   {879,0,0b11001},   {880,0,0b11111},   {881,1,0b11111},   {882,0,0b01011},   {883,1,0b11101},   {884,0,0b00111},   {885,1,0b10111},   {886,0,0b00101},   {887,1,0b01011},   {888,0,0b00001},   {889,1,0b00011},   {890,0,0b00111},   {891,0,0b01001},   {892,1,0b01101},   {893,0,0b00011},   {894,1,0b10011},   {895,1,0b01111},   {896,1,0b10111},   {897,0,0b01001},   {898,0,0b01111},   {899,0,0b10011},   {900,1,0b11111},   {901,1,0b11001},   {902,0,0b00011},   {903,1,0b10001},   {904,1,0b01011},   {905,0,0b00101},   {906,1,0b01001},   {907,0,0b10011},   {908,0,0b10111},   {909,0,0b11011},   {910,1,0b11111},   {911,1,0b11111},   {912,1,0b00111},   {913,1,0b01101},   {914,1,0b11101},   {915,0,0b10101},   {916,0,0b11011},   {917,1,0b11011},   {918,0,0b01111},   {919,0,0b10001},   {920,1,0b11101},   {921,0,0b01011},   {922,1,0b10111},   {923,0,0b00001},   {924,0,0b01011},   {925,1,0b10001},   {926,0,0b00011},   {927,1,0b01101},   {928,1,0b11001},   {929,0,0b00111},   {930,0,0b01101},   {931,0,0b11011},   {932,1,0b11111},   {933,1,0b11011},   {934,1,0b11011},   {935,0,0b10101},   {936,1,0b11001},   {937,1,0b00111},   {938,1,0b01011},   {939,0,0b00101},   {940,1,0b00111},   {941,1,0b01001},   {942,1,0b11111},   {943,0,0b01101},   {944,1,0b11101},   {945,0,0b00001},   {946,1,0b11001},   {947,0,0b01001},   {948,1,0b01111},   {949,1,0b00001},   {950,0,0b00101},   {951,0,0b01111},   {952,0,0b11001},   {953,1,0b11001},   {954,0,0b10001},   {955,1,0b11011},   {956,0,0b01101},   {957,1,0b01101},   {958,1,0b01101},   {959,0,0b00111},   {960,0,0b01011},   {961,1,0b10011},   {962,0,0b00111},   {963,0,0b10001},   {964,0,0b10101},   {965,1,0b11001},   {966,1,0b11011},   {967,1,0b11101},   {968,1,0b01001},   {969,0,0b00101},   {970,0,0b00111},   {971,1,0b10111},   {972,1,0b00001},   {973,0,0b01101},   {974,1,0b10101},   {975,1,0b11111},   {976,1,0b01111},   {977,0,0b00101},   {978,0,0b10001},   {979,1,0b11111},   {980,1,0b10111},   {981,0,0b01011},   {982,0,0b01101},   {983,1,0b10101},   {984,1,0b11101},   {985,1,0b10011},   {986,0,0b10101},   {987,1,0b11111},   {988,0,0b10011},   {989,1,0b11111},   {990,0,0b00111},   {991,1,0b10111},   {992,0,0b10101},   {993,0,0b10101},   {994,1,0b11011},   {995,0,0b01001},   {996,1,0b10101},   {997,1,0b01011},   {998,1,0b10101},   {999,1,0b11001},   {1000,1,0b01111},   {1001,1,0b00011},   {1002,0,0b00001},   {1003,0,0b00011},   {1004,0,0b00101},   {1005,1,0b01011},   {1006,1,0b00101},   {1007,1,0b00101},   {1008,0,0b00111},   {1009,1,0b01011},   {1010,0,0b11001},   {1011,1,0b11111},   {1012,0,0b10101},   {1013,0,0b11101},   {1014,1,0b11111},   {1015,1,0b10101},   {1016,0,0b01011},   {1017,0,0b10111},   {1018,1,0b11111},   {1019,1,0b11011},   {1020,1,0b10101},   {1021,0,0b01001},   {1022,0,0b10001},   {1023,1,0b11111},   {1024,1,0b11001},   {1025,0,0b00101},   {1026,0,0b10001},   {1027,1,0b11001},   {1028,0,0b10111},   {1029,1,0b10111},   {1030,0,0b11011},   {1031,1,0b11111},   {1032,1,0b11111},   {1033,0,0b01011},   {1034,0,0b01011},   {1035,1,0b10011},   {1036,0,0b01101},   {1037,1,0b10011},   {1038,0,0b00001},   {1039,1,0b01111},   {1040,1,0b00011},   {1041,0,0b10101},   {1042,1,0b11101},   {1043,0,0b11001},   {1044,1,0b11011},   {1045,1,0b01101},   {1046,0,0b00101},   {1047,0,0b01011},   {1048,0,0b10101},   {1049,0,0b11101},   {1050,1,0b11101},   {1051,0,0b00001},   {1052,0,0b01101},   {1053,1,0b10001},   {1054,0,0b00101},   {1055,0,0b00111},   {1056,1,0b01001},   {1057,0,0b11101},   {1058,1,0b11101},   {1059,1,0b10001},   {1060,1,0b10101},   {1061,0,0b00101},   {1062,1,0b10101},   {1063,0,0b00011},   {1064,0,0b00101},   {1065,1,0b10111},   {1066,0,0b01011},   {1067,1,0b01011},   {1068,0,0b00101},   {1069,1,0b01011},   {1070,1,0b01001},   {1071,0,0b00011},   {1072,1,0b00101},   {1073,0,0b10001},   {1074,1,0b11101},   {1075,1,0b01011},   {1076,1,0b11001}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1887,7 +1887,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11101},   {  1,1,0b11111},   {  2,0,0b10101},   {  3,1,0b11011},   {  5,0,0b01001},   {  6,0,0b01011},   {  7,1,0b10011},   {  8,0,0b00101},   {  9,1,0b10001},   { 10,0,0b01101},   { 11,1,0b11001},   { 12,0,0b00001},   { 13,1,0b11111},   { 14,1,0b10001},   { 15,1,0b00001},   { 16,0,0b01001},   { 17,1,0b11111},   { 18,0,0b01101},   { 19,1,0b01111},   { 20,0,0b01111},   { 21,0,0b10111},   { 22,1,0b11111},   { 23,1,0b01111},   { 24,0,0b00001},   { 25,0,0b01001},   { 26,1,0b11001},   { 27,1,0b10001},   { 28,1,0b10111},   { 29,1,0b01011},   { 30,0,0b00011},   { 31,1,0b11001},   { 34,0,0b01001},   { 35,0,0b01111},   { 36,0,0b10101},   { 37,1,0b11001},   { 38,0,0b00011},   { 39,0,0b00101},   { 40,0,0b01101},   { 41,0,0b10011},   { 42,1,0b11011},   { 43,1,0b11001},   { 44,1,0b00011},   { 45,1,0b01111},   { 46,1,0b11011},   { 47,1,0b11111},   { 48,1,0b10011},   { 49,1,0b11111},   { 50,1,0b00001},   { 51,1,0b10001},   { 52,0,0b01101},   { 53,0,0b01111},   { 54,1,0b10101},   { 55,1,0b10101},   { 56,0,0b10111},   { 57,1,0b11101},   { 58,1,0b10101},   { 59,0,0b00001},   { 60,1,0b10001},   { 61,1,0b01111},   { 62,0,0b01101},   { 63,0,0b10111},   { 64,1,0b11001},   { 65,0,0b01001},   { 66,0,0b01011},   { 67,1,0b01111},   { 68,1,0b00111},   { 69,1,0b00111},   { 70,0,0b00111},   { 71,1,0b01101},   { 72,1,0b11101},   { 73,1,0b10101},   { 74,0,0b10001},   { 75,1,0b11111},   { 76,1,0b11111},   { 77,0,0b01001},   { 78,0,0b10111},   { 79,1,0b11001},   { 80,0,0b00111},   { 81,1,0b11111},   { 83,0,0b01011},   { 84,1,0b10101},   { 85,0,0b00001},   { 86,0,0b01101},   { 87,0,0b10011},   { 88,1,0b10101},   { 89,1,0b01011},   { 90,0,0b01101},   { 91,1,0b01111},   { 92,1,0b00101},   { 93,1,0b11101},   { 94,0,0b00111},   { 95,1,0b01001},   { 96,0,0b00101},   { 97,1,0b10001},   { 98,0,0b10001},   { 99,0,0b10001},   {100,1,0b11001},   {101,1,0b01101},   {102,1,0b01001},   {103,0,0b00101},   {104,0,0b00111},   {105,0,0b00111},   {106,1,0b10011},   {107,1,0b00001},   {108,0,0b01101},   {109,1,0b10101},   {110,0,0b10101},   {111,1,0b11001},   {112,0,0b01111},   {113,1,0b01111},   {114,1,0b00101},   {115,0,0b10001},   {116,0,0b10101},   {117,0,0b10111},   {118,1,0b11011},   {119,1,0b10111},   {120,1,0b10101},   {121,0,0b01111},   {122,0,0b01111},   {123,0,0b10101},   {124,1,0b10101},   {125,0,0b00111},   {126,0,0b01011},   {127,1,0b10001},   {128,0,0b01011},   {129,1,0b11101},   {130,0,0b01001},   {131,1,0b10111},   {132,0,0b10111},   {133,1,0b11001},   {134,0,0b01111},   {135,1,0b11001},   {136,0,0b00101},   {137,1,0b11101},   {138,1,0b00011},   {139,1,0b11011},   {140,1,0b00011},   {141,0,0b10001},   {142,1,0b10111},   {143,0,0b00001},   {144,0,0b01101},   {145,0,0b10001},   {146,1,0b11011},   {147,0,0b00101},   {148,0,0b10111},   {149,1,0b11011},   {150,0,0b01111},   {151,1,0b11001},   {152,0,0b10011},   {153,1,0b10101},   {154,1,0b10111},   {155,0,0b01011},   {156,1,0b01111},   {157,0,0b00111},   {158,0,0b10001},   {159,1,0b11011},   {160,1,0b00001},   {161,0,0b11111},   {162,1,0b11111},   {163,0,0b01001},   {164,0,0b10001},   {165,1,0b10011},   {166,1,0b01111},   {167,0,0b00111},   {168,0,0b01111},   {169,1,0b10101},   {170,0,0b01101},   {171,1,0b11001},   {172,1,0b11011},   {173,1,0b01011},   {174,1,0b10101},   {175,1,0b01101},   {176,1,0b01101},   {177,0,0b00111},   {178,1,0b11001},   {179,0,0b01011},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b01001},   {183,0,0b01101},   {184,0,0b11001},   {185,1,0b11101},   {186,1,0b10011},   {187,0,0b00011},   {188,1,0b00011},   {189,0,0b00011},   {190,0,0b00101},   {191,1,0b10101},   {192,1,0b00001},   {193,1,0b10001},   {194,1,0b11011},   {195,0,0b10001},   {196,0,0b10111},   {197,0,0b11101},   {198,1,0b11101},   {199,1,0b00101},   {200,0,0b01101},   {201,1,0b11111},   {202,1,0b01101},   {203,1,0b00101},   {204,1,0b01001},   {205,1,0b10001},   {206,0,0b01001},   {207,1,0b01011},   {208,0,0b10111},   {209,1,0b10111},   {210,1,0b01101},   {211,0,0b01011},   {212,1,0b10101},   {213,0,0b01011},   {214,1,0b10001},   {215,0,0b00001},   {216,0,0b11011},   {217,0,0b11011},   {218,1,0b11011},   {219,1,0b11101},   {220,0,0b00001},   {221,1,0b00101},   {222,0,0b00011},   {223,1,0b01001},   {224,1,0b10101},   {225,1,0b11001},   {226,1,0b11101},   {227,1,0b00001},   {228,1,0b01001},   {229,0,0b00111},   {230,0,0b01001},   {231,1,0b11011},   {232,1,0b01111},   {233,0,0b01001},   {234,0,0b01011},   {235,1,0b01111},   {236,0,0b00111},   {237,0,0b00111},   {238,1,0b11011},   {239,1,0b10101},   {240,0,0b00001},   {241,0,0b10001},   {242,1,0b11011},   {243,0,0b00101},   {244,1,0b10011},   {245,0,0b00111},   {246,1,0b10001},   {247,1,0b11001},   {248,1,0b11001},   {249,1,0b00111},   {250,1,0b10111},   {251,0,0b00001},   {252,1,0b10101},   {253,1,0b10011},   {254,1,0b00101},   {255,1,0b10101},   {256,1,0b01111},   {257,0,0b01001},   {258,1,0b10001},   {259,0,0b00011},   {260,0,0b10001},   {261,1,0b11111},   {262,0,0b00011},   {263,0,0b01011},   {264,1,0b10011},   {265,1,0b00011},   {266,0,0b01101},   {267,1,0b11001},   {268,0,0b00101},   {269,0,0b10111},   {270,1,0b11011},   {271,1,0b11101},   {272,1,0b10001},   {273,0,0b00001},   {274,1,0b11101},   {275,0,0b10111},   {276,1,0b11111},   {277,0,0b01101},   {278,0,0b10111},   {279,1,0b11111},   {280,0,0b00111},   {281,1,0b11101},   {282,0,0b01011},   {283,1,0b10101},   {284,0,0b01101},   {285,1,0b10001},   {286,0,0b00101},   {287,0,0b10001},   {288,0,0b11001},   {289,1,0b11101},   {290,1,0b00111},   {291,0,0b01011},   {292,1,0b11001},   {293,0,0b01011},   {294,1,0b11001},   {295,0,0b00001},   {296,0,0b00011},   {297,0,0b00101},   {298,1,0b11011},   {299,0,0b00011},   {300,0,0b00111},   {301,1,0b10001},   {302,1,0b11011},   {303,0,0b11001},   {304,1,0b11111},   {305,1,0b11101},   {306,0,0b11001},   {307,1,0b11111},   {308,0,0b01001},   {309,1,0b01101},   {310,1,0b11011},   {311,1,0b10101},   {312,0,0b00101},   {313,0,0b01101},   {314,1,0b10111},   {315,0,0b00111},   {316,0,0b11011},   {317,1,0b11011},   {318,1,0b00011},   {319,0,0b01111},   {320,0,0b11001},   {321,1,0b11111},   {322,1,0b10011},   {323,1,0b01101},   {324,1,0b11101},   {325,1,0b00001},   {326,1,0b01101},   {327,0,0b01001},   {328,1,0b11011},   {329,0,0b00111},   {330,1,0b10001},   {331,1,0b10011},   {332,0,0b01111},   {333,0,0b10101},   {334,1,0b11101},   {335,1,0b11001},   {336,0,0b01101},   {337,1,0b10111},   {338,1,0b00001},   {339,1,0b00011},   {340,1,0b01111},   {341,1,0b11011},   {342,0,0b10101},   {343,1,0b10111},   {344,1,0b10101},   {345,1,0b11011},   {346,0,0b01011},   {347,1,0b11001},   {348,1,0b01001},   {349,1,0b01101},   {350,0,0b11001},   {351,1,0b11111},   {352,1,0b01001},   {353,1,0b11011},   {354,1,0b00101},   {355,1,0b00111},   {356,0,0b01111},   {357,1,0b11001},   {358,0,0b10011},   {359,1,0b11011},   {360,0,0b01001},   {361,1,0b10001},   {362,1,0b10101},   {363,0,0b01101},   {364,1,0b11101},   {365,1,0b01111},   {366,1,0b01101},   {367,0,0b00111},   {368,0,0b01101},   {369,1,0b11001},   {370,0,0b10011},   {371,1,0b11101},   {372,0,0b01001},   {373,0,0b01011},   {374,1,0b01111},   {375,0,0b10101},   {376,1,0b11101},   {377,0,0b00101},   {378,0,0b01011},   {379,1,0b11001},   {380,1,0b10001},   {381,0,0b00101},   {382,1,0b11101},   {383,0,0b01111},   {384,1,0b11111},   {385,0,0b10111},   {386,1,0b11111},   {387,1,0b01101},   {388,0,0b10011},   {389,1,0b10101},   {390,0,0b00001},   {391,0,0b00011},   {392,1,0b10011},   {393,0,0b01001},   {394,0,0b10011},   {395,1,0b11001},   {396,0,0b01011},   {397,1,0b01111},   {398,0,0b00111},   {399,1,0b11011},   {400,1,0b10111},   {401,0,0b01111},   {402,1,0b01111},   {403,1,0b00101},   {404,1,0b11111},   {405,1,0b11101},   {406,1,0b10101},   {407,1,0b01101},   {408,0,0b01111},   {409,0,0b10001},   {410,1,0b10001},   {411,0,0b10101},   {412,1,0b11111},   {413,0,0b01111},   {414,1,0b11101},   {415,0,0b00111},   {416,0,0b01001},   {417,1,0b10001},   {418,0,0b10011},   {419,1,0b11101},   {420,0,0b00001},   {421,1,0b01111},   {422,0,0b11001},   {423,1,0b11101},   {424,1,0b01101},   {425,1,0b11111},   {426,1,0b01101},   {427,0,0b00011},   {428,0,0b00101},   {429,0,0b11101},   {430,1,0b11111},   {431,0,0b00011},   {432,0,0b01001},   {433,1,0b11011},   {434,0,0b01101},   {435,1,0b11111},   {436,1,0b11001},   {437,0,0b01111},   {438,1,0b11101},   {439,1,0b11101},   {440,1,0b00101},   {441,0,0b01011},   {442,1,0b11011},   {443,0,0b00011},   {444,1,0b00101},   {445,1,0b11011},   {446,0,0b11111},   {447,1,0b11111},   {448,1,0b10101},   {449,0,0b00011},   {450,0,0b01111},   {451,0,0b10001},   {452,1,0b11011},   {453,0,0b01101},   {454,0,0b10101},   {455,1,0b11111},   {456,1,0b10111},   {457,1,0b01111},   {458,0,0b01101},   {459,1,0b10101},   {460,0,0b10101},   {461,1,0b11101},   {462,1,0b00111},   {463,1,0b11101},   {464,1,0b01101},   {465,0,0b00001},   {466,0,0b10001},   {467,1,0b10101},   {468,1,0b10001},   {469,0,0b00011},   {470,1,0b01101},   {471,1,0b00001},   {472,0,0b00001},   {473,1,0b01101},   {474,1,0b10011},   {475,1,0b11101},   {476,0,0b00001},   {477,1,0b11011},   {478,1,0b00001},   {479,1,0b01101},   {480,1,0b10011},   {481,1,0b00111},   {482,1,0b01111},   {483,1,0b01001},   {484,0,0b00111},   {485,1,0b11101},   {486,0,0b01011},   {487,1,0b10101},   {488,1,0b00111},   {489,0,0b00111},   {490,1,0b01001},   {491,1,0b11101},   {492,0,0b10001},   {493,1,0b11101},   {494,1,0b01001},   {495,1,0b10001},   {496,1,0b10101},   {497,0,0b00011},   {498,1,0b00111},   {500,0,0b00011},   {501,1,0b01101},   {502,1,0b10001},   {504,0,0b01111},   {505,1,0b10111},   {507,1,0b00011},   {508,1,0b10001},   {509,1,0b10101},   {513,0,0b01101},   {514,1,0b10001},   {515,0,0b00101},   {516,0,0b00111},   {517,1,0b11101},   {518,1,0b11111},   {519,0,0b00011},   {520,1,0b00011},   {521,0,0b00101},   {522,1,0b01111},   {523,0,0b00001},   {524,1,0b10111},   {525,0,0b00001},   {526,1,0b00101},   {527,1,0b01001},   {528,0,0b00101},   {529,1,0b01111},   {530,1,0b10111},   {531,1,0b00011},   {532,0,0b10001},   {533,1,0b11101},   {534,1,0b01001},   {535,0,0b00111},   {536,0,0b10111},   {537,1,0b11111},   {538,1,0b11001},   {539,0,0b00001},   {540,1,0b01101},   {542,1,0b11001},   {544,1,0b00011},   {545,0,0b00111},   {546,1,0b10111},   {548,0,0b00101},   {549,0,0b10101},   {550,1,0b11011},   {551,1,0b01101},   {553,0,0b01011},   {554,0,0b10001},   {555,1,0b11011},   {556,0,0b01111},   {557,1,0b11111},   {558,0,0b00011},   {559,0,0b01101},   {560,0,0b10011},   {561,1,0b10011},   {562,0,0b00001},   {563,1,0b11111},   {564,1,0b11001},   {565,1,0b01001},   {569,1,0b10101},   {570,0,0b10011},   {571,1,0b11001},   {572,1,0b10011},   {573,1,0b01011},   {574,1,0b01111},   {576,0,0b00011},   {577,0,0b01101},   {578,1,0b11111},   {579,0,0b00111},   {580,1,0b01001},   {581,1,0b01001},   {582,1,0b11001},   {583,1,0b10001},   {584,1,0b10011},   {586,0,0b01001},   {587,1,0b10101},   {588,0,0b10111},   {589,1,0b11111},   {590,1,0b10111},   {591,0,0b00001},   {592,0,0b00001},   {593,1,0b01011},   {594,1,0b01001},   {595,0,0b00011},   {596,1,0b10001},   {597,0,0b11101},   {598,1,0b11111},   {599,1,0b11111},   {600,1,0b11101},   {601,1,0b10111},   {602,1,0b01011},   {603,0,0b11101},   {604,1,0b11111},   {605,1,0b01011},   {606,1,0b11011},   {607,1,0b01011},   {608,0,0b10111},   {609,1,0b11011},   {610,0,0b01101},   {611,1,0b01111},   {612,1,0b01001},   {613,0,0b01111},   {614,1,0b10111},   {615,0,0b10011},   {616,0,0b10111},   {617,1,0b11001},   {618,1,0b01111},   {619,0,0b10011},   {620,1,0b10011},   {621,0,0b00101},   {622,1,0b01111},   {625,1,0b00011},   {626,0,0b00001},   {627,1,0b11011},   {629,1,0b11111},   {630,1,0b00101},   {633,0,0b01011},   {634,1,0b01101},   {635,0,0b01111},   {636,1,0b10101},   {637,1,0b10111},   {638,0,0b10101},   {639,0,0b11011},   {640,1,0b11011},   {641,1,0b00111},   {642,0,0b01111},   {643,1,0b01111},   {644,0,0b00011},   {645,0,0b00011},   {646,0,0b01111},   {647,0,0b10011},   {648,1,0b11011},   {649,1,0b01111},   {650,1,0b01111},   {651,1,0b00111},   {652,0,0b00001},   {653,1,0b00011},   {654,1,0b10011},   {655,0,0b11011},   {656,1,0b11101},   {657,0,0b00001},   {658,1,0b00011},   {659,1,0b00101},   {660,1,0b01011},   {661,1,0b00101},   {662,0,0b00011},   {663,1,0b01001},   {664,0,0b01101},   {665,1,0b11011},   {666,0,0b10001},   {667,1,0b10011},   {668,1,0b11101},   {670,1,0b11111},   {671,1,0b11001},   {673,0,0b10001},   {674,1,0b11011},   {675,0,0b00111},   {676,1,0b11001},   {677,0,0b00101},   {678,0,0b00101},   {679,1,0b01101},   {680,1,0b00011},   {681,1,0b10001},   {682,0,0b01111},   {683,1,0b01111},   {684,1,0b00001},   {686,1,0b10001},   {691,0,0b10001},   {692,1,0b11001},   {694,1,0b11001},   {696,0,0b10001},   {697,0,0b10001},   {698,1,0b10111},   {699,1,0b11011},   {700,1,0b11111},   {701,1,0b11111},   {703,1,0b00001},   {706,0,0b00111},   {707,0,0b01111},   {708,1,0b10111},   {712,0,0b00101},   {713,1,0b01101},   {714,1,0b01101},   {715,1,0b00011},   {718,0,0b10011},   {719,0,0b11011},   {720,1,0b11111},   {721,1,0b00001},   {722,0,0b00001},   {723,0,0b10011},   {724,1,0b11011},   {725,1,0b01001},   {726,0,0b00001},   {727,1,0b00011},   {728,1,0b10111},   {731,1,0b00101},   {732,1,0b11101},   {734,1,0b01111},   {735,0,0b10011},   {736,1,0b10111},   {738,0,0b00101},   {739,0,0b01101},   {740,1,0b10011},   {741,0,0b01101},   {742,1,0b01111},   {743,0,0b00101},   {744,1,0b01111},   {745,0,0b10101},   {746,1,0b10111},   {747,0,0b00111},   {748,1,0b10011},   {749,0,0b00011},   {750,1,0b10001},   {751,0,0b00011},   {752,1,0b10001},   {753,1,0b01111},   {754,1,0b11001},   {756,1,0b01101},   {760,0,0b00001},   {761,0,0b01001},   {762,0,0b11111},   {763,1,0b11111},   {764,0,0b01101},   {765,1,0b10101},   {766,1,0b01011},   {767,0,0b00111},   {768,0,0b01101},   {769,1,0b11011},   {770,1,0b00001},   {771,0,0b01011},   {772,0,0b01111},   {773,1,0b11001},   {774,0,0b00111},   {775,0,0b01011},   {776,0,0b11011},   {777,1,0b11011},   {778,0,0b01011},   {779,1,0b01011},   {780,0,0b01101},   {781,0,0b10001},   {782,1,0b11001},   {783,1,0b00101},   {784,1,0b10011},   {785,0,0b01101},   {786,1,0b11111},   {787,0,0b00111},   {788,0,0b01011},   {789,1,0b11001},   {790,1,0b11111},   {791,1,0b10111},   {792,0,0b00011},   {793,1,0b11011},   {794,0,0b11001},   {795,1,0b11011},   {796,0,0b00101},   {797,0,0b00101},   {798,1,0b11111},   {799,0,0b01011},   {800,1,0b10111},   {801,1,0b01101},   {802,1,0b01001},   {803,0,0b01001},   {804,1,0b10011},   {805,1,0b11001},   {806,0,0b10111},   {807,1,0b11011},   {808,0,0b10101},   {809,1,0b11101},   {810,1,0b11101},   {811,0,0b00111},   {812,0,0b01011},   {813,1,0b10001},   {814,0,0b00001},   {815,0,0b00011},   {816,1,0b00011},   {817,1,0b10111},   {818,1,0b00111},   {819,0,0b01001},   {820,1,0b01011},   {821,0,0b00011},   {822,1,0b10011},   {823,0,0b01001},   {824,0,0b11001},   {825,1,0b11001},   {826,1,0b10111},   {827,1,0b01011},   {828,0,0b00011},   {829,1,0b10001},   {830,0,0b00101},   {831,1,0b11001},   {832,1,0b10011},   {833,1,0b10111},   {834,0,0b00001},   {835,0,0b01001},   {836,1,0b11011},   {837,0,0b00101},   {838,0,0b01011},   {839,1,0b10001},   {840,0,0b01111},   {841,1,0b11001},   {842,1,0b00101},   {843,1,0b10011},   {844,1,0b11001},   {845,1,0b10011},   {846,1,0b10011},   {847,1,0b01111},   {848,1,0b01101},   {849,1,0b10101},   {850,0,0b00011},   {851,0,0b00111},   {852,1,0b10001},   {853,1,0b00101},   {854,0,0b00001},   {855,0,0b01101},   {856,1,0b10111},   {857,1,0b11001},   {858,0,0b11001},   {859,1,0b11011},   {860,1,0b10111},   {861,1,0b10011},   {862,1,0b00001},   {863,0,0b00111},   {864,1,0b11001},   {865,0,0b00011},   {866,1,0b10111},   {867,0,0b01101},   {868,1,0b10001},   {869,1,0b01001},   {870,0,0b10111},   {871,1,0b10111},   {872,1,0b10001},   {873,1,0b00011},   {874,1,0b01011},   {875,1,0b01101},   {876,0,0b00011},   {877,1,0b11111},   {878,1,0b11101},   {879,1,0b10111},   {880,1,0b00101},   {881,0,0b01001},   {882,1,0b11101},   {883,1,0b00111},   {884,0,0b10011},   {885,1,0b11101},   {886,0,0b00111},   {887,1,0b10101},   {888,0,0b00011},   {889,1,0b01111},   {890,0,0b01001},   {891,1,0b01111},   {892,0,0b00011},   {893,1,0b10011},   {894,0,0b01011},   {895,1,0b11001},   {896,0,0b00001},   {897,1,0b00101},   {898,1,0b01011},   {899,0,0b00011},   {900,0,0b00011},   {901,1,0b01111},   {902,0,0b01011},   {903,1,0b01101},   {904,0,0b00001},   {905,1,0b10011},   {906,0,0b00001},   {907,0,0b00001},   {908,0,0b00111},   {909,0,0b10011},   {910,0,0b11001},   {911,1,0b11001},   {912,1,0b10001},   {913,1,0b10111},   {914,0,0b00001},   {915,0,0b00011},   {916,1,0b11011},   {917,1,0b11101},   {918,0,0b00011},   {919,0,0b10001},   {920,1,0b10111},   {921,0,0b01001},   {922,0,0b10011},   {923,1,0b10111},   {924,0,0b00111},   {925,1,0b11101},   {926,1,0b00111},   {927,0,0b00001},   {928,1,0b00011},   {929,0,0b00011},   {930,1,0b11011},   {931,0,0b00001},   {932,0,0b01011},   {933,1,0b01011},   {934,0,0b00001},   {935,0,0b00111},   {936,0,0b01011},   {937,0,0b11101},   {938,1,0b11111},   {939,1,0b11101},   {940,0,0b00101},   {941,1,0b00111},   {942,1,0b00111},   {943,0,0b11001},   {944,1,0b11111},   {945,0,0b00111},   {946,1,0b11101},   {947,1,0b10101},   {948,1,0b11011},   {949,0,0b00101},   {950,1,0b11011},   {951,1,0b01001},   {952,1,0b00001},   {953,1,0b11011},   {954,1,0b11101},   {955,0,0b00001},   {956,1,0b00001},   {957,0,0b00101},   {958,0,0b00101},   {959,1,0b01111},   {960,1,0b00111},   {961,1,0b11101},   {962,0,0b11011},   {963,1,0b11111},   {964,0,0b00001},   {965,1,0b01101},   {966,0,0b00101},   {967,0,0b00111},   {968,1,0b10101},   {969,1,0b11001},   {970,0,0b00001},   {971,1,0b01011},   {972,0,0b00011},   {973,0,0b01011},   {974,1,0b10001},   {975,0,0b01111},   {976,0,0b10011},   {977,1,0b11011},   {978,0,0b01101},   {979,1,0b11101},   {980,0,0b10001},   {981,1,0b11101},   {982,0,0b01111},   {983,1,0b01111},   {984,0,0b01001},   {985,0,0b01001},   {986,0,0b01101},   {987,1,0b11111},   {988,1,0b10111},   {989,1,0b00111},   {990,0,0b00101},   {991,1,0b01101},   {992,0,0b01001},   {993,0,0b10101},   {994,1,0b11001},   {995,1,0b00101},   {996,1,0b00101},   {997,0,0b01011},   {998,0,0b01011},   {999,1,0b01011},   {1000,1,0b10111},   {1001,0,0b01001},   {1002,1,0b01111},   {1003,0,0b00001},   {1004,0,0b01001},   {1005,0,0b01001},   {1006,0,0b01011},   {1007,1,0b11011},   {1008,1,0b10101},   {1009,1,0b11111},   {1010,0,0b01001},   {1011,1,0b01101},   {1012,0,0b00001},   {1013,1,0b11101},   {1014,1,0b00001},   {1015,1,0b10111},   {1016,1,0b00001},   {1017,1,0b11011},   {1018,1,0b10011},   {1019,0,0b00001},   {1020,1,0b11101},   {1021,0,0b01001},   {1022,1,0b10101},   {1023,0,0b11001},   {1024,1,0b11101},   {1025,0,0b00001},   {1026,1,0b01011},   {1027,0,0b01111},   {1028,1,0b10101},   {1029,1,0b01001},   {1030,1,0b01101},   {1031,0,0b01111},   {1032,0,0b11011},   {1033,0,0b11101},   {1034,1,0b11111},   {1035,0,0b00001},   {1036,0,0b00011},   {1037,1,0b01111},   {1038,0,0b11001},   {1039,1,0b11111},   {1040,1,0b00111},   {1041,0,0b00001},   {1042,1,0b00011},   {1043,0,0b01011},   {1044,0,0b10011},   {1045,1,0b11101},   {1046,1,0b11011},   {1047,1,0b01001},   {1048,1,0b00101},   {1049,1,0b11001},   {1050,1,0b01011},   {1051,1,0b01111},   {1052,1,0b10101},   {1056,1,0b11011},   {1057,0,0b01011},   {1058,0,0b01101},   {1059,1,0b11011},   {1061,0,0b00111},   {1062,0,0b11011},   {1063,1,0b11101},   {1064,0,0b00101},   {1065,1,0b00101},   {1066,0,0b00101},   {1067,1,0b11001},   {1068,0,0b00011},   {1069,1,0b01101},   {1070,0,0b01101},   {1071,1,0b11011},   {1073,0,0b00101},   {1074,0,0b10001},   {1075,1,0b11001},   {1076,1,0b00011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1905,7 +1905,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b00101},   {  1,0,0b01111},   {  2,0,0b10101},   {  3,1,0b11011},   {  4,1,0b00101},   {  5,1,0b01001},   {  6,1,0b10111},   {  7,1,0b00101},   {  8,1,0b10111},   {  9,1,0b10001},   { 10,1,0b10001},   { 12,0,0b00011},   { 13,0,0b00101},   { 14,0,0b11011},   { 15,1,0b11101},   { 16,0,0b00011},   { 17,1,0b11001},   { 18,0,0b10101},   { 19,1,0b11101},   { 20,1,0b11111},   { 21,1,0b11011},   { 22,1,0b11011},   { 23,0,0b00001},   { 24,1,0b10011},   { 25,1,0b01111},   { 26,1,0b11101},   { 27,1,0b00101},   { 28,1,0b10101},   { 29,0,0b11001},   { 30,1,0b11011},   { 31,1,0b11111},   { 32,0,0b01011},   { 33,1,0b01111},   { 34,0,0b00001},   { 35,1,0b01001},   { 36,1,0b00111},   { 37,0,0b10001},   { 38,1,0b10001},   { 39,1,0b11001},   { 40,0,0b10011},   { 41,1,0b11001},   { 42,0,0b00101},   { 43,1,0b11011},   { 44,1,0b01101},   { 46,1,0b11001},   { 47,1,0b10111},   { 48,1,0b10011},   { 50,1,0b10111},   { 51,1,0b00111},   { 52,1,0b01111},   { 53,1,0b01011},   { 54,1,0b10001},   { 55,1,0b01111},   { 56,1,0b11111},   { 57,1,0b10011},   { 58,1,0b01101},   { 59,1,0b11101},   { 60,1,0b00011},   { 61,1,0b11011},   { 62,1,0b11011},   { 63,1,0b00001},   { 64,1,0b11011},   { 65,1,0b11011},   { 66,1,0b01101},   { 67,1,0b00001},   { 68,1,0b10001},   { 69,1,0b00001},   { 70,1,0b01001},   { 71,1,0b00111},   { 72,1,0b11111},   { 73,1,0b00011},   { 74,0,0b01011},   { 75,1,0b10011},   { 76,1,0b10111},   { 77,1,0b10011},   { 78,1,0b01111},   { 79,1,0b00001},   { 80,1,0b01111},   { 81,1,0b00101},   { 82,1,0b10111},   { 83,1,0b10011},   { 84,0,0b10001},   { 85,1,0b10111},   { 86,0,0b10111},   { 87,1,0b11001},   { 88,1,0b10001},   { 89,0,0b11011},   { 90,1,0b11111},   { 91,0,0b00011},   { 92,1,0b10111},   { 93,1,0b10101},   { 94,1,0b10001},   { 95,1,0b10011},   { 96,1,0b01001},   { 97,1,0b10001},   { 98,1,0b11101},   { 99,1,0b10011},   {100,0,0b01011},   {101,1,0b10111},   {102,1,0b00001},   {103,1,0b01101},   {104,1,0b10101},   {105,1,0b11001},   {106,1,0b00111},   {107,1,0b11001},   {108,1,0b10111},   {109,1,0b00011},   {110,1,0b01011},   {111,1,0b10001},   {112,0,0b01101},   {113,0,0b10001},   {114,1,0b11101},   {115,1,0b01011},   {116,1,0b11101},   {117,0,0b01111},   {118,1,0b10001},   {119,0,0b00001},   {120,1,0b00011},   {121,1,0b10011},   {122,1,0b01001},   {123,1,0b10111},   {124,1,0b00101},   {125,1,0b00001},   {126,0,0b01011},   {127,1,0b10111},   {128,1,0b10111},   {129,1,0b00111},   {130,1,0b11111},   {131,1,0b11111},   {132,0,0b01001},   {133,1,0b11011},   {134,1,0b01101},   {135,1,0b00101},   {136,1,0b10111},   {137,1,0b00101},   {138,1,0b01101},   {139,1,0b10101},   {140,1,0b11011},   {141,0,0b01011},   {142,0,0b01101},   {143,1,0b01101},   {144,0,0b01011},   {145,1,0b11011},   {146,0,0b00011},   {147,1,0b10101},   {148,1,0b11101},   {149,0,0b01001},   {150,1,0b01101},   {151,0,0b01111},   {152,1,0b10111},   {153,0,0b10101},   {154,0,0b11011},   {155,1,0b11101},   {156,1,0b00111},   {157,0,0b00101},   {158,1,0b11111},   {159,1,0b10111},   {160,1,0b10111},   {161,1,0b10111},   {162,1,0b11111},   {163,0,0b00011},   {164,1,0b11101},   {165,0,0b10001},   {166,0,0b10111},   {167,1,0b11001},   {168,0,0b10111},   {169,1,0b11111},   {170,1,0b11011},   {171,1,0b00011},   {172,0,0b00011},   {173,0,0b00111},   {174,1,0b10101},   {175,0,0b10011},   {176,1,0b10101},   {177,1,0b01001},   {178,1,0b10011},   {179,0,0b01001},   {180,1,0b11111},   {181,1,0b11011},   {182,1,0b00111},   {183,1,0b10001},   {184,1,0b11111},   {185,1,0b10101},   {186,1,0b00001},   {187,1,0b01011},   {188,0,0b00001},   {189,1,0b01001},   {190,1,0b11001},   {191,0,0b01001},   {192,1,0b01011},   {193,1,0b00111},   {194,0,0b00101},   {195,1,0b01101},   {196,0,0b00001},   {197,1,0b11001},   {198,1,0b10101},   {199,1,0b11101},   {200,1,0b01101},   {201,1,0b01101},   {202,1,0b00001},   {203,1,0b01001},   {204,1,0b11101},   {205,1,0b01011},   {206,1,0b11101},   {207,1,0b11111},   {208,1,0b00111},   {209,1,0b00111},   {210,1,0b11011},   {211,1,0b11111},   {212,0,0b01001},   {213,1,0b10101},   {214,1,0b10111},   {215,1,0b11011},   {216,0,0b00101},   {217,1,0b01101},   {218,0,0b10001},   {219,1,0b10111},   {220,1,0b11101},   {221,1,0b11111},   {222,1,0b01011},   {223,0,0b01001},   {224,0,0b10101},   {225,1,0b10111},   {226,1,0b01111},   {227,0,0b00101},   {228,0,0b01001},   {229,0,0b11011},   {230,1,0b11101},   {231,1,0b10011},   {232,1,0b00101},   {233,1,0b10111},   {234,1,0b11011},   {235,0,0b01111},   {236,1,0b01111},   {237,0,0b00101},   {238,0,0b11001},   {239,1,0b11111},   {240,1,0b10001},   {241,1,0b10001},   {242,1,0b01101},   {243,1,0b01111},   {244,0,0b00011},   {245,1,0b01001},   {246,1,0b01111},   {247,1,0b01101},   {248,1,0b01101},   {249,1,0b10101},   {250,1,0b00011},   {251,0,0b10111},   {252,1,0b11111},   {253,1,0b10101},   {254,1,0b10001},   {255,0,0b10101},   {256,1,0b11001},   {257,1,0b01111},   {258,1,0b10111},   {259,0,0b00001},   {260,1,0b11001},   {261,0,0b00001},   {262,0,0b10101},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b11111},   {266,1,0b10001},   {267,1,0b11001},   {268,1,0b10111},   {269,0,0b01101},   {270,1,0b10101},   {271,0,0b10101},   {272,1,0b11101},   {273,1,0b00001},   {274,1,0b01001},   {275,1,0b11111},   {276,1,0b11101},   {277,0,0b01111},   {278,0,0b10111},   {279,1,0b11111},   {280,1,0b00011},   {281,0,0b01011},   {282,0,0b10001},   {283,1,0b11101},   {284,1,0b00111},   {285,1,0b10001},   {286,1,0b10011},   {287,1,0b00011},   {288,0,0b00101},   {289,1,0b01011},   {290,1,0b10111},   {291,1,0b01001},   {292,1,0b11111},   {293,1,0b10001},   {294,1,0b00101},   {295,0,0b00101},   {296,0,0b11111},   {297,1,0b11111},   {298,1,0b11101},   {299,1,0b11011},   {300,1,0b01101},   {301,1,0b00111},   {302,1,0b01001},   {303,1,0b11001},   {304,1,0b01101},   {305,1,0b11111},   {306,0,0b01101},   {307,1,0b01111},   {308,1,0b01001},   {309,1,0b11001},   {310,1,0b00001},   {311,1,0b01011},   {312,1,0b00101},   {313,0,0b00011},   {314,1,0b11111},   {315,0,0b00101},   {316,1,0b10101},   {317,1,0b01001},   {318,1,0b10011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11111},   {322,1,0b00101},   {323,1,0b00101},   {324,1,0b11111},   {325,1,0b11111},   {326,1,0b10011},   {327,1,0b11001},   {328,0,0b10011},   {329,1,0b11011},   {330,1,0b10001},   {331,0,0b00001},   {332,1,0b01011},   {333,1,0b11101},   {334,1,0b10011},   {335,1,0b11111},   {336,1,0b11011},   {337,1,0b11001},   {338,0,0b10101},   {339,1,0b11111},   {340,1,0b01111},   {341,1,0b10011},   {342,1,0b10001},   {343,0,0b00111},   {344,1,0b10001},   {345,1,0b10101},   {346,1,0b01011},   {347,1,0b11111},   {348,0,0b11001},   {349,1,0b11011},   {350,1,0b10001},   {351,0,0b10101},   {352,1,0b11111},   {353,1,0b01111},   {354,1,0b11101},   {355,0,0b00101},   {356,1,0b00111},   {357,1,0b00101},   {358,0,0b00011},   {359,1,0b01111},   {360,1,0b01011},   {361,0,0b00001},   {362,1,0b01101},   {363,1,0b10101},   {364,1,0b11111},   {365,1,0b00001},   {366,0,0b10001},   {367,1,0b10101},   {368,1,0b10001},   {369,1,0b10001},   {370,1,0b11101},   {371,1,0b11011},   {372,1,0b10011},   {373,0,0b00111},   {374,1,0b01101},   {375,0,0b00001},   {376,1,0b00111},   {377,1,0b01011},   {378,1,0b00001},   {379,1,0b11001},   {380,0,0b10101},   {381,1,0b10101},   {382,1,0b00111},   {383,1,0b01111},   {384,1,0b10001},   {385,0,0b00001},   {386,1,0b00101},   {387,0,0b10111},   {388,1,0b10111},   {389,0,0b00101},   {390,0,0b01001},   {391,1,0b11111},   {392,1,0b01011},   {393,0,0b10011},   {394,0,0b10011},   {395,1,0b11111},   {396,1,0b11101},   {397,0,0b00001},   {398,1,0b11111},   {399,1,0b01101},   {400,1,0b01001},   {401,1,0b01011},   {402,0,0b01001},   {403,0,0b01011},   {404,1,0b11101},   {405,0,0b01001},   {406,1,0b10001},   {407,1,0b10011},   {408,1,0b10111},   {409,0,0b01101},   {410,1,0b11111},   {411,1,0b01001},   {412,1,0b10111},   {413,0,0b00111},   {414,1,0b10001},   {415,0,0b01001},   {416,0,0b01011},   {417,1,0b10111},   {418,1,0b10001},   {419,0,0b01001},   {420,1,0b10101},   {421,1,0b00011},   {422,1,0b11011},   {423,1,0b11101},   {424,1,0b00001},   {425,0,0b11011},   {426,1,0b11111},   {427,1,0b01101},   {428,1,0b00101},   {429,1,0b01101},   {430,1,0b10011},   {431,1,0b00011},   {432,1,0b10101},   {433,1,0b01011},   {434,1,0b00001},   {435,1,0b10001},   {436,1,0b10001},   {437,1,0b01101},   {438,1,0b00111},   {439,1,0b10111},   {440,1,0b00011},   {441,0,0b00101},   {442,0,0b10101},   {443,1,0b11011},   {444,1,0b01101},   {445,1,0b00001},   {446,1,0b00001},   {447,1,0b00001},   {448,0,0b01011},   {449,1,0b10001},   {450,0,0b00011},   {451,0,0b00111},   {452,1,0b11001},   {453,1,0b00101},   {454,0,0b00111},   {455,1,0b11111},   {456,0,0b10011},   {457,0,0b10011},   {458,1,0b11101},   {459,0,0b10101},   {460,1,0b10101},   {461,1,0b11011},   {462,1,0b01111},   {463,0,0b00101},   {464,1,0b01001},   {465,1,0b00111},   {466,0,0b00111},   {467,1,0b10101},   {468,1,0b11111},   {469,1,0b11101},   {470,1,0b10001},   {471,1,0b00001},   {472,0,0b01111},   {473,1,0b01111},   {474,1,0b10111},   {475,0,0b10001},   {476,1,0b10011},   {477,0,0b00101},   {478,1,0b11001},   {479,1,0b10101},   {480,0,0b11011},   {481,1,0b11111},   {482,1,0b11111},   {483,0,0b00101},   {484,1,0b10001},   {485,1,0b10101},   {486,1,0b11001},   {487,1,0b01101},   {488,1,0b11001},   {489,0,0b10101},   {490,1,0b11111},   {491,1,0b00001},   {492,1,0b10011},   {493,1,0b01001},   {494,1,0b01101},   {495,1,0b00101},   {496,1,0b10111},   {497,0,0b00011},   {498,1,0b01111},   {499,1,0b10011},   {500,0,0b11111},   {501,1,0b11111},   {502,1,0b10011},   {503,1,0b10001},   {504,0,0b00111},   {505,0,0b01111},   {506,1,0b10011},   {507,1,0b11111},   {508,1,0b01001},   {509,1,0b10011},   {510,0,0b00111},   {511,1,0b01111},   {512,1,0b01111},   {513,1,0b01011},   {514,1,0b11101},   {515,0,0b10001},   {516,1,0b10011},   {517,1,0b00011},   {518,0,0b11011},   {519,1,0b11101},   {520,1,0b00011},   {521,1,0b00101},   {522,0,0b01011},   {523,1,0b10011},   {524,1,0b10011},   {525,1,0b11001},   {526,1,0b10011},   {527,1,0b01101},   {528,1,0b01001},   {529,0,0b00101},   {530,1,0b10111},   {531,1,0b00101},   {532,1,0b00001},   {533,0,0b00001},   {534,0,0b10101},   {535,1,0b11001},   {536,0,0b01011},   {537,0,0b01011},   {538,1,0b11001},   {539,1,0b10001},   {540,0,0b00101},   {541,0,0b10011},   {542,1,0b10011},   {543,1,0b00111},   {544,1,0b11011},   {545,1,0b01111},   {546,1,0b11111},   {547,1,0b01101},   {548,0,0b01101},   {549,1,0b11101},   {550,1,0b11111},   {551,0,0b00111},   {552,1,0b01011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1924,7 +1924,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1943,7 +1943,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
 
@@ -1965,7 +1965,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -1983,7 +1983,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,0,0b00001},   {  2,0,0b01101},   {  3,0,0b10011},   {  4,0,0b10101},   {  5,1,0b11111},   {  6,1,0b11011},   {  7,0,0b10101},   {  8,1,0b10111},   {  9,1,0b01101},   { 10,0,0b00011},   { 11,0,0b10101},   { 12,1,0b11101},   { 13,1,0b00011},   { 14,0,0b00001},   { 15,0,0b00001},   { 16,1,0b01101},   { 17,1,0b10011},   { 18,0,0b10101},   { 19,1,0b11011},   { 20,1,0b00011},   { 21,1,0b01011},   { 22,0,0b00111},   { 23,0,0b01011},   { 24,0,0b11011},   { 25,1,0b11111},   { 26,0,0b00101},   { 27,1,0b11101},   { 28,1,0b01001},   { 29,1,0b10001},   { 30,1,0b10011},   { 31,1,0b11011},   { 32,0,0b00001},   { 33,0,0b00111},   { 34,0,0b11011},   { 35,0,0b11011},   { 36,1,0b11101},   { 37,1,0b00101},   { 38,1,0b11111},   { 39,0,0b01001},   { 40,0,0b10011},   { 41,0,0b10011},   { 42,1,0b11111},   { 43,1,0b11101},   { 44,0,0b01101},   { 45,0,0b01101},   { 46,1,0b11101},   { 47,1,0b01101},   { 48,0,0b00011},   { 49,0,0b11001},   { 50,1,0b11011},   { 51,1,0b01001},   { 52,1,0b00111},   { 53,0,0b00011},   { 54,1,0b00111},   { 55,1,0b10011},   { 56,0,0b00001},   { 57,1,0b11001},   { 58,0,0b00001},   { 59,0,0b00001},   { 60,1,0b01001},   { 61,0,0b00101},   { 62,0,0b10011},   { 63,1,0b10111},   { 64,1,0b00011},   { 65,1,0b00111},   { 66,0,0b10001},   { 67,1,0b10001},   { 68,1,0b01101},   { 69,0,0b00001},   { 70,0,0b01101},   { 71,1,0b11011},   { 72,0,0b01101},   { 73,0,0b10111},   { 74,0,0b11001},   { 75,1,0b11101},   { 76,0,0b00111},   { 77,0,0b00111},   { 78,0,0b01011},   { 79,1,0b11011},   { 80,0,0b01001},   { 81,0,0b01101},   { 82,0,0b01101},   { 83,1,0b11111},   { 84,1,0b11111},   { 85,0,0b10011},   { 86,0,0b11001},   { 87,1,0b11001},   { 88,1,0b00101},   { 89,0,0b00001},   { 90,1,0b00111},   { 91,1,0b01011},   { 92,0,0b01011},   { 93,0,0b11011},   { 94,1,0b11011},   { 95,1,0b10111},   { 96,0,0b01001},   { 97,1,0b10111},   { 98,0,0b10011},   { 99,1,0b11011},   {100,1,0b11001},   {101,1,0b00101},   {102,1,0b11001},   {103,1,0b01101},   {104,0,0b10111},   {105,1,0b11111},   {106,1,0b11001},   {109,0,0b00101},   {110,1,0b01111},   {111,1,0b01001},   {112,0,0b11101},   {113,1,0b11101},   {114,0,0b01111},   {115,0,0b10001},   {116,1,0b11101},   {117,0,0b00101},   {118,1,0b11001},   {119,1,0b11011},   {120,1,0b00111},   {121,0,0b01011},   {122,0,0b01011},   {123,0,0b01101},   {124,1,0b11111},   {125,1,0b10101},   {126,0,0b10011},   {127,1,0b10101},   {128,1,0b11001},   {129,0,0b00011},   {130,1,0b10111},   {131,1,0b01111},   {134,1,0b01011},   {135,1,0b00111},   {137,1,0b10111},   {138,0,0b01001},   {139,1,0b01111},   {140,1,0b00101},   {141,0,0b01001},   {142,1,0b01011},   {143,0,0b01111},   {144,1,0b10011},   {146,1,0b01011},   {148,0,0b00001},   {149,0,0b10011},   {150,1,0b11001},   {152,1,0b01011},   {154,0,0b10001},   {155,0,0b10101},   {156,1,0b10101},   {157,1,0b10011},   {158,1,0b11001},   {159,0,0b10001},   {160,0,0b10101},   {161,1,0b11111},   {162,0,0b00001},   {163,0,0b00111},   {164,1,0b01011},   {165,1,0b01011},   {166,1,0b11101},   {167,0,0b00111},   {168,1,0b01011},   {169,0,0b00101},   {170,1,0b10101},   {171,1,0b11101},   {172,0,0b00101},   {173,1,0b11001},   {174,0,0b00111},   {175,1,0b11101},   {176,0,0b00111},   {177,1,0b11001},   {179,0,0b01001},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b11111},   {183,1,0b11111},   {184,0,0b10111},   {185,1,0b10111},   {186,0,0b00101},   {187,1,0b11101},   {188,0,0b10001},   {189,0,0b10101},   {190,1,0b11111},   {191,0,0b01111},   {192,0,0b10111},   {193,1,0b11111},   {194,1,0b10111},   {195,1,0b01011},   {197,0,0b01011},   {198,1,0b10101},   {199,1,0b10111},   {200,0,0b10101},   {201,1,0b11001},   {202,1,0b00101},   {203,1,0b11011},   {204,1,0b01011},   {207,0,0b00001},   {208,0,0b01011},   {209,0,0b01011},   {210,1,0b01111},   {211,1,0b11111},   {212,1,0b10111},   {213,1,0b01111},   {214,1,0b11011},   {215,0,0b01011},   {216,1,0b01101},   {218,1,0b01001},   {219,0,0b11011},   {220,0,0b11011},   {221,1,0b11111},   {222,1,0b10101},   {224,1,0b01011},   {226,1,0b11111},   {229,1,0b11001},   {230,1,0b01011},   {233,0,0b01011},   {234,1,0b10111},   {238,1,0b01111},   {239,0,0b11101},   {240,0,0b11101},   {241,0,0b11111},   {242,1,0b11111},   {243,0,0b00001},   {244,0,0b01001},   {245,1,0b10101},   {246,1,0b01111},   {247,0,0b00011},   {248,1,0b11001},   {249,0,0b00011},   {250,0,0b00101},   {251,1,0b11011},   {252,0,0b00101},   {253,1,0b01111},   {254,0,0b00001},   {255,0,0b11001},   {256,1,0b11111},   {257,0,0b00001},   {258,0,0b01011},   {259,1,0b11101},   {260,1,0b01011},   {261,0,0b01101},   {262,1,0b01111},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b00011},   {266,0,0b00011},   {267,1,0b11011},   {268,0,0b00101},   {269,1,0b10001},   {270,1,0b11101},   {271,1,0b11001},   {272,0,0b01101},   {273,1,0b11001},   {275,1,0b10101},   {277,0,0b11001},   {278,1,0b11001},   {279,1,0b10101},   {280,0,0b00011},   {281,1,0b00101},   {282,1,0b00101},   {283,0,0b10001},   {284,1,0b11111},   {285,1,0b10101},   {286,1,0b10111},   {287,0,0b00101},   {288,1,0b01101},   {290,1,0b01011},   {292,1,0b01111},   {293,1,0b00111},   {296,0,0b01011},   {297,1,0b01101},   {298,1,0b11001},   {301,0,0b00001},   {302,1,0b10101},   {303,0,0b00001},   {304,1,0b01011},   {305,1,0b11001},   {306,1,0b01011},   {308,0,0b01001},   {309,1,0b10001},   {310,1,0b01001},   {312,0,0b01011},   {313,1,0b01011},   {314,0,0b01011},   {315,0,0b01011},   {316,1,0b01111},   {317,0,0b00011},   {318,1,0b11011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11001},   {322,1,0b00001},   {325,0,0b01101},   {326,0,0b01101},   {327,1,0b11001},   {328,0,0b01101},   {329,1,0b10111},   {330,0,0b00001},   {331,1,0b10011},   {332,0,0b00011},   {333,1,0b10111},   {334,1,0b11101},   {335,0,0b01111},   {336,0,0b10111},   {337,1,0b11001},   {338,1,0b10011},   {339,1,0b01101},   {340,1,0b01011},   {341,1,0b11111},   {342,0,0b01001},   {343,1,0b11001},   {344,1,0b00001},   {346,0,0b10001},   {347,0,0b10111},   {348,1,0b11101},   {349,0,0b00111},   {350,1,0b10001},   {351,1,0b10001},   {352,0,0b01011},   {353,1,0b11001},   {354,1,0b00011},   {355,1,0b00111},   {357,0,0b10011},   {358,1,0b11101},   {359,1,0b00011},   {360,0,0b01111},   {361,1,0b10001},   {362,1,0b01111},   {363,1,0b10101},   {366,1,0b11111},   {367,1,0b00111},   {370,1,0b11001},   {371,1,0b11101},   {373,1,0b00011},   {375,1,0b00101},   {378,1,0b00111},   {379,1,0b11111},   {381,0,0b01001},   {382,0,0b10011},   {383,0,0b11001},   {384,1,0b11011},   {385,0,0b00111},   {386,1,0b01101},   {387,0,0b00011},   {388,0,0b00101},   {389,0,0b01101},   {390,0,0b10111},   {391,0,0b11001},   {392,1,0b11111},   {393,1,0b10111},   {394,1,0b00001},   {395,0,0b01101},   {396,1,0b01101},   {397,0,0b00001},   {398,0,0b01011},   {399,1,0b10111},   {400,1,0b11111},   {401,0,0b00101},   {402,1,0b01001},   {403,1,0b01101},   {404,0,0b10001},   {405,0,0b10011},   {406,1,0b10101},   {407,1,0b01011},   {408,1,0b10001},   {409,0,0b01011},   {410,1,0b01111},   {411,1,0b11011},   {412,0,0b00101},   {413,1,0b10001},   {414,0,0b00111},   {415,0,0b11001},   {416,0,0b11001},   {417,1,0b11101},   {418,1,0b01001},   {419,0,0b00111},   {420,1,0b11011},   {421,1,0b11101},   {422,1,0b01111},   {423,1,0b11001},   {424,0,0b00011},   {425,1,0b10111},   {426,0,0b00101},   {427,1,0b11001},   {428,0,0b10011},   {429,1,0b10111},   {430,1,0b10011},   {431,1,0b01011},   {432,0,0b01111},   {433,1,0b11111},   {438,1,0b10111},   {440,1,0b00011},   {441,1,0b10011},   {442,1,0b01111},   {445,1,0b11111},   {446,1,0b01001},   {447,0,0b00001},   {448,0,0b00001},   {449,0,0b01101},   {450,0,0b01111},   {451,0,0b10101},   {452,0,0b11101},   {453,1,0b11111},   {454,0,0b10001},   {455,1,0b11111},   {456,0,0b10001},   {457,1,0b11101},   {458,0,0b00101},   {459,1,0b01001},   {460,0,0b00101},   {461,0,0b10011},   {462,0,0b11001},   {463,0,0b11101},   {464,1,0b11101},   {465,1,0b01111},   {466,0,0b00011},   {467,1,0b10111},   {468,1,0b00001},   {469,1,0b01111},   {470,1,0b00111},   {471,1,0b10011},   {472,0,0b11001},   {473,0,0b11001},   {474,1,0b11101},   {475,1,0b10111},   {476,1,0b11111},   {477,0,0b00011},   {478,1,0b01001},   {479,0,0b00001},   {480,0,0b10101},   {481,1,0b11101},   {482,0,0b10001},   {483,1,0b10011},   {484,1,0b00001},   {485,1,0b00001},   {486,0,0b01111},   {487,1,0b01111},   {488,1,0b00111},   {489,0,0b00011},   {490,0,0b00101},   {491,0,0b01101},   {492,1,0b10001},   {493,0,0b00011},   {494,1,0b10111},   {495,0,0b01001},   {496,1,0b10101},   {497,0,0b00111},   {498,1,0b01011},   {499,0,0b00001},   {500,1,0b10001},   {501,0,0b01011},   {502,0,0b10011},   {503,1,0b11111},   {504,1,0b11011},   {505,1,0b10011},   {506,1,0b10001},   {507,0,0b00111},   {508,1,0b10001},   {509,1,0b01101},   {510,0,0b10111},   {511,1,0b11101},   {512,1,0b11101},   {513,0,0b00111},   {514,0,0b11001},   {515,1,0b11101},   {516,1,0b01011},   {517,0,0b10001},   {518,1,0b10111},   {519,0,0b00011},   {520,1,0b00111},   {521,1,0b00101},   {522,0,0b10101},   {523,1,0b11001},   {524,0,0b00101},   {525,1,0b10101},   {526,1,0b10001},   {527,0,0b01001},   {528,1,0b11111},   {529,0,0b01101},   {530,1,0b01111},   {531,1,0b11001},   {532,0,0b00101},   {533,1,0b00111},   {534,1,0b01011},   {535,0,0b00111},   {536,0,0b10001},   {537,0,0b10101},   {538,1,0b10111},   {539,0,0b00011},   {540,0,0b01001},   {541,1,0b10011},   {542,1,0b11101},   {543,0,0b01001},   {544,0,0b01001},   {545,0,0b01011},   {546,1,0b11011},   {547,0,0b01101},   {548,0,0b10101},   {549,1,0b10101},   {550,0,0b00001},   {551,0,0b00101},   {552,1,0b01111},   {553,1,0b01011},   {554,0,0b10101},   {555,1,0b11101},   {556,1,0b10011},   {557,0,0b01001},   {558,0,0b10001},   {559,1,0b10101},   {560,0,0b00101},   {561,0,0b01111},   {562,0,0b10101},   {563,0,0b10111},   {564,1,0b11101},   {565,1,0b01111},   {566,1,0b00101},   {567,0,0b00101},   {568,0,0b00111},   {569,1,0b01001},   {570,1,0b01011},   {571,1,0b01111},   {572,1,0b00101},   {573,1,0b00111},   {574,1,0b11011},   {575,0,0b00111},   {576,1,0b10101},   {577,1,0b01111},   {578,1,0b11001},   {579,1,0b00001},   {580,1,0b00001},   {581,1,0b00001},   {582,0,0b01011},   {583,1,0b11011},   {584,0,0b00011},   {585,0,0b01001},   {586,0,0b10011},   {587,1,0b11011},   {588,0,0b10001},   {589,1,0b11001},   {590,1,0b00101},   {591,1,0b10111},   {592,0,0b10011},   {593,0,0b10101},   {594,1,0b11001},   {595,0,0b10011},   {596,1,0b10101},   {597,1,0b10011},   {598,1,0b11001},   {599,0,0b00111},   {600,0,0b10101},   {601,0,0b10101},   {602,1,0b11101},   {603,0,0b10011},   {604,1,0b10011},   {605,1,0b01001},   {606,1,0b01011},   {607,1,0b00111},   {608,0,0b00001},   {609,0,0b00011},   {610,0,0b10001},   {611,1,0b11001},   {612,0,0b00001},   {613,0,0b01011},   {614,1,0b11001},   {615,1,0b00111},   {616,1,0b11001},   {617,0,0b00111},   {618,0,0b01101},   {619,0,0b10001},   {620,1,0b10001},   {621,1,0b11011},   {622,0,0b01101},   {623,1,0b11101},   {624,0,0b00011},   {625,1,0b01111},   {626,1,0b11101},   {627,0,0b00111},   {628,1,0b01001},   {629,0,0b00001},   {630,1,0b11011},   {631,0,0b00101},   {632,1,0b10111},   {633,0,0b00111},   {634,1,0b11011},   {635,1,0b11101},   {636,1,0b00011},   {637,1,0b01111},   {638,0,0b00011},   {639,0,0b01101},   {640,1,0b11011},   {641,1,0b00011},   {642,0,0b00111},   {643,0,0b01001},   {644,0,0b01011},   {645,0,0b10111},   {646,0,0b11001},   {647,1,0b11101},   {648,1,0b01011},   {649,1,0b10111},   {650,1,0b00011},   {651,0,0b00101},   {652,0,0b10111},   {653,0,0b10111},   {654,1,0b11011},   {655,0,0b01011},   {656,1,0b11011},   {657,0,0b00111},   {658,0,0b01101},   {659,0,0b10011},   {660,1,0b11111},   {661,1,0b01011},   {662,0,0b10101},   {663,1,0b11011},   {664,0,0b01011},   {665,0,0b01111},   {666,1,0b11001},   {667,1,0b11011},   {668,1,0b00111},   {669,1,0b00101},   {670,1,0b01001},   {671,1,0b01011},   {672,1,0b11101},   {673,1,0b10011},   {674,0,0b01001},   {675,1,0b11001},   {676,0,0b00101},   {677,1,0b01111},   {678,0,0b00001},   {679,1,0b10001},   {680,0,0b00101},   {681,1,0b11011},   {682,1,0b10101},   {683,0,0b01111},   {684,0,0b10111},   {685,1,0b11111},   {686,0,0b00101},   {687,0,0b01011},   {688,0,0b10011},   {689,1,0b11011},   {690,1,0b01001},   {691,0,0b00101},   {692,1,0b11001},   {693,0,0b10011},   {694,1,0b10101},   {695,1,0b10001},   {696,1,0b10111},   {697,1,0b00111},   {698,1,0b11001},   {699,1,0b00001},   {700,1,0b01101},   {701,1,0b11111},   {702,1,0b00001},   {703,0,0b00111},   {704,1,0b11001},   {705,1,0b10001},   {706,0,0b11101},   {707,1,0b11101},   {708,0,0b10111},   {709,1,0b11111},   {710,0,0b00001},   {711,0,0b00101},   {712,1,0b01011},   {713,0,0b00011},   {714,1,0b10111},   {715,0,0b00011},   {716,1,0b00101},   {717,0,0b01001},   {718,0,0b10101},   {719,1,0b11111},   {720,0,0b01011},   {721,1,0b10111},   {722,1,0b01111},   {723,0,0b01011},   {724,1,0b10101},   {725,0,0b01111},   {726,1,0b11011},   {727,0,0b00111},   {728,0,0b10011},   {729,1,0b10111},   {730,0,0b00111},   {731,0,0b10001},   {732,1,0b10011},   {733,1,0b00001},   {734,0,0b01111},   {735,0,0b01111},   {736,1,0b10001},   {737,1,0b01001},   {738,0,0b00001},   {739,1,0b00111},   {740,1,0b11011},   {741,0,0b10001},   {742,0,0b10001},   {743,0,0b10001},   {744,1,0b10111},   {745,1,0b10001},   {746,1,0b10001},   {747,0,0b01001},   {748,0,0b01101},   {749,0,0b11001},   {750,1,0b11011},   {751,1,0b10001},   {752,0,0b00001},   {753,0,0b00011},   {754,1,0b00101},   {755,1,0b00111},   {756,0,0b00011},   {757,1,0b01001},   {758,1,0b00111},   {759,0,0b00001},   {760,1,0b11101},   {761,1,0b01111},   {762,1,0b00111},   {763,0,0b01001},   {764,1,0b10001},   {765,1,0b00111},   {766,1,0b01011},   {767,1,0b10011},   {768,0,0b01101},   {769,1,0b10001},   {770,1,0b10001},   {771,0,0b00011},   {772,0,0b00101},   {773,1,0b11101},   {774,1,0b10111},   {775,1,0b10101},   {776,1,0b10001},   {777,1,0b11101},   {778,0,0b11001},   {779,1,0b11101},   {780,0,0b01011},   {781,1,0b11001},   {782,0,0b10001},   {783,1,0b10101},   {784,1,0b00001},   {785,0,0b10001},   {786,1,0b11101},   {787,1,0b11111},   {788,0,0b00011},   {789,1,0b10001},   {790,1,0b01011},   {791,1,0b10101},   {792,0,0b11001},   {793,1,0b11101},   {794,0,0b10001},   {795,1,0b10101},   {796,1,0b01001},   {797,1,0b11011},   {798,0,0b00111},   {799,0,0b01001},   {800,0,0b10111},   {801,1,0b11111},   {802,1,0b11101},   {803,1,0b10101},   {804,0,0b00011},   {805,1,0b10001},   {806,1,0b11111},   {807,1,0b10111},   {808,1,0b01111},   {809,0,0b01011},   {810,1,0b11011},   {811,1,0b10101},   {812,0,0b00011},   {813,1,0b01101},   {814,0,0b00101},   {815,0,0b01001},   {816,1,0b10001},   {817,0,0b01101},   {818,1,0b11111},   {819,1,0b01001},   {820,0,0b10101},   {821,0,0b10111},   {822,1,0b11111},   {823,0,0b00001},   {824,1,0b10011},   {825,1,0b00011},   {826,1,0b01101},   {827,1,0b11011},   {828,1,0b00001},   {829,1,0b11011},   {830,1,0b10011},   {831,0,0b01101},   {832,1,0b10001},   {833,0,0b00011},   {834,1,0b10011},   {835,0,0b00101},   {836,1,0b01001},   {837,0,0b01111},   {838,1,0b10011},   {839,0,0b10011},   {840,1,0b11111},   {841,1,0b01001},   {842,1,0b01101},   {843,0,0b01111},   {844,1,0b10101},   {845,0,0b00011},   {846,1,0b11111},   {847,1,0b00111},   {848,0,0b00001},   {849,0,0b00111},   {850,0,0b10101},   {851,0,0b10111},   {852,1,0b11101},   {853,0,0b01111},   {854,1,0b11001},   {855,1,0b10001},   {856,1,0b01111},   {857,0,0b10111},   {858,0,0b11001},   {859,1,0b11001},   {860,0,0b10101},   {861,1,0b11111},   {862,1,0b10011},   {863,0,0b01011},   {864,1,0b11011},   {865,1,0b11011},   {866,0,0b10011},   {867,1,0b10101},   {868,0,0b00101},   {869,1,0b00101},   {870,0,0b00011},   {871,0,0b10111},   {872,1,0b11011},   {873,0,0b01001},   {874,0,0b01001},   {875,1,0b11101},   {876,0,0b01001},   {877,0,0b10101},   {878,1,0b11101},   {879,0,0b11001},   {880,0,0b11111},   {881,1,0b11111},   {882,0,0b01011},   {883,1,0b11101},   {884,0,0b00111},   {885,1,0b10111},   {886,0,0b00101},   {887,1,0b01011},   {888,0,0b00001},   {889,1,0b00011},   {890,0,0b00111},   {891,0,0b01001},   {892,1,0b01101},   {893,0,0b00011},   {894,1,0b10011},   {895,1,0b01111},   {896,1,0b10111},   {897,0,0b01001},   {898,0,0b01111},   {899,0,0b10011},   {900,1,0b11111},   {901,1,0b11001},   {902,0,0b00011},   {903,1,0b10001},   {904,1,0b01011},   {905,0,0b00101},   {906,1,0b01001},   {907,0,0b10011},   {908,0,0b10111},   {909,0,0b11011},   {910,1,0b11111},   {911,1,0b11111},   {912,1,0b00111},   {913,1,0b01101},   {914,1,0b11101},   {915,0,0b10101},   {916,0,0b11011},   {917,1,0b11011},   {918,0,0b01111},   {919,0,0b10001},   {920,1,0b11101},   {921,0,0b01011},   {922,1,0b10111},   {923,0,0b00001},   {924,0,0b01011},   {925,1,0b10001},   {926,0,0b00011},   {927,1,0b01101},   {928,1,0b11001},   {929,0,0b00111},   {930,0,0b01101},   {931,0,0b11011},   {932,1,0b11111},   {933,1,0b11011},   {934,1,0b11011},   {935,0,0b10101},   {936,1,0b11001},   {937,1,0b00111},   {938,1,0b01011},   {939,0,0b00101},   {940,1,0b00111},   {941,1,0b01001},   {942,1,0b11111},   {943,0,0b01101},   {944,1,0b11101},   {945,0,0b00001},   {946,1,0b11001},   {947,0,0b01001},   {948,1,0b01111},   {949,1,0b00001},   {950,0,0b00101},   {951,0,0b01111},   {952,0,0b11001},   {953,1,0b11001},   {954,0,0b10001},   {955,1,0b11011},   {956,0,0b01101},   {957,1,0b01101},   {958,1,0b01101},   {959,0,0b00111},   {960,0,0b01011},   {961,1,0b10011},   {962,0,0b00111},   {963,0,0b10001},   {964,0,0b10101},   {965,1,0b11001},   {966,1,0b11011},   {967,1,0b11101},   {968,1,0b01001},   {969,0,0b00101},   {970,0,0b00111},   {971,1,0b10111},   {972,1,0b00001},   {973,0,0b01101},   {974,1,0b10101},   {975,1,0b11111},   {976,1,0b01111},   {977,0,0b00101},   {978,0,0b10001},   {979,1,0b11111},   {980,1,0b10111},   {981,0,0b01011},   {982,0,0b01101},   {983,1,0b10101},   {984,1,0b11101},   {985,1,0b10011},   {986,0,0b10101},   {987,1,0b11111},   {988,0,0b10011},   {989,1,0b11111},   {990,0,0b00111},   {991,1,0b10111},   {992,0,0b10101},   {993,0,0b10101},   {994,1,0b11011},   {995,0,0b01001},   {996,1,0b10101},   {997,1,0b01011},   {998,1,0b10101},   {999,1,0b11001},   {1000,1,0b01111},   {1001,1,0b00011},   {1002,0,0b00001},   {1003,0,0b00011},   {1004,0,0b00101},   {1005,1,0b01011},   {1006,1,0b00101},   {1007,1,0b00101},   {1008,0,0b00111},   {1009,1,0b01011},   {1010,0,0b11001},   {1011,1,0b11111},   {1012,0,0b10101},   {1013,0,0b11101},   {1014,1,0b11111},   {1015,1,0b10101},   {1016,0,0b01011},   {1017,0,0b10111},   {1018,1,0b11111},   {1019,1,0b11011},   {1020,1,0b10101},   {1021,0,0b01001},   {1022,0,0b10001},   {1023,1,0b11111},   {1024,1,0b11001},   {1025,0,0b00101},   {1026,0,0b10001},   {1027,1,0b11001},   {1028,0,0b10111},   {1029,1,0b10111},   {1030,0,0b11011},   {1031,1,0b11111},   {1032,1,0b11111},   {1033,0,0b01011},   {1034,0,0b01011},   {1035,1,0b10011},   {1036,0,0b01101},   {1037,1,0b10011},   {1038,0,0b00001},   {1039,1,0b01111},   {1040,1,0b00011},   {1041,0,0b10101},   {1042,1,0b11101},   {1043,0,0b11001},   {1044,1,0b11011},   {1045,1,0b01101},   {1046,0,0b00101},   {1047,0,0b01011},   {1048,0,0b10101},   {1049,0,0b11101},   {1050,1,0b11101},   {1051,0,0b00001},   {1052,0,0b01101},   {1053,1,0b10001},   {1054,0,0b00101},   {1055,0,0b00111},   {1056,1,0b01001},   {1057,0,0b11101},   {1058,1,0b11101},   {1059,1,0b10001},   {1060,1,0b10101},   {1061,0,0b00101},   {1062,1,0b10101},   {1063,0,0b00011},   {1064,0,0b00101},   {1065,1,0b10111},   {1066,0,0b01011},   {1067,1,0b01011},   {1068,0,0b00101},   {1069,1,0b01011},   {1070,1,0b01001},   {1071,0,0b00011},   {1072,1,0b00101},   {1073,0,0b10001},   {1074,1,0b11101},   {1075,1,0b01011},   {1076,1,0b11001}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2001,7 +2001,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11101},   {  1,1,0b11111},   {  2,0,0b10101},   {  3,1,0b11011},   {  5,0,0b01001},   {  6,0,0b01011},   {  7,1,0b10011},   {  8,0,0b00101},   {  9,1,0b10001},   { 10,0,0b01101},   { 11,1,0b11001},   { 12,0,0b00001},   { 13,1,0b11111},   { 14,1,0b10001},   { 15,1,0b00001},   { 16,0,0b01001},   { 17,1,0b11111},   { 18,0,0b01101},   { 19,1,0b01111},   { 20,0,0b01111},   { 21,0,0b10111},   { 22,1,0b11111},   { 23,1,0b01111},   { 24,0,0b00001},   { 25,0,0b01001},   { 26,1,0b11001},   { 27,1,0b10001},   { 28,1,0b10111},   { 29,1,0b01011},   { 30,0,0b00011},   { 31,1,0b11001},   { 34,0,0b01001},   { 35,0,0b01111},   { 36,0,0b10101},   { 37,1,0b11001},   { 38,0,0b00011},   { 39,0,0b00101},   { 40,0,0b01101},   { 41,0,0b10011},   { 42,1,0b11011},   { 43,1,0b11001},   { 44,1,0b00011},   { 45,1,0b01111},   { 46,1,0b11011},   { 47,1,0b11111},   { 48,1,0b10011},   { 49,1,0b11111},   { 50,1,0b00001},   { 51,1,0b10001},   { 52,0,0b01101},   { 53,0,0b01111},   { 54,1,0b10101},   { 55,1,0b10101},   { 56,0,0b10111},   { 57,1,0b11101},   { 58,1,0b10101},   { 59,0,0b00001},   { 60,1,0b10001},   { 61,1,0b01111},   { 62,0,0b01101},   { 63,0,0b10111},   { 64,1,0b11001},   { 65,0,0b01001},   { 66,0,0b01011},   { 67,1,0b01111},   { 68,1,0b00111},   { 69,1,0b00111},   { 70,0,0b00111},   { 71,1,0b01101},   { 72,1,0b11101},   { 73,1,0b10101},   { 74,0,0b10001},   { 75,1,0b11111},   { 76,1,0b11111},   { 77,0,0b01001},   { 78,0,0b10111},   { 79,1,0b11001},   { 80,0,0b00111},   { 81,1,0b11111},   { 83,0,0b01011},   { 84,1,0b10101},   { 85,0,0b00001},   { 86,0,0b01101},   { 87,0,0b10011},   { 88,1,0b10101},   { 89,1,0b01011},   { 90,0,0b01101},   { 91,1,0b01111},   { 92,1,0b00101},   { 93,1,0b11101},   { 94,0,0b00111},   { 95,1,0b01001},   { 96,0,0b00101},   { 97,1,0b10001},   { 98,0,0b10001},   { 99,0,0b10001},   {100,1,0b11001},   {101,1,0b01101},   {102,1,0b01001},   {103,0,0b00101},   {104,0,0b00111},   {105,0,0b00111},   {106,1,0b10011},   {107,1,0b00001},   {108,0,0b01101},   {109,1,0b10101},   {110,0,0b10101},   {111,1,0b11001},   {112,0,0b01111},   {113,1,0b01111},   {114,1,0b00101},   {115,0,0b10001},   {116,0,0b10101},   {117,0,0b10111},   {118,1,0b11011},   {119,1,0b10111},   {120,1,0b10101},   {121,0,0b01111},   {122,0,0b01111},   {123,0,0b10101},   {124,1,0b10101},   {125,0,0b00111},   {126,0,0b01011},   {127,1,0b10001},   {128,0,0b01011},   {129,1,0b11101},   {130,0,0b01001},   {131,1,0b10111},   {132,0,0b10111},   {133,1,0b11001},   {134,0,0b01111},   {135,1,0b11001},   {136,0,0b00101},   {137,1,0b11101},   {138,1,0b00011},   {139,1,0b11011},   {140,1,0b00011},   {141,0,0b10001},   {142,1,0b10111},   {143,0,0b00001},   {144,0,0b01101},   {145,0,0b10001},   {146,1,0b11011},   {147,0,0b00101},   {148,0,0b10111},   {149,1,0b11011},   {150,0,0b01111},   {151,1,0b11001},   {152,0,0b10011},   {153,1,0b10101},   {154,1,0b10111},   {155,0,0b01011},   {156,1,0b01111},   {157,0,0b00111},   {158,0,0b10001},   {159,1,0b11011},   {160,1,0b00001},   {161,0,0b11111},   {162,1,0b11111},   {163,0,0b01001},   {164,0,0b10001},   {165,1,0b10011},   {166,1,0b01111},   {167,0,0b00111},   {168,0,0b01111},   {169,1,0b10101},   {170,0,0b01101},   {171,1,0b11001},   {172,1,0b11011},   {173,1,0b01011},   {174,1,0b10101},   {175,1,0b01101},   {176,1,0b01101},   {177,0,0b00111},   {178,1,0b11001},   {179,0,0b01011},   {180,1,0b11011},   {181,0,0b00011},   {182,1,0b01001},   {183,0,0b01101},   {184,0,0b11001},   {185,1,0b11101},   {186,1,0b10011},   {187,0,0b00011},   {188,1,0b00011},   {189,0,0b00011},   {190,0,0b00101},   {191,1,0b10101},   {192,1,0b00001},   {193,1,0b10001},   {194,1,0b11011},   {195,0,0b10001},   {196,0,0b10111},   {197,0,0b11101},   {198,1,0b11101},   {199,1,0b00101},   {200,0,0b01101},   {201,1,0b11111},   {202,1,0b01101},   {203,1,0b00101},   {204,1,0b01001},   {205,1,0b10001},   {206,0,0b01001},   {207,1,0b01011},   {208,0,0b10111},   {209,1,0b10111},   {210,1,0b01101},   {211,0,0b01011},   {212,1,0b10101},   {213,0,0b01011},   {214,1,0b10001},   {215,0,0b00001},   {216,0,0b11011},   {217,0,0b11011},   {218,1,0b11011},   {219,1,0b11101},   {220,0,0b00001},   {221,1,0b00101},   {222,0,0b00011},   {223,1,0b01001},   {224,1,0b10101},   {225,1,0b11001},   {226,1,0b11101},   {227,1,0b00001},   {228,1,0b01001},   {229,0,0b00111},   {230,0,0b01001},   {231,1,0b11011},   {232,1,0b01111},   {233,0,0b01001},   {234,0,0b01011},   {235,1,0b01111},   {236,0,0b00111},   {237,0,0b00111},   {238,1,0b11011},   {239,1,0b10101},   {240,0,0b00001},   {241,0,0b10001},   {242,1,0b11011},   {243,0,0b00101},   {244,1,0b10011},   {245,0,0b00111},   {246,1,0b10001},   {247,1,0b11001},   {248,1,0b11001},   {249,1,0b00111},   {250,1,0b10111},   {251,0,0b00001},   {252,1,0b10101},   {253,1,0b10011},   {254,1,0b00101},   {255,1,0b10101},   {256,1,0b01111},   {257,0,0b01001},   {258,1,0b10001},   {259,0,0b00011},   {260,0,0b10001},   {261,1,0b11111},   {262,0,0b00011},   {263,0,0b01011},   {264,1,0b10011},   {265,1,0b00011},   {266,0,0b01101},   {267,1,0b11001},   {268,0,0b00101},   {269,0,0b10111},   {270,1,0b11011},   {271,1,0b11101},   {272,1,0b10001},   {273,0,0b00001},   {274,1,0b11101},   {275,0,0b10111},   {276,1,0b11111},   {277,0,0b01101},   {278,0,0b10111},   {279,1,0b11111},   {280,0,0b00111},   {281,1,0b11101},   {282,0,0b01011},   {283,1,0b10101},   {284,0,0b01101},   {285,1,0b10001},   {286,0,0b00101},   {287,0,0b10001},   {288,0,0b11001},   {289,1,0b11101},   {290,1,0b00111},   {291,0,0b01011},   {292,1,0b11001},   {293,0,0b01011},   {294,1,0b11001},   {295,0,0b00001},   {296,0,0b00011},   {297,0,0b00101},   {298,1,0b11011},   {299,0,0b00011},   {300,0,0b00111},   {301,1,0b10001},   {302,1,0b11011},   {303,0,0b11001},   {304,1,0b11111},   {305,1,0b11101},   {306,0,0b11001},   {307,1,0b11111},   {308,0,0b01001},   {309,1,0b01101},   {310,1,0b11011},   {311,1,0b10101},   {312,0,0b00101},   {313,0,0b01101},   {314,1,0b10111},   {315,0,0b00111},   {316,0,0b11011},   {317,1,0b11011},   {318,1,0b00011},   {319,0,0b01111},   {320,0,0b11001},   {321,1,0b11111},   {322,1,0b10011},   {323,1,0b01101},   {324,1,0b11101},   {325,1,0b00001},   {326,1,0b01101},   {327,0,0b01001},   {328,1,0b11011},   {329,0,0b00111},   {330,1,0b10001},   {331,1,0b10011},   {332,0,0b01111},   {333,0,0b10101},   {334,1,0b11101},   {335,1,0b11001},   {336,0,0b01101},   {337,1,0b10111},   {338,1,0b00001},   {339,1,0b00011},   {340,1,0b01111},   {341,1,0b11011},   {342,0,0b10101},   {343,1,0b10111},   {344,1,0b10101},   {345,1,0b11011},   {346,0,0b01011},   {347,1,0b11001},   {348,1,0b01001},   {349,1,0b01101},   {350,0,0b11001},   {351,1,0b11111},   {352,1,0b01001},   {353,1,0b11011},   {354,1,0b00101},   {355,1,0b00111},   {356,0,0b01111},   {357,1,0b11001},   {358,0,0b10011},   {359,1,0b11011},   {360,0,0b01001},   {361,1,0b10001},   {362,1,0b10101},   {363,0,0b01101},   {364,1,0b11101},   {365,1,0b01111},   {366,1,0b01101},   {367,0,0b00111},   {368,0,0b01101},   {369,1,0b11001},   {370,0,0b10011},   {371,1,0b11101},   {372,0,0b01001},   {373,0,0b01011},   {374,1,0b01111},   {375,0,0b10101},   {376,1,0b11101},   {377,0,0b00101},   {378,0,0b01011},   {379,1,0b11001},   {380,1,0b10001},   {381,0,0b00101},   {382,1,0b11101},   {383,0,0b01111},   {384,1,0b11111},   {385,0,0b10111},   {386,1,0b11111},   {387,1,0b01101},   {388,0,0b10011},   {389,1,0b10101},   {390,0,0b00001},   {391,0,0b00011},   {392,1,0b10011},   {393,0,0b01001},   {394,0,0b10011},   {395,1,0b11001},   {396,0,0b01011},   {397,1,0b01111},   {398,0,0b00111},   {399,1,0b11011},   {400,1,0b10111},   {401,0,0b01111},   {402,1,0b01111},   {403,1,0b00101},   {404,1,0b11111},   {405,1,0b11101},   {406,1,0b10101},   {407,1,0b01101},   {408,0,0b01111},   {409,0,0b10001},   {410,1,0b10001},   {411,0,0b10101},   {412,1,0b11111},   {413,0,0b01111},   {414,1,0b11101},   {415,0,0b00111},   {416,0,0b01001},   {417,1,0b10001},   {418,0,0b10011},   {419,1,0b11101},   {420,0,0b00001},   {421,1,0b01111},   {422,0,0b11001},   {423,1,0b11101},   {424,1,0b01101},   {425,1,0b11111},   {426,1,0b01101},   {427,0,0b00011},   {428,0,0b00101},   {429,0,0b11101},   {430,1,0b11111},   {431,0,0b00011},   {432,0,0b01001},   {433,1,0b11011},   {434,0,0b01101},   {435,1,0b11111},   {436,1,0b11001},   {437,0,0b01111},   {438,1,0b11101},   {439,1,0b11101},   {440,1,0b00101},   {441,0,0b01011},   {442,1,0b11011},   {443,0,0b00011},   {444,1,0b00101},   {445,1,0b11011},   {446,0,0b11111},   {447,1,0b11111},   {448,1,0b10101},   {449,0,0b00011},   {450,0,0b01111},   {451,0,0b10001},   {452,1,0b11011},   {453,0,0b01101},   {454,0,0b10101},   {455,1,0b11111},   {456,1,0b10111},   {457,1,0b01111},   {458,0,0b01101},   {459,1,0b10101},   {460,0,0b10101},   {461,1,0b11101},   {462,1,0b00111},   {463,1,0b11101},   {464,1,0b01101},   {465,0,0b00001},   {466,0,0b10001},   {467,1,0b10101},   {468,1,0b10001},   {469,0,0b00011},   {470,1,0b01101},   {471,1,0b00001},   {472,0,0b00001},   {473,1,0b01101},   {474,1,0b10011},   {475,1,0b11101},   {476,0,0b00001},   {477,1,0b11011},   {478,1,0b00001},   {479,1,0b01101},   {480,1,0b10011},   {481,1,0b00111},   {482,1,0b01111},   {483,1,0b01001},   {484,0,0b00111},   {485,1,0b11101},   {486,0,0b01011},   {487,1,0b10101},   {488,1,0b00111},   {489,0,0b00111},   {490,1,0b01001},   {491,1,0b11101},   {492,0,0b10001},   {493,1,0b11101},   {494,1,0b01001},   {495,1,0b10001},   {496,1,0b10101},   {497,0,0b00011},   {498,1,0b00111},   {500,0,0b00011},   {501,1,0b01101},   {502,1,0b10001},   {504,0,0b01111},   {505,1,0b10111},   {507,1,0b00011},   {508,1,0b10001},   {509,1,0b10101},   {513,0,0b01101},   {514,1,0b10001},   {515,0,0b00101},   {516,0,0b00111},   {517,1,0b11101},   {518,1,0b11111},   {519,0,0b00011},   {520,1,0b00011},   {521,0,0b00101},   {522,1,0b01111},   {523,0,0b00001},   {524,1,0b10111},   {525,0,0b00001},   {526,1,0b00101},   {527,1,0b01001},   {528,0,0b00101},   {529,1,0b01111},   {530,1,0b10111},   {531,1,0b00011},   {532,0,0b10001},   {533,1,0b11101},   {534,1,0b01001},   {535,0,0b00111},   {536,0,0b10111},   {537,1,0b11111},   {538,1,0b11001},   {539,0,0b00001},   {540,1,0b01101},   {542,1,0b11001},   {544,1,0b00011},   {545,0,0b00111},   {546,1,0b10111},   {548,0,0b00101},   {549,0,0b10101},   {550,1,0b11011},   {551,1,0b01101},   {553,0,0b01011},   {554,0,0b10001},   {555,1,0b11011},   {556,0,0b01111},   {557,1,0b11111},   {558,0,0b00011},   {559,0,0b01101},   {560,0,0b10011},   {561,1,0b10011},   {562,0,0b00001},   {563,1,0b11111},   {564,1,0b11001},   {565,1,0b01001},   {569,1,0b10101},   {570,0,0b10011},   {571,1,0b11001},   {572,1,0b10011},   {573,1,0b01011},   {574,1,0b01111},   {576,0,0b00011},   {577,0,0b01101},   {578,1,0b11111},   {579,0,0b00111},   {580,1,0b01001},   {581,1,0b01001},   {582,1,0b11001},   {583,1,0b10001},   {584,1,0b10011},   {586,0,0b01001},   {587,1,0b10101},   {588,0,0b10111},   {589,1,0b11111},   {590,1,0b10111},   {591,0,0b00001},   {592,0,0b00001},   {593,1,0b01011},   {594,1,0b01001},   {595,0,0b00011},   {596,1,0b10001},   {597,0,0b11101},   {598,1,0b11111},   {599,1,0b11111},   {600,1,0b11101},   {601,1,0b10111},   {602,1,0b01011},   {603,0,0b11101},   {604,1,0b11111},   {605,1,0b01011},   {606,1,0b11011},   {607,1,0b01011},   {608,0,0b10111},   {609,1,0b11011},   {610,0,0b01101},   {611,1,0b01111},   {612,1,0b01001},   {613,0,0b01111},   {614,1,0b10111},   {615,0,0b10011},   {616,0,0b10111},   {617,1,0b11001},   {618,1,0b01111},   {619,0,0b10011},   {620,1,0b10011},   {621,0,0b00101},   {622,1,0b01111},   {625,1,0b00011},   {626,0,0b00001},   {627,1,0b11011},   {629,1,0b11111},   {630,1,0b00101},   {633,0,0b01011},   {634,1,0b01101},   {635,0,0b01111},   {636,1,0b10101},   {637,1,0b10111},   {638,0,0b10101},   {639,0,0b11011},   {640,1,0b11011},   {641,1,0b00111},   {642,0,0b01111},   {643,1,0b01111},   {644,0,0b00011},   {645,0,0b00011},   {646,0,0b01111},   {647,0,0b10011},   {648,1,0b11011},   {649,1,0b01111},   {650,1,0b01111},   {651,1,0b00111},   {652,0,0b00001},   {653,1,0b00011},   {654,1,0b10011},   {655,0,0b11011},   {656,1,0b11101},   {657,0,0b00001},   {658,1,0b00011},   {659,1,0b00101},   {660,1,0b01011},   {661,1,0b00101},   {662,0,0b00011},   {663,1,0b01001},   {664,0,0b01101},   {665,1,0b11011},   {666,0,0b10001},   {667,1,0b10011},   {668,1,0b11101},   {670,1,0b11111},   {671,1,0b11001},   {673,0,0b10001},   {674,1,0b11011},   {675,0,0b00111},   {676,1,0b11001},   {677,0,0b00101},   {678,0,0b00101},   {679,1,0b01101},   {680,1,0b00011},   {681,1,0b10001},   {682,0,0b01111},   {683,1,0b01111},   {684,1,0b00001},   {686,1,0b10001},   {691,0,0b10001},   {692,1,0b11001},   {694,1,0b11001},   {696,0,0b10001},   {697,0,0b10001},   {698,1,0b10111},   {699,1,0b11011},   {700,1,0b11111},   {701,1,0b11111},   {703,1,0b00001},   {706,0,0b00111},   {707,0,0b01111},   {708,1,0b10111},   {712,0,0b00101},   {713,1,0b01101},   {714,1,0b01101},   {715,1,0b00011},   {718,0,0b10011},   {719,0,0b11011},   {720,1,0b11111},   {721,1,0b00001},   {722,0,0b00001},   {723,0,0b10011},   {724,1,0b11011},   {725,1,0b01001},   {726,0,0b00001},   {727,1,0b00011},   {728,1,0b10111},   {731,1,0b00101},   {732,1,0b11101},   {734,1,0b01111},   {735,0,0b10011},   {736,1,0b10111},   {738,0,0b00101},   {739,0,0b01101},   {740,1,0b10011},   {741,0,0b01101},   {742,1,0b01111},   {743,0,0b00101},   {744,1,0b01111},   {745,0,0b10101},   {746,1,0b10111},   {747,0,0b00111},   {748,1,0b10011},   {749,0,0b00011},   {750,1,0b10001},   {751,0,0b00011},   {752,1,0b10001},   {753,1,0b01111},   {754,1,0b11001},   {756,1,0b01101},   {760,0,0b00001},   {761,0,0b01001},   {762,0,0b11111},   {763,1,0b11111},   {764,0,0b01101},   {765,1,0b10101},   {766,1,0b01011},   {767,0,0b00111},   {768,0,0b01101},   {769,1,0b11011},   {770,1,0b00001},   {771,0,0b01011},   {772,0,0b01111},   {773,1,0b11001},   {774,0,0b00111},   {775,0,0b01011},   {776,0,0b11011},   {777,1,0b11011},   {778,0,0b01011},   {779,1,0b01011},   {780,0,0b01101},   {781,0,0b10001},   {782,1,0b11001},   {783,1,0b00101},   {784,1,0b10011},   {785,0,0b01101},   {786,1,0b11111},   {787,0,0b00111},   {788,0,0b01011},   {789,1,0b11001},   {790,1,0b11111},   {791,1,0b10111},   {792,0,0b00011},   {793,1,0b11011},   {794,0,0b11001},   {795,1,0b11011},   {796,0,0b00101},   {797,0,0b00101},   {798,1,0b11111},   {799,0,0b01011},   {800,1,0b10111},   {801,1,0b01101},   {802,1,0b01001},   {803,0,0b01001},   {804,1,0b10011},   {805,1,0b11001},   {806,0,0b10111},   {807,1,0b11011},   {808,0,0b10101},   {809,1,0b11101},   {810,1,0b11101},   {811,0,0b00111},   {812,0,0b01011},   {813,1,0b10001},   {814,0,0b00001},   {815,0,0b00011},   {816,1,0b00011},   {817,1,0b10111},   {818,1,0b00111},   {819,0,0b01001},   {820,1,0b01011},   {821,0,0b00011},   {822,1,0b10011},   {823,0,0b01001},   {824,0,0b11001},   {825,1,0b11001},   {826,1,0b10111},   {827,1,0b01011},   {828,0,0b00011},   {829,1,0b10001},   {830,0,0b00101},   {831,1,0b11001},   {832,1,0b10011},   {833,1,0b10111},   {834,0,0b00001},   {835,0,0b01001},   {836,1,0b11011},   {837,0,0b00101},   {838,0,0b01011},   {839,1,0b10001},   {840,0,0b01111},   {841,1,0b11001},   {842,1,0b00101},   {843,1,0b10011},   {844,1,0b11001},   {845,1,0b10011},   {846,1,0b10011},   {847,1,0b01111},   {848,1,0b01101},   {849,1,0b10101},   {850,0,0b00011},   {851,0,0b00111},   {852,1,0b10001},   {853,1,0b00101},   {854,0,0b00001},   {855,0,0b01101},   {856,1,0b10111},   {857,1,0b11001},   {858,0,0b11001},   {859,1,0b11011},   {860,1,0b10111},   {861,1,0b10011},   {862,1,0b00001},   {863,0,0b00111},   {864,1,0b11001},   {865,0,0b00011},   {866,1,0b10111},   {867,0,0b01101},   {868,1,0b10001},   {869,1,0b01001},   {870,0,0b10111},   {871,1,0b10111},   {872,1,0b10001},   {873,1,0b00011},   {874,1,0b01011},   {875,1,0b01101},   {876,0,0b00011},   {877,1,0b11111},   {878,1,0b11101},   {879,1,0b10111},   {880,1,0b00101},   {881,0,0b01001},   {882,1,0b11101},   {883,1,0b00111},   {884,0,0b10011},   {885,1,0b11101},   {886,0,0b00111},   {887,1,0b10101},   {888,0,0b00011},   {889,1,0b01111},   {890,0,0b01001},   {891,1,0b01111},   {892,0,0b00011},   {893,1,0b10011},   {894,0,0b01011},   {895,1,0b11001},   {896,0,0b00001},   {897,1,0b00101},   {898,1,0b01011},   {899,0,0b00011},   {900,0,0b00011},   {901,1,0b01111},   {902,0,0b01011},   {903,1,0b01101},   {904,0,0b00001},   {905,1,0b10011},   {906,0,0b00001},   {907,0,0b00001},   {908,0,0b00111},   {909,0,0b10011},   {910,0,0b11001},   {911,1,0b11001},   {912,1,0b10001},   {913,1,0b10111},   {914,0,0b00001},   {915,0,0b00011},   {916,1,0b11011},   {917,1,0b11101},   {918,0,0b00011},   {919,0,0b10001},   {920,1,0b10111},   {921,0,0b01001},   {922,0,0b10011},   {923,1,0b10111},   {924,0,0b00111},   {925,1,0b11101},   {926,1,0b00111},   {927,0,0b00001},   {928,1,0b00011},   {929,0,0b00011},   {930,1,0b11011},   {931,0,0b00001},   {932,0,0b01011},   {933,1,0b01011},   {934,0,0b00001},   {935,0,0b00111},   {936,0,0b01011},   {937,0,0b11101},   {938,1,0b11111},   {939,1,0b11101},   {940,0,0b00101},   {941,1,0b00111},   {942,1,0b00111},   {943,0,0b11001},   {944,1,0b11111},   {945,0,0b00111},   {946,1,0b11101},   {947,1,0b10101},   {948,1,0b11011},   {949,0,0b00101},   {950,1,0b11011},   {951,1,0b01001},   {952,1,0b00001},   {953,1,0b11011},   {954,1,0b11101},   {955,0,0b00001},   {956,1,0b00001},   {957,0,0b00101},   {958,0,0b00101},   {959,1,0b01111},   {960,1,0b00111},   {961,1,0b11101},   {962,0,0b11011},   {963,1,0b11111},   {964,0,0b00001},   {965,1,0b01101},   {966,0,0b00101},   {967,0,0b00111},   {968,1,0b10101},   {969,1,0b11001},   {970,0,0b00001},   {971,1,0b01011},   {972,0,0b00011},   {973,0,0b01011},   {974,1,0b10001},   {975,0,0b01111},   {976,0,0b10011},   {977,1,0b11011},   {978,0,0b01101},   {979,1,0b11101},   {980,0,0b10001},   {981,1,0b11101},   {982,0,0b01111},   {983,1,0b01111},   {984,0,0b01001},   {985,0,0b01001},   {986,0,0b01101},   {987,1,0b11111},   {988,1,0b10111},   {989,1,0b00111},   {990,0,0b00101},   {991,1,0b01101},   {992,0,0b01001},   {993,0,0b10101},   {994,1,0b11001},   {995,1,0b00101},   {996,1,0b00101},   {997,0,0b01011},   {998,0,0b01011},   {999,1,0b01011},   {1000,1,0b10111},   {1001,0,0b01001},   {1002,1,0b01111},   {1003,0,0b00001},   {1004,0,0b01001},   {1005,0,0b01001},   {1006,0,0b01011},   {1007,1,0b11011},   {1008,1,0b10101},   {1009,1,0b11111},   {1010,0,0b01001},   {1011,1,0b01101},   {1012,0,0b00001},   {1013,1,0b11101},   {1014,1,0b00001},   {1015,1,0b10111},   {1016,1,0b00001},   {1017,1,0b11011},   {1018,1,0b10011},   {1019,0,0b00001},   {1020,1,0b11101},   {1021,0,0b01001},   {1022,1,0b10101},   {1023,0,0b11001},   {1024,1,0b11101},   {1025,0,0b00001},   {1026,1,0b01011},   {1027,0,0b01111},   {1028,1,0b10101},   {1029,1,0b01001},   {1030,1,0b01101},   {1031,0,0b01111},   {1032,0,0b11011},   {1033,0,0b11101},   {1034,1,0b11111},   {1035,0,0b00001},   {1036,0,0b00011},   {1037,1,0b01111},   {1038,0,0b11001},   {1039,1,0b11111},   {1040,1,0b00111},   {1041,0,0b00001},   {1042,1,0b00011},   {1043,0,0b01011},   {1044,0,0b10011},   {1045,1,0b11101},   {1046,1,0b11011},   {1047,1,0b01001},   {1048,1,0b00101},   {1049,1,0b11001},   {1050,1,0b01011},   {1051,1,0b01111},   {1052,1,0b10101},   {1056,1,0b11011},   {1057,0,0b01011},   {1058,0,0b01101},   {1059,1,0b11011},   {1061,0,0b00111},   {1062,0,0b11011},   {1063,1,0b11101},   {1064,0,0b00101},   {1065,1,0b00101},   {1066,0,0b00101},   {1067,1,0b11001},   {1068,0,0b00011},   {1069,1,0b01101},   {1070,0,0b01101},   {1071,1,0b11011},   {1073,0,0b00101},   {1074,0,0b10001},   {1075,1,0b11001},   {1076,1,0b00011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2019,7 +2019,7 @@ public:
                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b00101},   {  1,0,0b01111},   {  2,0,0b10101},   {  3,1,0b11011},   {  4,1,0b00101},   {  5,1,0b01001},   {  6,1,0b10111},   {  7,1,0b00101},   {  8,1,0b10111},   {  9,1,0b10001},   { 10,1,0b10001},   { 12,0,0b00011},   { 13,0,0b00101},   { 14,0,0b11011},   { 15,1,0b11101},   { 16,0,0b00011},   { 17,1,0b11001},   { 18,0,0b10101},   { 19,1,0b11101},   { 20,1,0b11111},   { 21,1,0b11011},   { 22,1,0b11011},   { 23,0,0b00001},   { 24,1,0b10011},   { 25,1,0b01111},   { 26,1,0b11101},   { 27,1,0b00101},   { 28,1,0b10101},   { 29,0,0b11001},   { 30,1,0b11011},   { 31,1,0b11111},   { 32,0,0b01011},   { 33,1,0b01111},   { 34,0,0b00001},   { 35,1,0b01001},   { 36,1,0b00111},   { 37,0,0b10001},   { 38,1,0b10001},   { 39,1,0b11001},   { 40,0,0b10011},   { 41,1,0b11001},   { 42,0,0b00101},   { 43,1,0b11011},   { 44,1,0b01101},   { 46,1,0b11001},   { 47,1,0b10111},   { 48,1,0b10011},   { 50,1,0b10111},   { 51,1,0b00111},   { 52,1,0b01111},   { 53,1,0b01011},   { 54,1,0b10001},   { 55,1,0b01111},   { 56,1,0b11111},   { 57,1,0b10011},   { 58,1,0b01101},   { 59,1,0b11101},   { 60,1,0b00011},   { 61,1,0b11011},   { 62,1,0b11011},   { 63,1,0b00001},   { 64,1,0b11011},   { 65,1,0b11011},   { 66,1,0b01101},   { 67,1,0b00001},   { 68,1,0b10001},   { 69,1,0b00001},   { 70,1,0b01001},   { 71,1,0b00111},   { 72,1,0b11111},   { 73,1,0b00011},   { 74,0,0b01011},   { 75,1,0b10011},   { 76,1,0b10111},   { 77,1,0b10011},   { 78,1,0b01111},   { 79,1,0b00001},   { 80,1,0b01111},   { 81,1,0b00101},   { 82,1,0b10111},   { 83,1,0b10011},   { 84,0,0b10001},   { 85,1,0b10111},   { 86,0,0b10111},   { 87,1,0b11001},   { 88,1,0b10001},   { 89,0,0b11011},   { 90,1,0b11111},   { 91,0,0b00011},   { 92,1,0b10111},   { 93,1,0b10101},   { 94,1,0b10001},   { 95,1,0b10011},   { 96,1,0b01001},   { 97,1,0b10001},   { 98,1,0b11101},   { 99,1,0b10011},   {100,0,0b01011},   {101,1,0b10111},   {102,1,0b00001},   {103,1,0b01101},   {104,1,0b10101},   {105,1,0b11001},   {106,1,0b00111},   {107,1,0b11001},   {108,1,0b10111},   {109,1,0b00011},   {110,1,0b01011},   {111,1,0b10001},   {112,0,0b01101},   {113,0,0b10001},   {114,1,0b11101},   {115,1,0b01011},   {116,1,0b11101},   {117,0,0b01111},   {118,1,0b10001},   {119,0,0b00001},   {120,1,0b00011},   {121,1,0b10011},   {122,1,0b01001},   {123,1,0b10111},   {124,1,0b00101},   {125,1,0b00001},   {126,0,0b01011},   {127,1,0b10111},   {128,1,0b10111},   {129,1,0b00111},   {130,1,0b11111},   {131,1,0b11111},   {132,0,0b01001},   {133,1,0b11011},   {134,1,0b01101},   {135,1,0b00101},   {136,1,0b10111},   {137,1,0b00101},   {138,1,0b01101},   {139,1,0b10101},   {140,1,0b11011},   {141,0,0b01011},   {142,0,0b01101},   {143,1,0b01101},   {144,0,0b01011},   {145,1,0b11011},   {146,0,0b00011},   {147,1,0b10101},   {148,1,0b11101},   {149,0,0b01001},   {150,1,0b01101},   {151,0,0b01111},   {152,1,0b10111},   {153,0,0b10101},   {154,0,0b11011},   {155,1,0b11101},   {156,1,0b00111},   {157,0,0b00101},   {158,1,0b11111},   {159,1,0b10111},   {160,1,0b10111},   {161,1,0b10111},   {162,1,0b11111},   {163,0,0b00011},   {164,1,0b11101},   {165,0,0b10001},   {166,0,0b10111},   {167,1,0b11001},   {168,0,0b10111},   {169,1,0b11111},   {170,1,0b11011},   {171,1,0b00011},   {172,0,0b00011},   {173,0,0b00111},   {174,1,0b10101},   {175,0,0b10011},   {176,1,0b10101},   {177,1,0b01001},   {178,1,0b10011},   {179,0,0b01001},   {180,1,0b11111},   {181,1,0b11011},   {182,1,0b00111},   {183,1,0b10001},   {184,1,0b11111},   {185,1,0b10101},   {186,1,0b00001},   {187,1,0b01011},   {188,0,0b00001},   {189,1,0b01001},   {190,1,0b11001},   {191,0,0b01001},   {192,1,0b01011},   {193,1,0b00111},   {194,0,0b00101},   {195,1,0b01101},   {196,0,0b00001},   {197,1,0b11001},   {198,1,0b10101},   {199,1,0b11101},   {200,1,0b01101},   {201,1,0b01101},   {202,1,0b00001},   {203,1,0b01001},   {204,1,0b11101},   {205,1,0b01011},   {206,1,0b11101},   {207,1,0b11111},   {208,1,0b00111},   {209,1,0b00111},   {210,1,0b11011},   {211,1,0b11111},   {212,0,0b01001},   {213,1,0b10101},   {214,1,0b10111},   {215,1,0b11011},   {216,0,0b00101},   {217,1,0b01101},   {218,0,0b10001},   {219,1,0b10111},   {220,1,0b11101},   {221,1,0b11111},   {222,1,0b01011},   {223,0,0b01001},   {224,0,0b10101},   {225,1,0b10111},   {226,1,0b01111},   {227,0,0b00101},   {228,0,0b01001},   {229,0,0b11011},   {230,1,0b11101},   {231,1,0b10011},   {232,1,0b00101},   {233,1,0b10111},   {234,1,0b11011},   {235,0,0b01111},   {236,1,0b01111},   {237,0,0b00101},   {238,0,0b11001},   {239,1,0b11111},   {240,1,0b10001},   {241,1,0b10001},   {242,1,0b01101},   {243,1,0b01111},   {244,0,0b00011},   {245,1,0b01001},   {246,1,0b01111},   {247,1,0b01101},   {248,1,0b01101},   {249,1,0b10101},   {250,1,0b00011},   {251,0,0b10111},   {252,1,0b11111},   {253,1,0b10101},   {254,1,0b10001},   {255,0,0b10101},   {256,1,0b11001},   {257,1,0b01111},   {258,1,0b10111},   {259,0,0b00001},   {260,1,0b11001},   {261,0,0b00001},   {262,0,0b10101},   {263,0,0b11011},   {264,1,0b11101},   {265,1,0b11111},   {266,1,0b10001},   {267,1,0b11001},   {268,1,0b10111},   {269,0,0b01101},   {270,1,0b10101},   {271,0,0b10101},   {272,1,0b11101},   {273,1,0b00001},   {274,1,0b01001},   {275,1,0b11111},   {276,1,0b11101},   {277,0,0b01111},   {278,0,0b10111},   {279,1,0b11111},   {280,1,0b00011},   {281,0,0b01011},   {282,0,0b10001},   {283,1,0b11101},   {284,1,0b00111},   {285,1,0b10001},   {286,1,0b10011},   {287,1,0b00011},   {288,0,0b00101},   {289,1,0b01011},   {290,1,0b10111},   {291,1,0b01001},   {292,1,0b11111},   {293,1,0b10001},   {294,1,0b00101},   {295,0,0b00101},   {296,0,0b11111},   {297,1,0b11111},   {298,1,0b11101},   {299,1,0b11011},   {300,1,0b01101},   {301,1,0b00111},   {302,1,0b01001},   {303,1,0b11001},   {304,1,0b01101},   {305,1,0b11111},   {306,0,0b01101},   {307,1,0b01111},   {308,1,0b01001},   {309,1,0b11001},   {310,1,0b00001},   {311,1,0b01011},   {312,1,0b00101},   {313,0,0b00011},   {314,1,0b11111},   {315,0,0b00101},   {316,1,0b10101},   {317,1,0b01001},   {318,1,0b10011},   {319,1,0b10011},   {320,0,0b10001},   {321,1,0b11111},   {322,1,0b00101},   {323,1,0b00101},   {324,1,0b11111},   {325,1,0b11111},   {326,1,0b10011},   {327,1,0b11001},   {328,0,0b10011},   {329,1,0b11011},   {330,1,0b10001},   {331,0,0b00001},   {332,1,0b01011},   {333,1,0b11101},   {334,1,0b10011},   {335,1,0b11111},   {336,1,0b11011},   {337,1,0b11001},   {338,0,0b10101},   {339,1,0b11111},   {340,1,0b01111},   {341,1,0b10011},   {342,1,0b10001},   {343,0,0b00111},   {344,1,0b10001},   {345,1,0b10101},   {346,1,0b01011},   {347,1,0b11111},   {348,0,0b11001},   {349,1,0b11011},   {350,1,0b10001},   {351,0,0b10101},   {352,1,0b11111},   {353,1,0b01111},   {354,1,0b11101},   {355,0,0b00101},   {356,1,0b00111},   {357,1,0b00101},   {358,0,0b00011},   {359,1,0b01111},   {360,1,0b01011},   {361,0,0b00001},   {362,1,0b01101},   {363,1,0b10101},   {364,1,0b11111},   {365,1,0b00001},   {366,0,0b10001},   {367,1,0b10101},   {368,1,0b10001},   {369,1,0b10001},   {370,1,0b11101},   {371,1,0b11011},   {372,1,0b10011},   {373,0,0b00111},   {374,1,0b01101},   {375,0,0b00001},   {376,1,0b00111},   {377,1,0b01011},   {378,1,0b00001},   {379,1,0b11001},   {380,0,0b10101},   {381,1,0b10101},   {382,1,0b00111},   {383,1,0b01111},   {384,1,0b10001},   {385,0,0b00001},   {386,1,0b00101},   {387,0,0b10111},   {388,1,0b10111},   {389,0,0b00101},   {390,0,0b01001},   {391,1,0b11111},   {392,1,0b01011},   {393,0,0b10011},   {394,0,0b10011},   {395,1,0b11111},   {396,1,0b11101},   {397,0,0b00001},   {398,1,0b11111},   {399,1,0b01101},   {400,1,0b01001},   {401,1,0b01011},   {402,0,0b01001},   {403,0,0b01011},   {404,1,0b11101},   {405,0,0b01001},   {406,1,0b10001},   {407,1,0b10011},   {408,1,0b10111},   {409,0,0b01101},   {410,1,0b11111},   {411,1,0b01001},   {412,1,0b10111},   {413,0,0b00111},   {414,1,0b10001},   {415,0,0b01001},   {416,0,0b01011},   {417,1,0b10111},   {418,1,0b10001},   {419,0,0b01001},   {420,1,0b10101},   {421,1,0b00011},   {422,1,0b11011},   {423,1,0b11101},   {424,1,0b00001},   {425,0,0b11011},   {426,1,0b11111},   {427,1,0b01101},   {428,1,0b00101},   {429,1,0b01101},   {430,1,0b10011},   {431,1,0b00011},   {432,1,0b10101},   {433,1,0b01011},   {434,1,0b00001},   {435,1,0b10001},   {436,1,0b10001},   {437,1,0b01101},   {438,1,0b00111},   {439,1,0b10111},   {440,1,0b00011},   {441,0,0b00101},   {442,0,0b10101},   {443,1,0b11011},   {444,1,0b01101},   {445,1,0b00001},   {446,1,0b00001},   {447,1,0b00001},   {448,0,0b01011},   {449,1,0b10001},   {450,0,0b00011},   {451,0,0b00111},   {452,1,0b11001},   {453,1,0b00101},   {454,0,0b00111},   {455,1,0b11111},   {456,0,0b10011},   {457,0,0b10011},   {458,1,0b11101},   {459,0,0b10101},   {460,1,0b10101},   {461,1,0b11011},   {462,1,0b01111},   {463,0,0b00101},   {464,1,0b01001},   {465,1,0b00111},   {466,0,0b00111},   {467,1,0b10101},   {468,1,0b11111},   {469,1,0b11101},   {470,1,0b10001},   {471,1,0b00001},   {472,0,0b01111},   {473,1,0b01111},   {474,1,0b10111},   {475,0,0b10001},   {476,1,0b10011},   {477,0,0b00101},   {478,1,0b11001},   {479,1,0b10101},   {480,0,0b11011},   {481,1,0b11111},   {482,1,0b11111},   {483,0,0b00101},   {484,1,0b10001},   {485,1,0b10101},   {486,1,0b11001},   {487,1,0b01101},   {488,1,0b11001},   {489,0,0b10101},   {490,1,0b11111},   {491,1,0b00001},   {492,1,0b10011},   {493,1,0b01001},   {494,1,0b01101},   {495,1,0b00101},   {496,1,0b10111},   {497,0,0b00011},   {498,1,0b01111},   {499,1,0b10011},   {500,0,0b11111},   {501,1,0b11111},   {502,1,0b10011},   {503,1,0b10001},   {504,0,0b00111},   {505,0,0b01111},   {506,1,0b10011},   {507,1,0b11111},   {508,1,0b01001},   {509,1,0b10011},   {510,0,0b00111},   {511,1,0b01111},   {512,1,0b01111},   {513,1,0b01011},   {514,1,0b11101},   {515,0,0b10001},   {516,1,0b10011},   {517,1,0b00011},   {518,0,0b11011},   {519,1,0b11101},   {520,1,0b00011},   {521,1,0b00101},   {522,0,0b01011},   {523,1,0b10011},   {524,1,0b10011},   {525,1,0b11001},   {526,1,0b10011},   {527,1,0b01101},   {528,1,0b01001},   {529,0,0b00101},   {530,1,0b10111},   {531,1,0b00101},   {532,1,0b00001},   {533,0,0b00001},   {534,0,0b10101},   {535,1,0b11001},   {536,0,0b01011},   {537,0,0b01011},   {538,1,0b11001},   {539,1,0b10001},   {540,0,0b00101},   {541,0,0b10011},   {542,1,0b10011},   {543,1,0b00111},   {544,1,0b11011},   {545,1,0b01111},   {546,1,0b11111},   {547,1,0b01101},   {548,0,0b01101},   {549,1,0b11101},   {550,1,0b11111},   {551,0,0b00111},   {552,1,0b01011}};
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2038,7 +2038,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2057,7 +2057,7 @@ public:
 
                     const uint8_t *res_key;
                     uint32_t res_size, dummy;
-                    typename Diva<O>::InfixStore *store;
+                    typename Diva<diva_type>::InfixStore *store;
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
 
@@ -2072,7 +2072,7 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void SerializeDeserialize() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -2089,7 +2089,7 @@ public:
         std::vector<std::string> string_keys;
         for (int32_t i = 0; i < n_keys; i++) {
             size_t str_length;
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 str_length = 8;
             else
                 str_length = 6 + rng() % 3;
@@ -2098,20 +2098,20 @@ public:
         }
 
         SUBCASE("bulk loaded") {
-            Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+            Diva<diva_type> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
 
             const uint32_t buf_size = s.Size() + 20;
             char *buf = new char[buf_size];
             const uint32_t serialized_size = s.Serialize(buf);
             REQUIRE_EQ(s.Size(), serialized_size);
 
-            Diva<O> reconstructed_s(buf);
+            Diva<diva_type> reconstructed_s(buf);
             AssertDivas(s, reconstructed_s);
 
             delete[] buf;
         }
 
-        Diva<O> s(infix_size, seed, load_factor, 0, true);
+        Diva<diva_type> s(infix_size, seed, load_factor, 0, true);
         const uint32_t sample_gap = n_keys / 20;
         for (uint32_t i = 0; i < n_keys; i += sample_gap)
             s.AddTreeKey(reinterpret_cast<const uint8_t *>(string_keys[i].data()), string_keys[i].size());
@@ -2122,7 +2122,7 @@ public:
             const uint32_t serialized_size = s.Serialize(buf);
             REQUIRE_EQ(s.Size(), serialized_size);
 
-            Diva<O> reconstructed_s(buf);
+            Diva<diva_type> reconstructed_s(buf);
             AssertDivas(s, reconstructed_s);
 
             delete[] buf;
@@ -2145,7 +2145,7 @@ public:
             const uint32_t serialized_size = s.Serialize(buf);
             REQUIRE_EQ(s.Size(), serialized_size);
 
-            Diva<O> reconstructed_s(buf);
+            Diva<diva_type> reconstructed_s(buf);
             AssertDivas(s, reconstructed_s);
 
             delete[] buf;
@@ -2153,7 +2153,7 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void BulkLoadStreaming() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -2170,7 +2170,7 @@ public:
         std::vector<std::string> string_keys;
         for (int32_t i = 0; i < n_keys; i++) {
             size_t str_length;
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 str_length = 8;
             else
                 str_length = 6 + rng() % 3;
@@ -2179,8 +2179,8 @@ public:
         }
 
         SUBCASE("streaming") {
-            Diva<O> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
-            Diva<O> streamed_s(infix_size, seed, load_factor);
+            Diva<diva_type> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor);
+            Diva<diva_type> streamed_s(infix_size, seed, load_factor);
             for (int32_t i = 0; i < n_keys; i++)
                 streamed_s.BulkLoadStreaming(string_keys[i]);
             streamed_s.BulkLoadStreamingFinish();
@@ -2189,7 +2189,7 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void Concurrency() {
         const uint32_t infix_size = 10;
         const uint32_t seed = 1;
@@ -2208,7 +2208,7 @@ public:
         std::vector<std::string> string_keys;
         for (int32_t i = 0; i < n_keys; i++) {
             size_t str_length;
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 str_length = 8;
             else
                 str_length = 6 + rng() % 3;
@@ -2217,7 +2217,7 @@ public:
         }
         std::shuffle(string_keys.begin(), string_keys.end(), rng);
         std::sort(string_keys.begin(), string_keys.begin() + n_bulk);
-        Diva<O> s(infix_size, string_keys.begin(), string_keys.begin() + n_bulk, seed, load_factor);
+        Diva<diva_type> s(infix_size, string_keys.begin(), string_keys.begin() + n_bulk, seed, load_factor);
         for (uint32_t i = 0; i < n_bulk; i++)
             REQUIRE_EQ(s.PointQuery(string_keys[i]), true);
 
@@ -2270,18 +2270,18 @@ public:
     }
 
 
-    template <bool O>
-    static void CheckDivaPayloads(Diva<O, PayloadType::FixedLength>& s, std::vector<std::string> keys, const uint64_t **payloads) {
-        const uint32_t infix_store_target_size = Diva<O, PayloadType::FixedLength>::infix_store_target_size;
+    template <DivaType diva_type>
+    static void CheckDivaPayloads(Diva<diva_type, PayloadType::FixedLength>& s, std::vector<std::string> keys, const uint64_t **payloads) {
+        const uint32_t infix_store_target_size = Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size;
 
         uint32_t check_pos = 0;
         const bool write = false, unlock = true;
         const uint8_t *tree_key, *next_tree_key;
         uint32_t tree_key_len, next_tree_key_len, dummy;
-        typename Diva<O, PayloadType::FixedLength>::InfixStore *store, *dummy_store;
+        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store, *dummy_store;
         wormhole_int_iter it_int;
         wormhole_iter it;
-        if constexpr (O) {
+        if constexpr (diva_type == DivaType::Int) {
             it_int.ref = s.better_tree_int_;
             it_int.map = s.better_tree_int_->map;
             it_int.leaf = nullptr;
@@ -2297,7 +2297,7 @@ public:
         }
         const uint8_t zero_key[8] = {}, one_key[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
         while (true) {
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wh_int_iter_peek_ref(&it_int, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                               reinterpret_cast<void **>(&store), &dummy);
             }
@@ -2313,7 +2313,7 @@ public:
                 check_pos++;
             }
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wh_int_iter_skip1(&it_int, write, unlock);
                 if (!wh_int_iter_valid(&it_int))
                     break;
@@ -2328,9 +2328,6 @@ public:
                                       reinterpret_cast<void **>(&dummy_store), &dummy);
             }
 
-            auto [shared, ignore, implicit_size] = s.GetSharedIgnoreImplicitLengths(
-                    {reinterpret_cast<const uint8_t *>(&tree_key), sizeof(tree_key_len)},
-                    {reinterpret_cast<const uint8_t *>(&next_tree_key), sizeof(next_tree_key_len)});
             uint64_t infix_list[infix_store_target_size];
             uint64_t payload_list[infix_store_target_size * ((s.payload_size_ + 63) / 64) + 1];
             const uint32_t count = s.GetInfixList(*store, infix_list, payload_list);
@@ -2339,7 +2336,7 @@ public:
                 check_pos++;
             }
         }
-        if constexpr (O) {
+        if constexpr (diva_type == DivaType::Int) {
             if (it_int.leaf)
                 wormleaf_int_unlock_read(it_int.leaf);
         }
@@ -2349,7 +2346,7 @@ public:
         }
     }
 
-    template <bool O>
+    template <DivaType diva_type>
     static void Payloads() {
         const uint32_t infix_size = 5;
         const uint32_t payload_size = 100;
@@ -2357,7 +2354,7 @@ public:
         const float load_factor = 0.95;
         const uint32_t n_threads = 32;
         const uint32_t n_keys = 10 * 1024;
-        const uint32_t infix_store_target_size = Diva<O, PayloadType::FixedLength>::infix_store_target_size;
+        const uint32_t infix_store_target_size = Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
 
@@ -2372,7 +2369,7 @@ public:
         for (int32_t i = 0; i < n_keys; i++) {
             size_t str_length;
             const size_t length_offset = rng() % 3;
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 str_length = 8;
             else
                 str_length = 6 + length_offset;
@@ -2392,7 +2389,7 @@ public:
         fixed_length_string_keys.clear();
         for (uint32_t i = 0; i < keys.size(); i++) {
             const uint64_t value = to_big_endian_order(keys[i]);
-            if constexpr (!O)
+            if constexpr (diva_type != DivaType::Int)
                 keys[i] = value;
             fixed_length_string_keys.emplace_back(reinterpret_cast<const char *>(&value), 8);
         }
@@ -2400,27 +2397,27 @@ public:
 
         SUBCASE("bulk load") {
             SUBCASE("normal") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
                                                     payload_size, reinterpret_cast<const uint64_t **>(&payloads));
                 CheckDivaPayloads(s, string_keys, reinterpret_cast<const uint64_t **>(&payloads));
             }
 
             SUBCASE("fixed length") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, keys.begin(), keys.end(), 8, seed, load_factor,
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, keys.begin(), keys.end(), 8, seed, load_factor,
                                                     payload_size, reinterpret_cast<const uint64_t **>(&payloads));
                 CheckDivaPayloads(s, fixed_length_string_keys, reinterpret_cast<const uint64_t **>(&payloads));
             }
 
             SUBCASE("streaming") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size);
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size);
                 for (uint32_t i = 0; i < n_keys; i++) {
-                    if constexpr (O)
+                    if constexpr (diva_type == DivaType::Int)
                         s.BulkLoadStreaming(keys[i], payloads[i]);
                     else
                         s.BulkLoadStreaming(string_keys[i], payloads[i]);
                 }
                 s.BulkLoadStreamingFinish();
-                if constexpr (O)
+                if constexpr (diva_type == DivaType::Int)
                     CheckDivaPayloads(s, fixed_length_string_keys, reinterpret_cast<const uint64_t **>(&payloads));
                 else 
                     CheckDivaPayloads(s, string_keys, reinterpret_cast<const uint64_t **>(&payloads));
@@ -2428,7 +2425,7 @@ public:
         }
 
         SUBCASE("empty filter") {
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
 
             uint32_t perm[string_keys.size()];
             for (uint32_t i = 0; i < string_keys.size(); i++)
@@ -2437,14 +2434,14 @@ public:
             
             for (auto it = s.GetIterator(string_keys[0]); it.IsValid(); it++) {
                 auto [key, key_len_bits] = *it;
-                if constexpr (O)
-                    REQUIRE_EQ(key, BITMASK(sizeof(key) * 8));
+                if constexpr (diva_type == DivaType::Int)
+                    REQUIRE_EQ(key, std::numeric_limits<typeof(key)>::max());
                 else
                     REQUIRE_EQ(key[0], 0xFF);
                 REQUIRE_EQ(key_len_bits, 800);
             }
 
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 for (uint32_t i = 0; i < string_keys.size(); i++) {
                     const uint32_t ind = perm[i];
                     bool found = false;
@@ -2516,7 +2513,7 @@ public:
             }
         }
 
-        Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size);
+        Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size);
 
         SUBCASE("insert") {
             uint64_t payload[payload_size / 64 + 2];
@@ -2572,9 +2569,9 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -2621,9 +2618,9 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -2671,9 +2668,9 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -2718,9 +2715,9 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -2766,15 +2763,15 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 uint8_t res_key[sizeof(uint64_t)];
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore store;
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
 
                     wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
 
                     wh_int_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
-                                     reinterpret_cast<void *>(&store), sizeof(typename Diva<O, PayloadType::FixedLength>::InfixStore), &dummy);
+                                     reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
                     REQUIRE(store.IsPartialKey());
                     REQUIRE_EQ(store.GetInvalidBits(), 7);
                     AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
@@ -2789,7 +2786,7 @@ public:
                     wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
 
                     wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
-                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<O, PayloadType::FixedLength>::InfixStore), &dummy);
+                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
                     REQUIRE(store.IsPartialKey());
                     REQUIRE_EQ(store.GetInvalidBits(), 7);
                     AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
@@ -2804,22 +2801,22 @@ public:
             // Split an extension of a partial boundary key
             uint8_t old_boundary [sizeof(uint64_t)];
             uint32_t old_boundary_size;
-            if constexpr (O) {
+            if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                 uint32_t dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore store;
                 wh_int_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
-                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<O, PayloadType::FixedLength>::InfixStore), &dummy);
+                                 reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                 uint32_t dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore store;
                 wh_iter_peek(it, reinterpret_cast<void *>(old_boundary), sizeof(old_boundary), &old_boundary_size, 
-                             reinterpret_cast<void *>(&store), sizeof(typename Diva<O, PayloadType::FixedLength>::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
                 wh_iter_destroy(it, check_it_write);
             }
             uint32_t extended_key_len = old_boundary_size + 1;
@@ -2839,12 +2836,12 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                 uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
                 value &= ~BITMASK(shamt);
                 value = to_big_endian_order(value);
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
@@ -2909,11 +2906,11 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                 uint64_t value = to_big_endian_order(0b0000000000000000000000000000000000011101000100110000000000000000UL);
 
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - 2, check_it_write);
                     wh_int_iter_skip1_rev(it, check_it_write, check_it_unlock);
@@ -2963,7 +2960,7 @@ public:
                 }
             }
 
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 return;
 
             uint8_t new_extended_key[12];
@@ -2972,10 +2969,10 @@ public:
                 uint64_t value = to_big_endian_order(0x0000000033333333UL);
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value), check_it_write);
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
                 uint32_t dummy;
                 wh_iter_peek(it, reinterpret_cast<void *>(new_extended_key), sizeof(new_extended_key), &new_extended_key_len, 
-                             reinterpret_cast<void *>(&store), sizeof(typename Diva<O, PayloadType::FixedLength>::InfixStore), &dummy);
+                             reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
                 wh_iter_destroy(it, check_it_write);
             }
             memset(new_extended_key + new_extended_key_len, 0, 3);
@@ -2994,7 +2991,7 @@ public:
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 const uint8_t *res_key;
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                 const uint64_t value = to_big_endian_order(0x0000000033333333UL);
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -3023,7 +3020,7 @@ public:
                 for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
                     check_payloads[i] = &(check_payloads_contents[i][0]);
                 uint32_t res_size, dummy;
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                 const uint64_t value = to_big_endian_order(0x0000000033333333UL);
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
@@ -3063,7 +3060,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -3080,7 +3077,7 @@ public:
                 uint64_t right_store_payloads[right_store_infixes.size() * ((payload_size + 63) / 64) + 1];
                 for (uint32_t i = 0; i < right_store_infixes.size() * ((payload_size + 63) / 64) + 1; i++)
                     right_store_payloads[i] = rng();
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -3118,7 +3115,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -3182,7 +3179,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -3225,7 +3222,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -3242,7 +3239,7 @@ public:
                 uint64_t right_store_payloads[right_store_infixes.size() * ((payload_size + 63) / 64) + 1];
                 for (uint32_t i = 0; i < right_store_infixes.size() * ((payload_size + 63) / 64) + 1; i++)
                     right_store_payloads[i] = rng();
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -3280,7 +3277,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -3344,7 +3341,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -3408,7 +3405,7 @@ public:
                 for (int32_t i = 1; i < 100; i++) {
                     const uint32_t shared = 34;
                     const uint32_t ignore = 1;
-                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                     const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                     const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -3424,7 +3421,7 @@ public:
                 for (int32_t i = 90; i >= 70; i -= 2) {
                     const uint32_t shared = 34;
                     const uint32_t ignore = 1;
-                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                     const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                     const uint64_t interp = (l * i + r * (100 - i)) / 100;
@@ -3441,7 +3438,7 @@ public:
                 for (int32_t i = 1; i < 50; i++) {
                     const uint32_t shared = 34;
                     const uint32_t ignore = 1;
-                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<O>::base_implicit_size - s.infix_size_;
+                    const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - Diva<diva_type>::base_implicit_size - s.infix_size_;
 
                     const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
                     const uint64_t interp = (l * 30 + r * 70) / 100 + (i << shamt);
@@ -3554,7 +3551,7 @@ public:
                 std::vector<std::pair<std::string, uint64_t *>> string_keys;
                 for (int32_t i = 0; i < n_keys; i++) {
                     size_t str_length;
-                    if constexpr (O)
+                    if constexpr (diva_type == DivaType::Int)
                         str_length = 8;
                     else
                         str_length = 6 + rng() % 3;
@@ -3571,8 +3568,8 @@ public:
                                [&](std::pair<std::string, uint64_t *> in) { return in.first; });
                 std::transform(string_keys.begin(), string_keys.begin() + bulk_n_keys, bulk_payloads,
                                [&](std::pair<std::string, uint64_t *> in) { return in.second; });
-                Diva<O, PayloadType::FixedLength> s(infix_size, bulk_string_keys, bulk_string_keys + bulk_n_keys, seed, load_factor,
-                                                    payload_size, (const uint64_t **) bulk_payloads);
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, bulk_string_keys, bulk_string_keys + bulk_n_keys, seed, load_factor,
+                                                            payload_size, (const uint64_t **) bulk_payloads);
 
                 std::vector<bool> deleted(n_keys, false);
                 uint32_t i = bulk_n_keys;
@@ -3611,7 +3608,7 @@ public:
                 const uint8_t *key_ptr;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
-                typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
                 uint32_t dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
@@ -3622,7 +3619,7 @@ public:
                 uint64_t store_payloads[store_infixes.size() * ((payload_size + 63) / 64) + 1];
                 for (uint32_t i = 0; i < store_infixes.size() * ((payload_size + 63) / 64) + 1; i++)
                     store_payloads[i] = rng();
-                if constexpr (O) {
+                if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
@@ -3648,7 +3645,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
@@ -3687,7 +3684,7 @@ public:
                             check_payloads[i] = &(check_payloads_contents[i][0]);
                         const uint8_t *res_key;
                         uint32_t res_size, dummy;
-                        typename Diva<O, PayloadType::FixedLength>::InfixStore *store;
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfixStore *store;
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
@@ -3707,21 +3704,21 @@ public:
             const uint32_t infix_size = 10;
 
             SUBCASE("bulk loaded") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
-                                                    payload_size, (const uint64_t **) payloads);
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                            payload_size, (const uint64_t **) payloads);
 
                 const uint32_t buf_size = s.Size() + 20;
                 char *buf = new char[buf_size];
                 const uint32_t serialized_size = s.Serialize(buf);
                 REQUIRE_EQ(s.Size(), serialized_size);
 
-                Diva<O, PayloadType::FixedLength> reconstructed_s(buf);
+                Diva<diva_type, PayloadType::FixedLength> reconstructed_s(buf);
                 AssertDivas(s, reconstructed_s);
 
                 delete[] buf;
             }
 
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
             const uint32_t sample_gap = n_keys / 20;
             for (uint32_t i = 0; i < n_keys; i += sample_gap)
                 s.AddTreeKey(reinterpret_cast<const uint8_t *>(string_keys[i].data()), string_keys[i].size(),
@@ -3733,7 +3730,7 @@ public:
                 const uint32_t serialized_size = s.Serialize(buf);
                 REQUIRE_EQ(s.Size(), serialized_size);
 
-                Diva<O, PayloadType::FixedLength> reconstructed_s(buf);
+                Diva<diva_type, PayloadType::FixedLength> reconstructed_s(buf);
                 AssertDivas(s, reconstructed_s);
 
                 delete[] buf;
@@ -3756,7 +3753,7 @@ public:
                 const uint32_t serialized_size = s.Serialize(buf);
                 REQUIRE_EQ(s.Size(), serialized_size);
 
-                Diva<O, PayloadType::FixedLength> reconstructed_s(buf);
+                Diva<diva_type, PayloadType::FixedLength> reconstructed_s(buf);
                 AssertDivas(s, reconstructed_s);
 
                 delete[] buf;
@@ -3768,9 +3765,9 @@ public:
             const uint32_t key_len = 48;
             const uint32_t key_len_words = (key_len + sizeof(uint64_t) - 1) / sizeof(uint64_t);
             const uint32_t payload_len_words = (payload_size + 63) / 64;
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed + 1, load_factor, payload_size, true);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed + 1, load_factor, payload_size, true);
 
-            if constexpr (!O) {
+            if constexpr (diva_type != DivaType::Int) {
                 const uint32_t n_keys = 10000000;
                 const uint32_t sample_key_threshold = 50000;
                 constexpr bool ascii = true;
@@ -3797,12 +3794,11 @@ public:
 
                     // Check for existence
                     auto it = s.GetIterator(key_sv);
-                    uint32_t cnt = 0;
                     if (it.IsValid()) {
                         bool matches = false;
                         do {
                             auto [fetch_key, bit_length] = *it;
-                            typename diva::Diva<false, diva::PayloadType::FixedLength>::InfiniteByteString curr_key;
+                            typename diva::Diva<diva_type, diva::PayloadType::FixedLength>::InfiniteByteString curr_key;
                             uint64_t it_payload[payload_len_words + 2];
                             // If the key prefix matches get the payload
                             if (memcmp(key, fetch_key.data(),
@@ -3810,10 +3806,9 @@ public:
                                 matches = true;
                                 if (bit_length < key_len * 8)
                                     matches = (key[bit_length / 8] & BITMASK(bit_length % 8 == 0 ? 8 : 8 - bit_length % 8)) 
-                                        == fetch_key[bit_length / 8];
+                                                    == fetch_key[bit_length / 8];
                                 if (matches) {
                                     it.GetPayload(it_payload);
-                                    cnt++;
                                 }
                             }
                             else 
@@ -3821,8 +3816,6 @@ public:
                             it++;
                         } while(it.IsValid() && matches);
                     }
-                    //REQUIRE_LE(cnt, 100);
-                    //REQUIRE_LE(it.keys_.size(), 100);
 
                     s.Insert(key_sv, payload, i < sample_key_threshold ? 1024 : 0);
                 }
@@ -3831,16 +3824,14 @@ public:
     }
 
 
-    template <bool O>
+    template <DivaType diva_type>
     static void Iterator() {
         const uint32_t infix_size = 10;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t payload_size = 100;
-        const uint32_t infix_store_target_size = Diva<O, PayloadType::FixedLength>::infix_store_target_size;
+        const uint32_t infix_store_target_size = Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size;
         const uint32_t n_keys = 100 * infix_store_target_size;
-        const bool check_it_write = false;
-        const bool check_it_unlock = true;
 
         const uint32_t rng_seed = 2;
         std::mt19937_64 rng(rng_seed);
@@ -3853,7 +3844,7 @@ public:
         for (int32_t i = 0; i < n_keys; i++) {
             size_t str_length;
             const size_t length_offset = rng() % 3;
-            if constexpr (O)
+            if constexpr (diva_type == DivaType::Int)
                 str_length = 8;
             else
                 str_length = 6 + length_offset;
@@ -3871,8 +3862,8 @@ public:
         }
 
         SUBCASE("bulk load start") {
-            Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
-                                                payload_size, (const uint64_t **) payloads);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                        payload_size, (const uint64_t **) payloads);
 
             SUBCASE("iterate over everything") {
                 uint32_t ind = 0;
@@ -3880,8 +3871,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -3909,8 +3900,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -3937,8 +3928,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -3961,7 +3952,7 @@ public:
         }
 
         SUBCASE("empty start") {
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
             
             const uint32_t sample_gap = n_keys / 20;
             for (uint32_t i = 0; i < n_keys; i += sample_gap)
@@ -3973,8 +3964,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -4002,8 +3993,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -4031,9 +4022,9 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
                     const uint32_t exp_ind = ((ind + sample_gap - 1) / sample_gap) * sample_gap;
-                    if constexpr (O) {
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[exp_ind].data()), static_cast<uint32_t>(string_keys[exp_ind].size())};
@@ -4074,8 +4065,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                     }
@@ -4085,8 +4076,8 @@ public:
 
                     bool found = false;
                     for (uint32_t i = std::max<int32_t>(0, ind - neighborhood_range); i < ind + neighborhood_range; i += infix_gap) {
-                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
-                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                                      static_cast<uint32_t>(string_keys[i].size())};
                         if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
                             uint64_t it_payload[payload_size / 64 + 2];
                             it.GetPayload(it_payload);
@@ -4110,8 +4101,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                     }
@@ -4121,8 +4112,8 @@ public:
 
                     bool found = false;
                     for (uint32_t i = std::max<int32_t>(0, ind - neighborhood_range); i < ind + neighborhood_range; i += infix_gap) {
-                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
-                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                                      static_cast<uint32_t>(string_keys[i].size())};
                         if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
                             uint64_t it_payload[payload_size / 64 + 2];
                             it.GetPayload(it_payload);
@@ -4146,9 +4137,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    const uint32_t exp_ind = ((ind + infix_gap - 1) / infix_gap) * infix_gap;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                     }
@@ -4158,8 +4148,8 @@ public:
 
                     bool found = false;
                     for (uint32_t i = std::max<int32_t>(0, ind + 1 - neighborhood_range); i < ind + 1 + neighborhood_range; i += infix_gap) {
-                        typename Diva<O, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
-                                                                                              static_cast<uint32_t>(string_keys[i].size())};
+                        typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString exp = {reinterpret_cast<const uint8_t *>(string_keys[i].data()),
+                                                                                                      static_cast<uint32_t>(string_keys[i].size())};
                         if (key.IsPrefixOf(exp, last_bits_to_ignore)) {
                             uint64_t it_payload[payload_size / 64 + 2];
                             it.GetPayload(it_payload);
@@ -4180,16 +4170,16 @@ public:
 
         SUBCASE("iterate bounded range") {
             SUBCASE("sample end") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
-                                                    payload_size, (const uint64_t **) payloads);
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                            payload_size, (const uint64_t **) payloads);
                 uint32_t ind = 0;
                 const uint32_t end_ind = 20 * infix_store_target_size;
                 auto it = s.GetIterator(string_keys[ind], string_keys[end_ind]);
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -4212,16 +4202,16 @@ public:
             }
 
             SUBCASE("infix end") {
-                Diva<O, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
-                                                    payload_size, (const uint64_t **) payloads);
+                Diva<diva_type, PayloadType::FixedLength> s(infix_size, string_keys.begin(), string_keys.end(), seed, load_factor,
+                                                            payload_size, (const uint64_t **) payloads);
                 uint32_t ind = 0;
                 const uint32_t end_ind = 20 * infix_store_target_size - 10;
                 auto it = s.GetIterator(string_keys[ind], string_keys[end_ind]);
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -4243,7 +4233,7 @@ public:
                 REQUIRE(!it.IsValid());
             }
 
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size, seed, load_factor, payload_size, true);
             const uint32_t sample_gap = n_keys / 20;
             for (uint32_t i = 0; i < n_keys; i += sample_gap)
                 s.AddTreeKey(reinterpret_cast<const uint8_t *>(string_keys[i].data()), string_keys[i].size(), payloads[i]);
@@ -4267,8 +4257,8 @@ public:
                 do {
                     REQUIRE(it.IsValid());
                     auto [fetch_key, bit_length] = *it;
-                    typename Diva<O, PayloadType::FixedLength>::InfiniteByteString key, exp;
-                    if constexpr (O) {
+                    typename Diva<diva_type, PayloadType::FixedLength>::InfiniteByteString key, exp;
+                    if constexpr (diva_type == DivaType::Int) {
                         fetch_key = to_big_endian_order(fetch_key);
                         key = {reinterpret_cast<const uint8_t *>(&fetch_key), (bit_length + 7) / 8};
                         exp = {reinterpret_cast<const uint8_t *>(string_keys[ind].data()), static_cast<uint32_t>(string_keys[ind].size())};
@@ -4315,7 +4305,7 @@ public:
             std::vector<std::string_view> string_keys;
             for (int32_t i = 0; i < n_keys; i++) {
                 size_t str_length;
-                if constexpr (O)
+                if constexpr (diva_type == DivaType::Int)
                     str_length = 8;
                 else
                     str_length = 10 + rng() % 3;
@@ -4338,13 +4328,13 @@ public:
                 payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
             }
 
-            Diva<O, PayloadType::FixedLength> s(infix_size,
-                                                string_keys.begin(),
-                                                string_keys.begin() + n_bulk,
-                                                seed,
-                                                load_factor,
-                                                payload_size,
-                                                (const uint64_t **) payloads);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size,
+                                                        string_keys.begin(),
+                                                        string_keys.begin() + n_bulk,
+                                                        seed,
+                                                        load_factor,
+                                                        payload_size,
+                                                        (const uint64_t **) payloads);
 
             std::vector<std::thread> threads;
             std::vector<std::atomic<bool>> deleted(string_keys.size());
@@ -4428,7 +4418,7 @@ public:
             std::vector<std::string_view> string_keys;
             for (int32_t i = 0; i < n_keys; i++) {
                 size_t str_length;
-                if constexpr (O)
+                if constexpr (diva_type == DivaType::Int)
                     str_length = 8;
                 else
                     str_length = 40 + rng() % 3;
@@ -4451,13 +4441,13 @@ public:
                 payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
             }
 
-            Diva<O, PayloadType::FixedLength> s(infix_size,
-                                                string_keys.begin(),
-                                                string_keys.begin() + n_bulk,
-                                                seed,
-                                                load_factor,
-                                                payload_size,
-                                                (const uint64_t **) payloads);
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size,
+                                                        string_keys.begin(),
+                                                        string_keys.begin() + n_bulk,
+                                                        seed,
+                                                        load_factor,
+                                                        payload_size,
+                                                        (const uint64_t **) payloads);
             REQUIRE_EQ(s.GetNumKeys(), n_bulk);
 
             std::cerr << "querying bulk loaded" << std::endl;
@@ -4591,7 +4581,7 @@ public:
             }
             std::cerr << "workload set up" << std::endl;
 
-            Diva<O, PayloadType::FixedLength> s(infix_size,
+            Diva<diva_type, PayloadType::FixedLength> s(infix_size,
                                                 seed,
                                                 load_factor,
                                                 payload_size, 
@@ -4650,12 +4640,10 @@ public:
                         else {
                             while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
                                 cpu_pause();
-                            /*
                             s.DeleteRange(nullptr, 0, nullptr, 0, 
                                     [=](const uint64_t *payload) { 
                                         return payload[0] <= delete_threshold && payload[0] > 0;
                                     });
-                                    */
                         }
                     });
             }
@@ -4666,17 +4654,17 @@ public:
 
 
 private:
-    template <bool O>
-    static void AssertStoreContents(const Diva<O>& s, const typename Diva<O>::InfixStore& store,
+    template <DivaType diva_type>
+    static void AssertStoreContents(const Diva<diva_type>& s, const typename Diva<diva_type>::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
         REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + 1;
-        const uint64_t *runends = store.ptr + 1 + Diva<O>::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + 1 + Diva<diva_type>::infix_store_target_size / 64;
         uint32_t ind = 0;
-        for (uint32_t i = 0; i < Diva<O>::infix_store_target_size; i++) {
+        for (uint32_t i = 0; i < Diva<diva_type>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
@@ -4711,7 +4699,7 @@ private:
         REQUIRE_EQ(occupieds_pos.size(), runend_count);
 
         uint32_t check_popcnts[2] = {};
-        for (int32_t i = 0; i < Diva<O>::infix_store_target_size / 128; i++) {
+        for (int32_t i = 0; i < Diva<diva_type>::infix_store_target_size / 128; i++) {
             check_popcnts[0] += __builtin_popcountll(occupieds[i]);
             if (static_cast<int32_t>(s.scaled_sizes_[store.GetSizeGrade()]) - i * 64 > 0) {
                 const uint64_t mask = BITMASK(std::min(64UL, s.scaled_sizes_[store.GetSizeGrade()] - i * 64));
@@ -4724,9 +4712,9 @@ private:
     }
 
 
-    template <bool O>
-    static void AssertStoreContents(const Diva<O, PayloadType::FixedLength>& s, 
-                                    const typename Diva<O, PayloadType::FixedLength>::InfixStore& store,
+    template <DivaType diva_type>
+    static void AssertStoreContents(const Diva<diva_type, PayloadType::FixedLength>& s, 
+                                    const typename Diva<diva_type, PayloadType::FixedLength>::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks,
                                     const uint64_t **check_payloads) {
@@ -4734,9 +4722,9 @@ private:
         REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + 1;
-        const uint64_t *runends = store.ptr + 1 + Diva<O, PayloadType::FixedLength>::infix_store_target_size / 64;
+        const uint64_t *runends = store.ptr + 1 + Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size / 64;
         uint32_t ind = 0;
-        for (uint32_t i = 0; i < Diva<O, PayloadType::FixedLength>::infix_store_target_size; i++) {
+        for (uint32_t i = 0; i < Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
@@ -4774,7 +4762,7 @@ private:
         REQUIRE_EQ(occupieds_pos.size(), runend_count);
 
         uint32_t check_popcnts[2] = {};
-        for (int32_t i = 0; i < Diva<O>::infix_store_target_size / 128; i++) {
+        for (int32_t i = 0; i < Diva<diva_type>::infix_store_target_size / 128; i++) {
             check_popcnts[0] += __builtin_popcountll(occupieds[i]);
             if (static_cast<int32_t>(s.scaled_sizes_[store.GetSizeGrade()]) - i * 64 > 0) {
                 const uint64_t mask = BITMASK(std::min(64UL, s.scaled_sizes_[store.GetSizeGrade()] - i * 64));
@@ -4787,8 +4775,8 @@ private:
     }
 
 
-    template <bool O, PayloadType payload_type>
-    static void AssertDivas(const Diva<O, payload_type>& a, const Diva<O, payload_type>& b) {
+    template <DivaType diva_type, PayloadType payload_type>
+    static void AssertDivas(const Diva<diva_type, payload_type>& a, const Diva<diva_type, payload_type>& b) {
         REQUIRE_EQ(a.infix_store_target_size, b.infix_store_target_size);
         REQUIRE_EQ(a.base_implicit_size, b.base_implicit_size);
         REQUIRE_EQ(a.scale_shift, b.scale_shift);
@@ -4809,10 +4797,10 @@ private:
 
         const uint8_t *tree_key_a, *tree_key_b;
         uint32_t tree_key_a_len, tree_key_b_len, dummy;
-        typename Diva<O>::InfixStore *store_a, *store_b;
+        typename Diva<diva_type>::InfixStore *store_a, *store_b;
         const bool check_it_write = false;
         const bool check_it_unlock = true;
-        if constexpr (O) {
+        if constexpr (diva_type == DivaType::Int) {
             wormhole_int_iter it_a, it_b;
             it_a.ref = a.better_tree_int_;
             it_a.map = a.better_tree_int_->map;
@@ -4894,8 +4882,8 @@ private:
     }
 
 
-    template <bool O, PayloadType payload_type>
-    static void PrintStore(const Diva<O, payload_type>& s, const typename Diva<O, payload_type>::InfixStore& store) {
+    template <DivaType diva_type, PayloadType payload_type>
+    static void PrintStore(const Diva<diva_type, payload_type>& s, const typename Diva<diva_type, payload_type>::InfixStore& store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + 1;
@@ -4953,95 +4941,95 @@ private:
 
 TEST_SUITE("diva") {
     TEST_CASE("insert") {
-        DivaTests::Insert<false>();
+        DivaTests::Insert<DivaType::Standard>();
     }
 
     TEST_CASE("random inserts") {
-        DivaTests::RandomInsert<false>();
+        DivaTests::RandomInsert<DivaType::Standard>();
     }
 
     TEST_CASE("point query") {
-        DivaTests::PointQuery<false>();
+        DivaTests::PointQuery<DivaType::Standard>();
     }
 
     TEST_CASE("range query") {
-        DivaTests::RangeQuery<false>();
+        DivaTests::RangeQuery<DivaType::Standard>();
     }
 
     TEST_CASE("delete") {
-        DivaTests::Delete<false>();
+        DivaTests::Delete<DivaType::Standard>();
     }
 
     TEST_CASE("shrink infix size") {
-        DivaTests::ShrinkInfixSize<false>();
+        DivaTests::ShrinkInfixSize<DivaType::Standard>();
     }
 
     TEST_CASE("bulk load") {
-        DivaTests::BulkLoad<false>();
-        DivaTests::BulkLoadStreaming<false>();
+        DivaTests::BulkLoad<DivaType::Standard>();
+        DivaTests::BulkLoadStreaming<DivaType::Standard>();
     }
 
     TEST_CASE("serialize and deserialize") {
-        DivaTests::SerializeDeserialize<false>();
+        DivaTests::SerializeDeserialize<DivaType::Standard>();
     }
 
     TEST_CASE("concurrency") {
-        DivaTests::Concurrency<false>();
+        DivaTests::Concurrency<DivaType::Standard>();
     }
 
     TEST_CASE("payloads") {
-        DivaTests::Payloads<false>();
+        DivaTests::Payloads<DivaType::Standard>();
     }
 
     TEST_CASE("iterator") {
-        DivaTests::Iterator<false>();
+        DivaTests::Iterator<DivaType::Standard>();
     }
 }
 
 TEST_SUITE("diva (int optimized)") {
     TEST_CASE("insert") {
-        DivaTests::Insert<true>();
+        DivaTests::Insert<DivaType::Int>();
     }
 
     TEST_CASE("random inserts") {
-        DivaTests::RandomInsert<true>();
+        DivaTests::RandomInsert<DivaType::Int>();
     }
 
     TEST_CASE("point query") {
-        DivaTests::PointQuery<true>();
+        DivaTests::PointQuery<DivaType::Int>();
     }
 
     TEST_CASE("range query") {
-        DivaTests::RangeQuery<true>();
+        DivaTests::RangeQuery<DivaType::Int>();
     }
 
     TEST_CASE("delete") {
-        DivaTests::Delete<true>();
+        DivaTests::Delete<DivaType::Int>();
     }
 
     TEST_CASE("shrink infix size") {
-        DivaTests::ShrinkInfixSize<true>();
+        DivaTests::ShrinkInfixSize<DivaType::Int>();
     }
 
     TEST_CASE("bulk load") {
-        DivaTests::BulkLoad<true>();
-        DivaTests::BulkLoadStreaming<true>();
+        DivaTests::BulkLoad<DivaType::Int>();
+        DivaTests::BulkLoadStreaming<DivaType::Int>();
     }
 
     TEST_CASE("serialize and deserialize") {
-        DivaTests::SerializeDeserialize<true>();
+        DivaTests::SerializeDeserialize<DivaType::Int>();
     }
 
     TEST_CASE("concurrency") {
-        DivaTests::Concurrency<true>();
+        DivaTests::Concurrency<DivaType::Int>();
     }
 
     TEST_CASE("payloads") {
-        DivaTests::Payloads<true>();
+        DivaTests::Payloads<DivaType::Int>();
     }
 
     TEST_CASE("iterator") {
-        DivaTests::Iterator<true>();
+        DivaTests::Iterator<DivaType::Int>();
     }
 }
 

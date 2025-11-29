@@ -62,13 +62,19 @@ static void validate_infixes_and_bounds(uint32_t infix_count, uint64_t *infix_li
     }
 }
 
-enum PayloadType {
+enum class DivaType {
+    Standard,
+    Int,
+    BinaryTrie
+};
+
+enum class PayloadType {
     None,
     FixedLength,
     VarLength
 };
 
-template <bool int_optimized=false, PayloadType payload_type=PayloadType::None>
+template <DivaType diva_type=DivaType::Standard, PayloadType payload_type=PayloadType::None>
 class Diva {
     friend class Iterator;
     friend class DivaTests;
@@ -188,13 +194,13 @@ public:
     };
 
     class Iterator {
-        friend class Diva<int_optimized, payload_type>;
+        friend class Diva<diva_type, payload_type>;
         friend class DivaTests;
 
-        using KeyType = std::conditional_t<int_optimized, uint64_t, std::string>;
+        using KeyType = std::conditional_t<diva_type == DivaType::Int, uint64_t, std::string>;
 
     public:
-        Iterator(Diva<int_optimized, payload_type> *parent):
+        Iterator(Diva<diva_type, payload_type> *parent):
             filter_(parent) { }
         ~Iterator();
 
@@ -212,7 +218,7 @@ public:
 
     private:
         static constexpr uint32_t iterator_local_buf_len = 1 << 10;
-        Diva<int_optimized, payload_type> *filter_;
+        Diva<diva_type, payload_type> *filter_;
         InfiniteByteString next_to_fetch_, end_key_;
         uint32_t shared_, ignore_, implicit_;
         uint8_t next_to_fetch_contents_[iterator_local_buf_len], end_key_contents_[iterator_local_buf_len];
@@ -222,14 +228,14 @@ public:
         std::function<bool(const uint64_t *)> should_remove_;
         bool first_store_to_fetched_and_delete_ = true;
 
-        Iterator(Diva<int_optimized, payload_type> *parent,
+        Iterator(Diva<diva_type, payload_type> *parent,
                  std::string_view start, std::string_view end,
                  std::function<bool(const uint64_t *)> should_remove=nullptr);
-        Iterator(Diva<int_optimized, payload_type> *parent, 
+        Iterator(Diva<diva_type, payload_type> *parent, 
                  const uint8_t *start, uint32_t start_len, 
                  const uint8_t *end, uint32_t end_len, 
                  std::function<bool(const uint64_t *)> should_remove=nullptr);
-        Iterator(Diva<int_optimized, payload_type> *parent,
+        Iterator(Diva<diva_type, payload_type> *parent,
                  uint64_t start, uint64_t end,
                  std::function<bool(const uint64_t *)> should_remove=nullptr);
 
@@ -265,6 +271,7 @@ public:
     };
 
 private:
+    static constexpr uint32_t num_metadata_offset_words = payload_type == PayloadType::FixedLength ? 2 : 1;
     static constexpr uint32_t infix_store_target_size = 1024;
     static_assert(infix_store_target_size % 64 == 0);
     static constexpr uint32_t base_implicit_size = __builtin_ctz(infix_store_target_size);
@@ -312,8 +319,8 @@ private:
 
         static uint64_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size, const uint32_t payload_size=0) {
             if constexpr (payload_type == PayloadType::FixedLength)
-                return 2 + (Diva::infix_store_target_size + static_cast<uint64_t>(slot_count) * (slot_size + 1 + payload_size) + 64 + 63) / 64;
-            return 2 + (Diva::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
+                return num_metadata_offset_words + (Diva::infix_store_target_size + slot_count * (slot_size + 1 + payload_size) + 63) / 64;
+            return num_metadata_offset_words + (Diva::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
         }
 
         uint64_t GetFullSlotCount() const {
@@ -366,7 +373,7 @@ private:
 
     public: 
         class TrieIterator {
-            friend class Diva<int_optimized, payload_type>;
+            friend class Diva<diva_type, payload_type>;
             friend class InfixTests;
 
         public:
@@ -547,12 +554,12 @@ private:
     void GetLowerUpperBounds(const InfiniteByteString& key, bool write, void *leaves[3],
                              wormhole_iter& it, wormhole_int_iter& it_int,
                              InfiniteByteString& prev_key, InfiniteByteString& next_key,
-                             Diva<int_optimized, payload_type>::InfixStore *& infix_store_ptr) const;
+                             Diva<diva_type, payload_type>::InfixStore *& infix_store_ptr) const;
     void DeleteGetLowerMiddleUpperBounds(const InfiniteByteString& key, void *leaves[3],
                                    wormhole_iter& it, wormhole_int_iter& it_int,
                                    InfiniteByteString& left_key, InfiniteByteString& middle_key, InfiniteByteString& right_key,
-                                   Diva<int_optimized, payload_type>::InfixStore *& left_store_ptr,
-                                   Diva<int_optimized, payload_type>::InfixStore *& right_store_ptr) const;
+                                   Diva<diva_type, payload_type>::InfixStore *& left_store_ptr,
+                                   Diva<diva_type, payload_type>::InfixStore *& right_store_ptr) const;
     void OrderLeaves(void *leaves[3], uint32_t l, uint32_t r) const;
     void UnlockLeaves(void *leaves[3], bool write) const;
 
@@ -572,7 +579,7 @@ private:
     void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value);
     void SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value, const uint32_t width);
     void GetPayload(const InfixStore &store, const uint32_t pos, uint64_t *payload, const uint32_t payload_offset=0) const;
-    void GetSamplePayload(InfixStore &store, const uint32_t pos, uint64_t *payload, const uint32_t payload_offset=0) const;
+    void GetSamplePayload(const InfixStore &store, const uint32_t pos, uint64_t *payload, const uint32_t payload_offset=0) const;
     void SetPayload(InfixStore &store, const uint32_t pos, const uint64_t *payload, const uint32_t payload_offset=0);
     void AddSamplePayload(InfixStore &store, const void *payload, const uint32_t payload_offset=0);
     void RemoveSamplePayload(InfixStore &store, const uint32_t pos);
@@ -679,10 +686,10 @@ public:
 };
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const uint32_t rng_seed,
-                                               const float load_factor, const uint32_t payload_size,
-                                               const bool setup_start_end_samples):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Diva(const uint32_t infix_size, const uint32_t rng_seed,
+                                           const float load_factor, const uint32_t payload_size,
+                                           const bool setup_start_end_samples):
             wh_(nullptr),
             better_tree_(nullptr),
             wh_int_(nullptr),
@@ -694,7 +701,7 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
             load_factor_alt_(load_factor),
             size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
             bulk_load_streaming_ind_(0) {
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
     }
@@ -715,7 +722,7 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
 
     if (setup_start_end_samples) {
         uint32_t key_len;
-        if constexpr (int_optimized)
+        if constexpr (diva_type == DivaType::Int)
             key_len = sizeof(uint64_t);
         else 
             key_len = 100;
@@ -728,11 +735,11 @@ inline Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 template <class t_itr>
-Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
-                                        const uint32_t rng_seed, const float load_factor,
-                                        const uint32_t payload_size, const uint64_t **payload_list):
+Diva<diva_type, payload_type>::Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, const uint32_t key_len,
+                                    const uint32_t rng_seed, const float load_factor,
+                                    const uint32_t payload_size, const uint64_t **payload_list):
         wh_(nullptr),
         better_tree_(nullptr),
         wh_int_(nullptr),
@@ -744,7 +751,7 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
         load_factor_alt_(load_factor),
         size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
         bulk_load_streaming_ind_(0) {
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
     }
@@ -773,11 +780,11 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 template <class t_itr>
-Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, 
-                                        const uint32_t rng_seed, const float load_factor,
-                                        const uint32_t payload_size, const uint64_t **payload_list):
+Diva<diva_type, payload_type>::Diva(const uint32_t infix_size, const t_itr begin, const t_itr end, 
+                                    const uint32_t rng_seed, const float load_factor,
+                                    const uint32_t payload_size, const uint64_t **payload_list):
         wh_(nullptr),
         better_tree_(nullptr),
         wh_int_(nullptr),
@@ -789,7 +796,7 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
         load_factor_alt_(load_factor),
         size_scalar_shrink_grow_sep(std::log(infix_store_target_size / 64) / std::log(1 / load_factor) + 1),
         bulk_load_streaming_ind_(0) {
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
     }
@@ -814,8 +821,8 @@ Diva<int_optimized, payload_type>::Diva(const uint32_t infix_size, const t_itr b
 
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::SetupScaleFactors() {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::SetupScaleFactors() {
     double pw = 1.0;
     for (int32_t i = size_scalar_shrink_grow_sep - 1; i >= 0; i--) {
         size_scalars_[i] = static_cast<uint64_t>(pw * (1ULL << scale_shift));
@@ -845,18 +852,18 @@ inline void Diva<int_optimized, payload_type>::SetupScaleFactors() {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::GetLowerUpperBounds(const InfiniteByteString& key, bool write, void *leaves[3],
-                                                                   wormhole_iter& it, wormhole_int_iter& it_int,
-                                                                   InfiniteByteString& prev_key, InfiniteByteString& next_key,
-                                                                   Diva<int_optimized, payload_type>::InfixStore *& infix_store_ptr) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::GetLowerUpperBounds(const InfiniteByteString& key, bool write, void *leaves[3],
+                                                               wormhole_iter& it, wormhole_int_iter& it_int,
+                                                               InfiniteByteString& prev_key, InfiniteByteString& next_key,
+                                                               Diva<diva_type, payload_type>::InfixStore *& infix_store_ptr) const {
     const bool unlock = false;
-    uint32_t exp_backoff = 2;
 GetLowerUpperBoundsRetry:
     uint32_t l_ind = 0, r_ind = 0;
     InfixStore *dummy_infix_store_ptr;
     uint32_t dummy_val;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
+        uint32_t exp_backoff = 2;
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
         it_int.leaf = nullptr;
@@ -975,14 +982,14 @@ GetLowerUpperBoundsRetry:
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteGetLowerMiddleUpperBounds(const InfiniteByteString& key, void *leaves[3],
-                                                                               wormhole_iter& it, wormhole_int_iter& it_int,
-                                                                               InfiniteByteString& left_key,
-                                                                               InfiniteByteString& middle_key,
-                                                                               InfiniteByteString& right_key,
-                                                                               Diva<int_optimized, payload_type>::InfixStore *& left_store_ptr,
-                                                                               Diva<int_optimized, payload_type>::InfixStore *& right_store_ptr) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteGetLowerMiddleUpperBounds(const InfiniteByteString& key, void *leaves[3],
+                                                                           wormhole_iter& it, wormhole_int_iter& it_int,
+                                                                           InfiniteByteString& left_key,
+                                                                           InfiniteByteString& middle_key,
+                                                                           InfiniteByteString& right_key,
+                                                                           Diva<diva_type, payload_type>::InfixStore *& left_store_ptr,
+                                                                           Diva<diva_type, payload_type>::InfixStore *& right_store_ptr) const {
     const bool write = true, unlock = false;
     uint32_t exp_backoff = 1;
 
@@ -990,7 +997,7 @@ GetLowerMiddleUpperBoundsRetry:
     uint32_t l_ind = 0, r_ind = 0;
     InfixStore *dummy_infix_store_ptr;
     uint32_t dummy_val;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
         it_int.leaf = nullptr;
@@ -1111,8 +1118,8 @@ GetLowerMiddleUpperBoundsRetry:
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::OrderLeaves(void *leaves[3], uint32_t l, uint32_t r) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::OrderLeaves(void *leaves[3], uint32_t l, uint32_t r) const {
     const uint32_t l_inc = l == 2 ? 0 : l + 1;
     if (l_inc == r) {
         leaves[0] = leaves[l];
@@ -1128,19 +1135,19 @@ inline void Diva<int_optimized, payload_type>::OrderLeaves(void *leaves[3], uint
     }
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::UnlockLeaves(void *leaves[3], bool write) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::UnlockLeaves(void *leaves[3], bool write) const {
     for (uint32_t i = 0; i < 3; i++) {
         if (leaves[i] == nullptr)
             continue;
         if (write) {
-            if constexpr (int_optimized)
+            if constexpr (diva_type == DivaType::Int)
                 wormleaf_int_unlock_write(reinterpret_cast<struct wormleaf_int *>(leaves[i]));
             else
                 wormleaf_unlock_write(reinterpret_cast<struct wormleaf *>(leaves[i]));
         }
         else {
-            if constexpr (int_optimized)
+            if constexpr (diva_type == DivaType::Int)
                 wormleaf_int_unlock_read(reinterpret_cast<struct wormleaf_int *>(leaves[i]));
             else
                 wormleaf_unlock_read(reinterpret_cast<struct wormleaf *>(leaves[i]));
@@ -1150,27 +1157,27 @@ inline void Diva<int_optimized, payload_type>::UnlockLeaves(void *leaves[3], boo
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Insert(uint64_t key,
-                                                      const void *payload,
-                                                      uint32_t random_number) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Insert(uint64_t key,
+                                                  const void *payload,
+                                                  uint32_t random_number) {
     key = __builtin_bswap64(key);
     Insert(reinterpret_cast<const uint8_t *>(&key), sizeof(key), payload, random_number);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Insert(std::string_view key,
-                                                      const void *payload,
-                                                      uint32_t random_number) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Insert(std::string_view key,
+                                                  const void *payload,
+                                                  uint32_t random_number) {
     Insert(reinterpret_cast<const uint8_t *>(key.data()), key.size(), payload, random_number);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Insert(const uint8_t *key, const uint32_t key_len,
-                                                      const void *payload,
-                                                      uint32_t random_number) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Insert(const uint8_t *key, const uint32_t key_len,
+                                                  const void *payload,
+                                                  uint32_t random_number) {
     const InfiniteByteString converted_key {key, static_cast<uint32_t>(key_len)};
     random_number = random_number == 0 ? rng_() : random_number;
     uint32_t num_keys_added = 1;
@@ -1181,9 +1188,9 @@ inline void Diva<int_optimized, payload_type>::Insert(const uint8_t *key, const 
     n_keys_.fetch_add(num_keys_added, std::memory_order_release);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::InsertSimple(const InfiniteByteString key,
-                                                            const void *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::InsertSimple(const InfiniteByteString key,
+                                                        const void *payload) {
     const bool it_write_lock = false;
     InfixStore *infix_store_ptr;
     void *leaves_to_unlock[3] = {};
@@ -1196,7 +1203,7 @@ inline void Diva<int_optimized, payload_type>::InsertSimple(const InfiniteByteSt
     GetLowerUpperBounds(key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
@@ -1228,8 +1235,8 @@ inline void Diva<int_optimized, payload_type>::InsertSimple(const InfiniteByteSt
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::RangeQuery(uint64_t l, uint64_t r) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::RangeQuery(uint64_t l, uint64_t r) const {
     l = __builtin_bswap64(l);
     r = __builtin_bswap64(r);
     return RangeQuery(reinterpret_cast<const uint8_t *>(&l), sizeof(l),
@@ -1237,16 +1244,16 @@ inline bool Diva<int_optimized, payload_type>::RangeQuery(uint64_t l, uint64_t r
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::RangeQuery(std::string_view input_l, std::string_view input_r) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::RangeQuery(std::string_view input_l, std::string_view input_r) const {
     return RangeQuery(reinterpret_cast<const uint8_t *>(input_l.data()), input_l.size(),
                       reinterpret_cast<const uint8_t *>(input_r.data()), input_r.size());
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
-                                                          const uint8_t *input_r, const uint32_t input_r_len) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, const uint32_t input_l_len,
+                                                      const uint8_t *input_r, const uint32_t input_r_len) const {
     const bool it_write_lock = false;
     const InfiniteByteString l_key {input_l, static_cast<uint32_t>(input_l_len)};
     const InfiniteByteString r_key {input_r, static_cast<uint32_t>(input_r_len)};
@@ -1261,7 +1268,7 @@ inline bool Diva<int_optimized, payload_type>::RangeQuery(const uint8_t *input_l
     GetLowerUpperBounds(l_key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         if (next_key.str != nullptr) {
@@ -1285,7 +1292,7 @@ inline bool Diva<int_optimized, payload_type>::RangeQuery(const uint8_t *input_l
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
 
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         const uint64_t l_key_int = __builtin_bswap64(*((uint64_t *) l_key.str));
         const uint64_t r_key_int = __builtin_bswap64(*((uint64_t *) r_key.str));
         const uint64_t prev_key_int = __builtin_bswap64(*((uint64_t *) prev_key.str));
@@ -1328,21 +1335,21 @@ inline bool Diva<int_optimized, payload_type>::RangeQuery(const uint8_t *input_l
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::PointQuery(uint64_t key) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::PointQuery(uint64_t key) const {
     key = __builtin_bswap64(key);
     return PointQuery(reinterpret_cast<const uint8_t *>(&key), sizeof(key));
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::PointQuery(std::string_view key) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::PointQuery(std::string_view key) const {
     return PointQuery(reinterpret_cast<const uint8_t *>(key.data()), key.size());
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::PointQuery(const uint8_t *input_key, const uint32_t key_len) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, const uint32_t key_len) const {
     const bool it_write_lock = false;
     const InfiniteByteString key {input_key, static_cast<uint32_t>(key_len)};
     
@@ -1357,7 +1364,7 @@ inline bool Diva<int_optimized, payload_type>::PointQuery(const uint8_t *input_k
     GetLowerUpperBounds(key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         if (next_key.str != nullptr) {
@@ -1393,8 +1400,8 @@ inline bool Diva<int_optimized, payload_type>::PointQuery(const uint8_t *input_k
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::AddTreeKey(const uint8_t *key, const uint32_t key_len, const uint64_t *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::AddTreeKey(const uint8_t *key, const uint32_t key_len, const uint64_t *payload) {
     InfixStore infix_store(scaled_sizes_[size_scalar_shrink_grow_sep], infix_size_,
                            size_scalar_shrink_grow_sep, payload_size_);
     if constexpr (payload_type == PayloadType::FixedLength) {
@@ -1402,16 +1409,15 @@ inline void Diva<int_optimized, payload_type>::AddTreeKey(const uint8_t *key, co
             AddSamplePayload(infix_store, payload);
     }
     void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
-    if constexpr (int_optimized)
+    if constexpr (diva_type == DivaType::Int)
         wh_int_put(better_tree_int_, key, key_len, &infix_store, sizeof(infix_store), dummy_locked_leaf_addrs);
     else
         wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store), dummy_locked_leaf_addrs);
 }
 
-
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteString key,
-                                                               const void *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::InsertSplit(const InfiniteByteString key,
+                                                           const void *payload) {
     const bool it_write_lock = true;
     InfixStore *infix_store_ptr;
     void *leaves_to_unlock[3] = {};
@@ -1424,7 +1430,7 @@ inline uint32_t Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByt
     GetLowerUpperBounds(key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
@@ -1621,7 +1627,7 @@ inline uint32_t Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByt
     infix_store.status = store_lt.status;
     infix_store.ptr = store_lt.ptr;
     infix_store.rwlock.store(store_lt.rwlock.load(std::memory_order_acquire), std::memory_order_release);
-    if constexpr (int_optimized)
+    if constexpr (diva_type == DivaType::Int)
         wh_int_put(better_tree_int_, key.str, key.length, &store_gt, sizeof(InfixStore), leaves_to_unlock);
     else
         wh_put(better_tree_, key.str, key.length, &store_gt, sizeof(InfixStore), leaves_to_unlock);
@@ -1653,11 +1659,11 @@ inline uint32_t Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByt
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline std::tuple<uint32_t, bool> Diva<int_optimized, payload_type>::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len,
-                                                                                                const uint32_t implicit_size, const uint32_t shamt,
-                                                                                                const uint64_t lower_lim, const uint64_t upper_lim) {
+inline std::tuple<uint32_t, bool> Diva<diva_type, payload_type>::GetExpandedInfixListLength(const uint64_t *list, const uint32_t list_len,
+                                                                                            const uint32_t implicit_size, const uint32_t shamt,
+                                                                                            const uint64_t lower_lim, const uint64_t upper_lim) {
     uint32_t actual_list_len = list_len;
     bool expanded = false;
     const uint64_t lower_implicit_lim = lower_lim >> infix_size_;
@@ -1680,13 +1686,13 @@ inline std::tuple<uint32_t, bool> Diva<int_optimized, payload_type>::GetExpanded
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
-                                                               const uint64_t lower_lim, const uint64_t upper_lim,
-                                                               uint64_t *res, const uint32_t res_len, const bool expanded,
-                                                               const uint64_t *payload_list, const uint32_t payload_list_offset,
-                                                               uint64_t *res_payload) const {
+inline void Diva<diva_type, payload_type>::UpdateInfixList(const uint64_t *list, const uint32_t list_len, const uint32_t shamt,
+                                                           const uint64_t lower_lim, const uint64_t upper_lim,
+                                                           uint64_t *res, const uint32_t res_len, const bool expanded,
+                                                           const uint64_t *payload_list, const uint32_t payload_list_offset,
+                                                           uint64_t *res_payload) const {
 #ifdef DEBUG
     if constexpr (payload_type == PayloadType::FixedLength) {
         assert(payload_list != nullptr);
@@ -1782,11 +1788,11 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixList(const uint64_t *l
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 inline std::tuple<uint32_t, uint32_t, uint32_t> 
-Diva<int_optimized, payload_type>::GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
-                                                                  const InfiniteByteString key_2) const {
-    uint32_t share = 0, ignore = 0, implicit = 0;
+Diva<diva_type, payload_type>::GetSharedIgnoreImplicitLengths(const InfiniteByteString key_1,
+                                                              const InfiniteByteString key_2) const {
+    uint32_t share = 0, ignore = 0;
 
     uint32_t ind = 0, delta;
     do {
@@ -1816,14 +1822,14 @@ Diva<int_optimized, payload_type>::GetSharedIgnoreImplicitLengths(const Infinite
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::ShrinkInfixSize(const uint32_t new_infix_size) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::ShrinkInfixSize(const uint32_t new_infix_size) {
     InfixStore *store_ptr;
     const uint8_t *key;
     uint32_t key_len, dummy_val;
     const bool write = false, unlock = true;
 
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
@@ -1860,8 +1866,8 @@ inline void Diva<int_optimized, payload_type>::ShrinkInfixSize(const uint32_t ne
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint64_t Diva<int_optimized, payload_type>::Size() const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint64_t Diva<diva_type, payload_type>::Size() const {
     uint64_t res = sizeof(bool) + sizeof(infix_store_target_size) 
                  + sizeof(base_implicit_size) + sizeof(scale_shift)
                  + sizeof(scale_implicit_shift) + sizeof(size_scalar_count)
@@ -1879,7 +1885,7 @@ inline uint64_t Diva<int_optimized, payload_type>::Size() const {
     InfixStore *store;
     const bool write = false, unlock = true;
 
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
@@ -1912,12 +1918,6 @@ inline uint64_t Diva<int_optimized, payload_type>::Size() const {
             wh_iter_peek_ref(&it, reinterpret_cast<const void **>(&tree_key), &tree_key_len, 
                                   reinterpret_cast<void **>(&store), &dummy);
             res += sizeof(tree_key_len) + tree_key_len;
-            /*
-            if (last_tree_key != nullptr) {
-                for (uint32_t i = 0; i < std::min(tree_key_len, last_tree_key_len) && last_tree_key[i] == tree_key[i]; i++)
-                    res--;
-            }
-            */
             res += sizeof(store->status); // + sizeof(store->ptr);
             if constexpr (payload_type == PayloadType::FixedLength) {
                 res += sizeof(store->num_sample_payloads);
@@ -1926,7 +1926,6 @@ inline uint64_t Diva<int_optimized, payload_type>::Size() const {
             if (store->ptr != nullptr) {
                 const uint64_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
                 res += word_count * sizeof(uint64_t);
-                //res += (store->GetFullSlotCount() * (infix_size_ + 1) + infix_store_target_size + 7) / 8;
             }
             last_tree_key = tree_key;
             last_tree_key_len = tree_key_len;
@@ -1939,8 +1938,8 @@ inline uint64_t Diva<int_optimized, payload_type>::Size() const {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Serialize(char *out) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Serialize(char *out) const {
     uint64_t res = SerializeMetadata(out);
 
     const uint8_t *tree_key;
@@ -1948,7 +1947,7 @@ inline uint32_t Diva<int_optimized, payload_type>::Serialize(char *out) const {
     InfixStore *store;
     const bool write = false, unlock = true;
 
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
@@ -1991,11 +1990,11 @@ inline uint32_t Diva<int_optimized, payload_type>::Serialize(char *out) const {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::SerializeMetadata(char *out) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::SerializeMetadata(char *out) const {
     uint32_t res = 0;
     // Diva Version
-    out[res++] = static_cast<char>(int_optimized);
+    out[res++] = static_cast<char>(diva_type);
 
     // Global Metadata
     memcpy(out + res, &infix_store_target_size, sizeof(infix_store_target_size));
@@ -2049,9 +2048,9 @@ inline uint32_t Diva<int_optimized, payload_type>::SerializeMetadata(char *out) 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint64_t Diva<int_optimized, payload_type>::SerializeInfixStore(char *out,
-                                                                       const Diva<int_optimized, payload_type>::InfixStore& store) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint64_t Diva<diva_type, payload_type>::SerializeInfixStore(char *out,
+                                                                   const Diva<diva_type, payload_type>::InfixStore& store) const {
     uint64_t offset = 0;
     memcpy(out + offset, &store.status, sizeof(store.status));
     offset += sizeof(store.status);
@@ -2078,15 +2077,15 @@ inline uint64_t Diva<int_optimized, payload_type>::SerializeInfixStore(char *out
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::~Diva() {
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::~Diva() {
     const bool write = true;
     const bool unlock = true;
     const uint8_t *tree_key;
     uint32_t tree_key_len, dummy;
     InfixStore *store;
 
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wormhole_int_iter it_int;
         it_int.ref = better_tree_int_;
         it_int.map = better_tree_int_->map;
@@ -2123,11 +2122,11 @@ inline Diva<int_optimized, payload_type>::~Diva() {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Diva(const char *deser_buf):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Diva(const char *deser_buf):
         bulk_load_streaming_ind_(0) {
     uint32_t ind = DeserializeMetadata(deser_buf);
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         wh_int_ = wh_int_create();
         better_tree_int_ = wh_int_ref(wh_int_);
     }
@@ -2153,7 +2152,7 @@ inline Diva<int_optimized, payload_type>::Diva(const char *deser_buf):
         ind += DeserializeInfixStore(deser_buf + ind, store);
 
         void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
-        if constexpr (int_optimized) {
+        if constexpr (diva_type == DivaType::Int) {
 #ifdef DEBUG
             assert(1 <= key_length && key_length <= sizeof(uint64_t));
 #endif
@@ -2168,13 +2167,13 @@ inline Diva<int_optimized, payload_type>::Diva(const char *deser_buf):
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::DeserializeMetadata(const char *deser_buf) {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::DeserializeMetadata(const char *deser_buf) {
     uint32_t res = 0;
     uint32_t buf32;
 
     // Diva Version
-    assert(static_cast<bool>(deser_buf[res]) == int_optimized && "Mismatched Diva version");
+    assert(static_cast<DivaType>(deser_buf[res]) == diva_type && "Mismatched Diva version");
     res++;
 
     // Global Metadata
@@ -2242,9 +2241,9 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeMetadata(const cha
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::DeserializeInfixStore(const char *deser_buf,
-                                                                         Diva<int_optimized, payload_type>::InfixStore& store) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::DeserializeInfixStore(const char *deser_buf,
+                                                                     Diva<diva_type, payload_type>::InfixStore& store) const {
     uint32_t offset = 0;
     memcpy(&store.status, deser_buf, sizeof(store.status));
     offset += sizeof(store.status);
@@ -2273,11 +2272,11 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeInfixStore(const c
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint64_t Diva<int_optimized, payload_type>::ExtractPartialKey(const InfiniteByteString key,
-                                                                     const uint32_t shared, const uint32_t ignore,
-                                                                     const uint32_t implicit_size, const uint64_t msb) const {
+inline uint64_t Diva<diva_type, payload_type>::ExtractPartialKey(const InfiniteByteString key,
+                                                                 const uint32_t shared, const uint32_t ignore,
+                                                                 const uint32_t implicit_size, const uint64_t msb) const {
     const uint32_t real_diff_pos = shared + ignore;
     uint64_t res = key.WordAt(real_diff_pos / 8);
     res >>= (63 - (implicit_size - 1) - infix_size_ - real_diff_pos % 8);
@@ -2287,23 +2286,23 @@ inline uint64_t Diva<int_optimized, payload_type>::ExtractPartialKey(const Infin
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Delete(uint64_t key,
-                                                      std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Delete(uint64_t key,
+                                                  std::function<bool(const uint64_t *)> should_remove) {
     key = __builtin_bswap64(key);
     Delete(reinterpret_cast<const uint8_t *>(&key), sizeof(key), should_remove);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Delete(std::string_view input_key,
-                                                      std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Delete(std::string_view input_key,
+                                                  std::function<bool(const uint64_t *)> should_remove) {
     Delete(reinterpret_cast<const uint8_t *>(input_key.data()), input_key.size(), should_remove);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Delete(const uint8_t *input_key, const uint32_t input_key_len,
-                                                      std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Delete(const uint8_t *input_key, const uint32_t input_key_len,
+                                                  std::function<bool(const uint64_t *)> should_remove) {
     const bool it_write_lock = false;
     InfiniteByteString key {input_key, input_key_len};
 
@@ -2318,7 +2317,7 @@ inline void Diva<int_optimized, payload_type>::Delete(const uint8_t *input_key, 
     GetLowerUpperBounds(key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
@@ -2371,9 +2370,9 @@ inline void Diva<int_optimized, payload_type>::Delete(const uint8_t *input_key, 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteRange(uint64_t l, uint64_t r,
-                                                           std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteRange(uint64_t l, uint64_t r,
+                                                       std::function<bool(const uint64_t *)> should_remove) {
     l = __builtin_bswap64(l);
     r = __builtin_bswap64(r);
     DeleteRange(reinterpret_cast<const uint8_t *>(&l), sizeof(l),
@@ -2382,19 +2381,19 @@ inline void Diva<int_optimized, payload_type>::DeleteRange(uint64_t l, uint64_t 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteRange(std::string_view input_l,
-                                                           std::string_view input_r,
-                                                           std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteRange(std::string_view input_l,
+                                                       std::string_view input_r,
+                                                       std::function<bool(const uint64_t *)> should_remove) {
     Delete(reinterpret_cast<const uint8_t *>(input_l.data()), input_l.size(),
            reinterpret_cast<const uint8_t *>(input_r.data()), input_r.size(),
            should_remove);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteRange(const uint8_t *input_l, const uint32_t input_l_len,
-                                                           const uint8_t *input_r, const uint32_t input_r_len,
-                                                           std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteRange(const uint8_t *input_l, const uint32_t input_l_len,
+                                                       const uint8_t *input_r, const uint32_t input_r_len,
+                                                       std::function<bool(const uint64_t *)> should_remove) {
     auto it = GetIterator(input_l, input_l_len, input_r, input_r_len,
                           should_remove ? should_remove 
                                         : [](const uint64_t *payload) { return true; });
@@ -2403,8 +2402,8 @@ inline void Diva<int_optimized, payload_type>::DeleteRange(const uint8_t *input_
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::CompareInfixes(uint64_t a, uint64_t b) {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::CompareInfixes(uint64_t a, uint64_t b) {
     const uint64_t a_lb = a & -a;
     a -= a_lb;
     const uint64_t b_lb = b & -b;
@@ -2413,8 +2412,8 @@ inline bool Diva<int_optimized, payload_type>::CompareInfixes(uint64_t a, uint64
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString key) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
     const bool it_write_lock = true;
 
     InfiniteByteString middle_key {};
@@ -2428,7 +2427,7 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
     DeleteGetLowerMiddleUpperBounds(key, leaves_to_unlock, it, it_int, 
                               left_key, middle_key, right_key, store_l, store_r);
     uint64_t left_key_word, middle_key_word, right_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         left_key_word = *reinterpret_cast<const uint64_t *>(left_key.str);
         left_key.str = reinterpret_cast<const uint8_t *>(&left_key_word);
         middle_key_word = *reinterpret_cast<const uint64_t *>(middle_key.str);
@@ -2570,27 +2569,19 @@ inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString ke
         }
     }
 
-    if constexpr (int_optimized)
+    if constexpr (diva_type == DivaType::Int)
         wh_int_del(better_tree_int_, middle_key.str, middle_key.length, leaves_to_unlock);
     else
         wh_del(better_tree_, middle_key.str, middle_key.length, leaves_to_unlock);
 
-    /*
-#ifdef DEBUG
-    {
-        uint64_t dummy_infix_list[total_elem_count + 1];
-        GetInfixList(*store_l, dummy_infix_list);
-    }
-#endif // DEBUG
-    */
     UnlockLeaves(leaves_to_unlock, it_write_lock);
     n_keys_.fetch_sub(1, std::memory_order_release);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
-                                                                     const InfiniteByteString left_key, const InfiniteByteString right_key,
-                                                                     uint64_t *infix_list, const uint32_t infix_list_len) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
+                                                                 const InfiniteByteString left_key, const InfiniteByteString right_key,
+                                                                 uint64_t *infix_list, const uint32_t infix_list_len) {
     const uint32_t shared_word_byte = (shared / 64) * 8;
 
     auto [old_shared, old_ignore, old_implicit_size] = GetSharedIgnoreImplicitLengths(
@@ -2674,10 +2665,10 @@ inline void Diva<int_optimized, payload_type>::UpdateInfixListDelete(const uint3
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 template <class t_itr>
-inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr begin, const t_itr end, const uint32_t key_len,
-                                                                   const uint64_t **payloads) {
+inline void Diva<diva_type, payload_type>::BulkLoadFixedLength(const t_itr begin, const t_itr end, const uint32_t key_len,
+                                                               const uint64_t **payloads) {
     void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
     uint64_t infix_list[infix_store_target_size], int_opt_buf[3];
     uint32_t payload_list_size = 1;
@@ -2687,7 +2678,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
     uint64_t payload_list[payload_list_size + 1];
     t_itr last_key_it = begin, key_it = begin;
     InfiniteByteString left_key {}, right_key {};
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         int_opt_buf[0] = __builtin_bswap64(*key_it);
         left_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 0), key_len};
     }
@@ -2698,7 +2689,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
     int32_t cnt = 1;
     for (++key_it; key_it != end; ++key_it) {
         if (cnt % infix_store_target_size == 0) {   // New boundary key
-            if constexpr (int_optimized) {
+            if constexpr (diva_type == DivaType::Int) {
                 int_opt_buf[1] = __builtin_bswap64(*key_it);
                 right_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 1), key_len};
             }
@@ -2717,7 +2708,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
                 last_key_pos = std::distance(begin, last_key_it);
             for (int32_t i = 0; i < infix_store_target_size - 1; i++) {
                 InfiniteByteString key;
-                if constexpr (int_optimized) {
+                if constexpr (diva_type == DivaType::Int) {
                     int_opt_buf[2] = __builtin_bswap64(*last_key_it);
                     key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
                 }
@@ -2753,12 +2744,12 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
             }
             else 
                 LoadListToInfixStore(store, infix_list, infix_store_target_size - 1, total_implicit);
-            if constexpr (int_optimized)
+            if constexpr (diva_type == DivaType::Int)
                 wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
             else
                 wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
 
-            if constexpr (int_optimized)
+            if constexpr (diva_type == DivaType::Int)
                 int_opt_buf[0] = int_opt_buf[1];
             else
                 left_key = right_key;
@@ -2770,7 +2761,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
 
     // Add what was left from the loop
     key_it--;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         int_opt_buf[1] = __builtin_bswap64(*key_it);
         right_key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 1), key_len};
     }
@@ -2793,7 +2784,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
             last_key_pos = std::distance(begin, last_key_it);
         while (last_key_it != key_it) {
             InfiniteByteString key;
-            if constexpr (int_optimized) {
+            if constexpr (diva_type == DivaType::Int) {
                 int_opt_buf[2] = __builtin_bswap64(*last_key_it);
                 key = {reinterpret_cast<const uint8_t *>(int_opt_buf + 2), key_len};
             }
@@ -2830,7 +2821,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
         }
         else
             LoadListToInfixStore(store, infix_list, i, total_implicit);
-        if constexpr (int_optimized)
+        if constexpr (diva_type == DivaType::Int)
             wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
         else
             wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
@@ -2847,10 +2838,10 @@ inline void Diva<int_optimized, payload_type>::BulkLoadFixedLength(const t_itr b
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 template <class t_itr>
-inline void Diva<int_optimized, payload_type>::BulkLoad(const t_itr begin, const t_itr end,
-                                                        const uint64_t **payloads) {
+inline void Diva<diva_type, payload_type>::BulkLoad(const t_itr begin, const t_itr end,
+                                                    const uint64_t **payloads) {
     void *dummy_locked_leaf_addrs[3] = {nullptr, nullptr, nullptr};
     uint64_t infix_list[infix_store_target_size];
     uint32_t payload_list_size = 1;
@@ -2917,7 +2908,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoad(const t_itr begin, const
             }
             else 
                 LoadListToInfixStore(store, infix_list, infix_store_target_size - 1, total_implicit);
-            if constexpr (int_optimized)
+            if constexpr (diva_type == DivaType::Int)
                 wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
             else
                 wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
@@ -3021,7 +3012,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoad(const t_itr begin, const
         }
         else
             LoadListToInfixStore(store, infix_list, i, total_implicit);
-        if constexpr (int_optimized)
+        if constexpr (diva_type == DivaType::Int)
             wh_int_put(better_tree_int_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
         else
             wh_put(better_tree_, left_key.str, left_key.length, &store, sizeof(store), dummy_locked_leaf_addrs);
@@ -3038,22 +3029,22 @@ inline void Diva<int_optimized, payload_type>::BulkLoad(const t_itr begin, const
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::BulkLoadStreaming(uint64_t key, const uint64_t *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::BulkLoadStreaming(uint64_t key, const uint64_t *payload) {
     key = __builtin_bswap64(key);
     BulkLoadStreaming(reinterpret_cast<const uint8_t *>(&key), sizeof(key), payload);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::BulkLoadStreaming(std::string_view key, const uint64_t *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::BulkLoadStreaming(std::string_view key, const uint64_t *payload) {
     BulkLoadStreaming(reinterpret_cast<const uint8_t *>(key.data()), key.size(), payload);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::BulkLoadStreaming(const uint8_t *key, const uint32_t key_len,
-                                                                 const uint64_t *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key, const uint32_t key_len,
+                                                             const uint64_t *payload) {
     uint8_t *key_copy = new uint8_t[key_len];
     memcpy(key_copy, key, key_len);
 
@@ -3096,7 +3087,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadStreaming(const uint8_t *
     }
     else 
         LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
-    if constexpr (int_optimized)
+    if constexpr (diva_type == DivaType::Int)
         wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
     else
         wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
@@ -3111,8 +3102,8 @@ inline void Diva<int_optimized, payload_type>::BulkLoadStreaming(const uint8_t *
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::BulkLoadStreamingFinish() {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
     uint8_t *key_copy = new uint8_t[bulk_load_streaming_max_len_];
     memset(key_copy, 0x00, bulk_load_streaming_max_len_);
     AddTreeKey(key_copy, bulk_load_streaming_max_len_);
@@ -3145,7 +3136,7 @@ inline void Diva<int_optimized, payload_type>::BulkLoadStreamingFinish() {
         }
         else 
             LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
-        if constexpr (int_optimized)
+        if constexpr (diva_type == DivaType::Int)
             wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
         else
             wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
@@ -3170,17 +3161,17 @@ inline void Diva<int_optimized, payload_type>::BulkLoadStreamingFinish() {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint64_t Diva<int_optimized, payload_type>::GetNumKeys() const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint64_t Diva<diva_type, payload_type>::GetNumKeys() const {
     return n_keys_.load(std::memory_order_acquire);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint32_t Diva<int_optimized, payload_type>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
+inline uint32_t Diva<diva_type, payload_type>::RankOccupieds(const InfixStore &store, const uint32_t pos) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-    const uint64_t *occupieds = store.ptr + 2;
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
 
     const bool cond = infix_store_target_size / 2 <= pos;
     uint32_t res = cond ? popcnts[0] : 0;
@@ -3190,13 +3181,13 @@ inline uint32_t Diva<int_optimized, payload_type>::RankOccupieds(const InfixStor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint32_t Diva<int_optimized, payload_type>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
+inline uint32_t Diva<diva_type, payload_type>::SelectRunends(const InfixStore &store, const uint32_t rank) const {
     const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_words = (scaled_sizes_[size_grade] + 63) / 64;
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
 
     const bool cond = popcnts[1] <= rank;
     uint32_t i, old_total_set_bits = cond ? popcnts[1] : 0, total_set_bits = cond ? popcnts[1] : 0;
@@ -3209,9 +3200,9 @@ inline uint32_t Diva<int_optimized, payload_type>::SelectRunends(const InfixStor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline int32_t Diva<int_optimized, payload_type>::NextOccupied(const InfixStore &store, const uint32_t pos) const {
-    const uint64_t *occupieds = store.ptr + 2;
+template <DivaType diva_type, PayloadType payload_type>
+inline int32_t Diva<diva_type, payload_type>::NextOccupied(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
     int32_t res = pos + 1, lb_pos;
     do {
         lb_pos = lowbit_pos(occupieds[res / 64] & (~BITMASK(res % 64)));
@@ -3221,10 +3212,10 @@ inline int32_t Diva<int_optimized, payload_type>::NextOccupied(const InfixStore 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
-    const uint64_t *occupieds = store.ptr + 2;
+inline int32_t Diva<diva_type, payload_type>::PreviousOccupied(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
     int32_t res = pos - 1, hb_pos;
     do {
         const int32_t offset = res % 64;
@@ -3238,10 +3229,10 @@ inline int32_t Diva<int_optimized, payload_type>::PreviousOccupied(const InfixSt
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::NextRunend(const InfixStore &store, const uint32_t pos) const {
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+inline int32_t Diva<diva_type, payload_type>::NextRunend(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t runends_size = scaled_sizes_[size_grade];
     int32_t res = pos + 1, lb_pos;
@@ -3253,10 +3244,10 @@ inline int32_t Diva<int_optimized, payload_type>::NextRunend(const InfixStore &s
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+inline int32_t Diva<diva_type, payload_type>::PreviousRunend(const InfixStore &store, const uint32_t pos) const {
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     int32_t res = pos - 1, hb_pos;
     do {
         const int32_t offset = res % 64;
@@ -3270,21 +3261,22 @@ inline int32_t Diva<int_optimized, payload_type>::PreviousRunend(const InfixStor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::GetMappedPos(const uint32_t implicit_part, const uint32_t size_grade,
-                                                               const uint64_t implicit_scalar) const {
+inline int32_t Diva<diva_type, payload_type>::GetMappedPos(const uint32_t implicit_part, const uint32_t size_grade,
+                                                           const uint64_t implicit_scalar) const {
     uint32_t res = (implicit_part * size_scalars_[size_grade] * implicit_scalar)
                         >> (scale_shift + scale_implicit_shift);
     return std::min<uint32_t>(scaled_sizes_[size_grade] - 1, res);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint64_t Diva<int_optimized, payload_type>::GetSlot(const InfixStore &store, const uint32_t pos) const {
+inline uint64_t Diva<diva_type, payload_type>::GetSlot(const InfixStore &store, const uint32_t pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
+    const uint32_t bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                           + scaled_sizes_[size_grade] + pos * infix_size_;
     const uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
     uint64_t value;
     memcpy(&value, ptr, sizeof(value));
@@ -3292,11 +3284,12 @@ inline uint64_t Diva<int_optimized, payload_type>::GetSlot(const InfixStore &sto
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
+inline void Diva<diva_type, payload_type>::SetSlot(InfixStore &store, const uint32_t pos, const uint64_t value) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + pos * infix_size_;
+    const uint32_t bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                           + scaled_sizes_[size_grade] + pos * infix_size_;
     uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
     uint64_t stamp;
     memcpy(&stamp, ptr, sizeof(stamp));
@@ -3306,15 +3299,16 @@ inline void Diva<int_optimized, payload_type>::SetSlot(InfixStore &store, const 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::SetSlot(InfixStore &store, const uint32_t pos,
-                                                       const uint64_t value, const uint32_t width) {
+inline void Diva<diva_type, payload_type>::SetSlot(InfixStore &store, const uint32_t pos,
+                                                   const uint64_t value, const uint32_t width) {
 #ifdef DEBUG
     assert(value > 0);
 #endif // DEBUG
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + pos * width;
+    const uint32_t bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                           + scaled_sizes_[size_grade] + pos * width;
     uint8_t *ptr = ((uint8_t *) store.ptr) + bit_pos / 8;
     uint64_t stamp;
     memcpy(&stamp, ptr, sizeof(stamp));
@@ -3324,49 +3318,51 @@ inline void Diva<int_optimized, payload_type>::SetSlot(InfixStore &store, const 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::GetPayload(const InfixStore &store, const uint32_t pos,
-                                                          uint64_t *payload, const uint32_t payload_offset) const {
+inline void Diva<diva_type, payload_type>::GetPayload(const InfixStore &store, const uint32_t pos,
+                                                      uint64_t *payload, const uint32_t payload_offset) const {
 #ifdef DEBUG
     static_assert(payload_type == PayloadType::FixedLength);
     assert(payload != nullptr);
 #endif // DEBUG
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + pos * payload_size_;
+    const uint32_t bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                           + scaled_sizes_[size_grade] * (infix_size_ + 1) + pos * payload_size_;
     copy_bitmap_to_bitmap(store.ptr, bit_pos, payload, payload_offset, payload_size_);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::GetSamplePayload(InfixStore &store, const uint32_t pos,
-                                                                uint64_t *payload, const uint32_t payload_offset) const {
+inline void Diva<diva_type, payload_type>::GetSamplePayload(const InfixStore &store, const uint32_t pos,
+                                                            uint64_t *payload, const uint32_t payload_offset) const {
     const uint64_t *payload_list = reinterpret_cast<const uint64_t *>(store.ptr[1]);
     const uint32_t bit_pos = pos * payload_size_;
     copy_bitmap_to_bitmap(payload_list, bit_pos, payload, payload_offset, payload_size_);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::SetPayload(InfixStore &store, const uint32_t pos,
-                                                          const uint64_t *payload, const uint32_t payload_offset) {
+inline void Diva<diva_type, payload_type>::SetPayload(InfixStore &store, const uint32_t pos,
+                                                      const uint64_t *payload, const uint32_t payload_offset) {
 #ifdef DEBUG
     static_assert(payload_type == PayloadType::FixedLength);
     assert(payload != nullptr);
 #endif // DEBUG
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + pos * payload_size_;
+    const uint32_t bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                           + scaled_sizes_[size_grade] * (infix_size_ + 1) + pos * payload_size_;
     copy_bitmap_to_bitmap(payload, payload_offset, store.ptr, bit_pos, payload_size_);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::AddSamplePayload(InfixStore &store,
-                                                                const void *payload,
-                                                                const uint32_t payload_offset) {
+inline void Diva<diva_type, payload_type>::AddSamplePayload(InfixStore &store,
+                                                            const void *payload,
+                                                            const uint32_t payload_offset) {
     uint64_t *payload_list = reinterpret_cast<uint64_t *>(store.ptr[1]);
     if (store.num_sample_payloads == 0) {
         const uint32_t malloc_size = (payload_size_ / 64 + 1) * 8;
@@ -3385,9 +3381,9 @@ inline void Diva<int_optimized, payload_type>::AddSamplePayload(InfixStore &stor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::RemoveSamplePayload(InfixStore &store, const uint32_t pos) {
+inline void Diva<diva_type, payload_type>::RemoveSamplePayload(InfixStore &store, const uint32_t pos) {
     uint64_t *payload_list = reinterpret_cast<uint64_t *>(store.ptr[1]);
     if (store.num_sample_payloads == 1) {
         free(payload_list);
@@ -3405,149 +3401,157 @@ inline void Diva<int_optimized, payload_type>::RemoveSamplePayload(InfixStore &s
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                               const uint32_t shamt) {
-#ifdef NAIVE_SLOT_SHIFT
-    for (int32_t i = r - 1; i >= l; i--)
-        SetSlot(store, i + shamt, GetSlot(store, i));
-    for (int32_t i = l; i < l + shamt; i++)
-        SetSlot(store, i, 0ULL);
-#else
+inline void Diva<diva_type, payload_type>::ShiftSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                           const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + l * infix_size_;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + r * infix_size_ - 1;
     shift_bitmap_right(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
-#endif
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                              const uint32_t shamt) {
-#ifdef NAIVE_SLOT_SHIFT
-    for (int32_t i = l; i < r; i--)
-        SetSlot(store, i - shamt, GetSlot(store, i));
-#else
+inline void Diva<diva_type, payload_type>::ShiftSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                          const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + l * infix_size_;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + r * infix_size_ - 1;
     shift_bitmap_left(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
-#endif
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftPayloadsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                                  const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::ShiftPayloadsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                              const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
     shift_bitmap_right(store.ptr, l_bit_pos, r_bit_pos, shamt * payload_size_);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftPayloadsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                                 const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::ShiftPayloadsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                             const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
     shift_bitmap_left(store.ptr, l_bit_pos, r_bit_pos, shamt * payload_size_);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::MoveSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                              const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::MoveSlotsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                          const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + l * infix_size_;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + r * infix_size_ - 1;
     move_bitmap_right(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
     zero_out_bitmap(store.ptr, l_bit_pos, std::min(r_bit_pos, l_bit_pos + shamt * infix_size_ - 1));
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::MoveSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                             const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::MoveSlotsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                         const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + l * infix_size_;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + r * infix_size_ - 1;
     move_bitmap_left(store.ptr, l_bit_pos, r_bit_pos, shamt * infix_size_);
     zero_out_bitmap(store.ptr, std::max(l_bit_pos, r_bit_pos - shamt * infix_size_ + 1), r_bit_pos);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::MovePayloadsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                                 const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::MovePayloadsRight(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                             const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
     move_bitmap_right(store.ptr, l_bit_pos, r_bit_pos, shamt * payload_size_);
     zero_out_bitmap(store.ptr, l_bit_pos, std::min(r_bit_pos, l_bit_pos + shamt * payload_size_ - 1));
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::MovePayloadsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                                const uint32_t shamt) {
+inline void Diva<diva_type, payload_type>::MovePayloadsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                            const uint32_t shamt) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
     move_bitmap_left(store.ptr, l_bit_pos, r_bit_pos, shamt * payload_size_);
     zero_out_bitmap(store.ptr, std::max(l_bit_pos, r_bit_pos - shamt * payload_size_ + 1), r_bit_pos);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ZeroOutSlots(const InfixStore &store, const uint32_t l, const uint32_t r) {
+inline void Diva<diva_type, payload_type>::ZeroOutSlots(const InfixStore &store, const uint32_t l, const uint32_t r) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + l * infix_size_;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] + r * infix_size_ - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + l * infix_size_;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] + r * infix_size_ - 1;
     zero_out_bitmap(store.ptr, l_bit_pos, r_bit_pos);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ZeroOutPayloads(const InfixStore &store, const uint32_t l, const uint32_t r) {
+inline void Diva<diva_type, payload_type>::ZeroOutPayloads(const InfixStore &store, const uint32_t l, const uint32_t r) {
     const uint32_t size_grade = store.GetSizeGrade();
-    const uint32_t l_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
-    const uint32_t r_bit_pos = 128 + infix_store_target_size + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
+    const uint32_t l_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * l;
+    const uint32_t r_bit_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                             + scaled_sizes_[size_grade] * (infix_size_ + 1) + payload_size_ * r - 1;
     zero_out_bitmap(store.ptr, l_bit_pos, r_bit_pos);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
-                                                                 const uint32_t shamt) {
-    shift_bitmap_right(store.ptr + 2 + infix_store_target_size / 64, l, r - 1, shamt);
+inline void Diva<diva_type, payload_type>::ShiftRunendsRight(const InfixStore &store, const uint32_t l, const uint32_t r, 
+                                                             const uint32_t shamt) {
+    shift_bitmap_right(store.ptr + num_metadata_offset_words + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
-                                                                const uint32_t shamt) {
-    shift_bitmap_left(store.ptr + 2 + infix_store_target_size / 64, l, r - 1, shamt);
+inline void Diva<diva_type, payload_type>::ShiftRunendsLeft(const InfixStore &store, const uint32_t l, const uint32_t r,
+                                                            const uint32_t shamt) {
+    shift_bitmap_left(store.ptr + num_metadata_offset_words + infix_store_target_size / 64, l, r - 1, shamt);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
+inline int32_t Diva<diva_type, payload_type>::FindEmptySlotAfter(const InfixStore &store, const uint32_t runend_pos) const {
     const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos;
     while (current_pos < scaled_sizes_[size_grade] && GetSlot(store, current_pos + 1)) {
@@ -3557,9 +3561,9 @@ inline int32_t Diva<int_optimized, payload_type>::FindEmptySlotAfter(const Infix
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline int32_t Diva<int_optimized, payload_type>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
+inline int32_t Diva<diva_type, payload_type>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
     int32_t current_pos = runend_pos, previous_pos;
     do {
         previous_pos = current_pos;
@@ -3573,10 +3577,10 @@ inline int32_t Diva<int_optimized, payload_type>::FindEmptySlotBefore(const Infi
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::InsertRawIntoInfixStore(InfixStore &store, const uint64_t key,
-                                                                       const uint32_t total_implicit,
-                                                                       const uint64_t *payload) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &store, const uint64_t key,
+                                                                   const uint32_t total_implicit,
+                                                                   const uint64_t *payload) {
     if constexpr (payload_type == PayloadType::FixedLength) {
         assert(payload != nullptr);
     }
@@ -3599,8 +3603,8 @@ inline void Diva<int_optimized, payload_type>::InsertRawIntoInfixStore(InfixStor
 #endif // DEBUG
 
     uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
-    uint64_t *occupieds = store.ptr + 2;
-    uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     
     const int32_t mapped_pos = GetMappedPos(implicit_part, size_grade, implicit_scalar);
     const uint32_t key_rank = RankOccupieds(store, implicit_part);
@@ -3735,10 +3739,10 @@ inline void Diva<int_optimized, payload_type>::InsertRawIntoInfixStore(InfixStor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::DeleteRawFromInfixStore(InfixStore &store, const uint64_t key,
-                                                                       const uint32_t total_implicit,
-                                                                       std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::DeleteRawFromInfixStore(InfixStore &store, const uint64_t key,
+                                                                   const uint32_t total_implicit,
+                                                                   std::function<bool(const uint64_t *)> should_remove) {
     uint32_t size_grade = store.GetSizeGrade();
     const uint64_t full_slot_count = store.GetFullSlotCount();
     if (size_grade > 0 && full_slot_count <= (size_grade > 1 ? scaled_sizes_[size_grade - 2] : exception_scaled_size_))
@@ -3750,8 +3754,8 @@ inline void Diva<int_optimized, payload_type>::DeleteRawFromInfixStore(InfixStor
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
 
     uint32_t *popcnts = reinterpret_cast<uint32_t *>(store.ptr);
-    uint64_t *occupieds = store.ptr + 2;
-    uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     const bool is_occupied = get_bitmap_bit(occupieds, implicit_part);
 #ifdef DEBUG
     /*
@@ -3935,13 +3939,13 @@ inline void Diva<int_optimized, payload_type>::DeleteRawFromInfixStore(InfixStor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 inline std::pair<uint64_t, uint32_t>
-Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &store,
-                                                                const uint64_t l_key,
-                                                                const uint64_t r_key, 
-                                                                const uint32_t total_implicit, 
-                                                                std::function<bool(const uint64_t *)> should_remove) {
+Diva<diva_type, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &store,
+                                                            const uint64_t l_key,
+                                                            const uint64_t r_key, 
+                                                            const uint32_t total_implicit, 
+                                                            std::function<bool(const uint64_t *)> should_remove) {
     uint32_t deleted_count = 0;
 
     const uint32_t size_grade = store.GetSizeGrade();
@@ -3951,8 +3955,8 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
     const uint64_t explicit_part_r = r_key & BITMASK(infix_size_);
     const uint64_t implicit_scalar = implicit_scalars_[total_implicit - infix_store_target_size / 2];
 
-    uint64_t *occupieds = store.ptr + 2;
-    uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     /*
 #ifdef DEBUG
     {
@@ -4005,7 +4009,7 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
         bool remove = (implicit_part_l < current_implicit && current_implicit < implicit_part_r);
         remove |= (implicit_part_l == current_implicit) && (explicit_part_l <= (current_slot & (current_slot - 1)));
         remove |= (implicit_part_r == current_implicit) && (explicit_part_r >= (current_slot | (current_slot - 1)));
-        if constexpr (PayloadType::FixedLength) {
+        if constexpr (payload_type == PayloadType::FixedLength) {
             if (should_remove && remove) {
                 uint64_t payload[(payload_size_ + 63) / 64 + 1];
                 GetPayload(store, current_pos, payload);
@@ -4350,14 +4354,14 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
-                                                                               const uint32_t total_implicit,
-                                                                               std::function<bool(const uint64_t*)> should_consider) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                                                           const uint32_t total_implicit,
+                                                                           std::function<bool(const uint64_t*)> should_consider) const {
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
 
-    uint64_t *occupieds = store.ptr + 2;
+    uint64_t *occupieds = store.ptr + num_metadata_offset_words;
     if (!get_bitmap_bit(occupieds, implicit_part))
         return 0;   // No matching infix found
 
@@ -4392,15 +4396,15 @@ inline uint32_t Diva<int_optimized, payload_type>::GetLongestMatchingInfixSize(c
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
-                                                                    const uint32_t total_implicit) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
+                                                                const uint32_t total_implicit) const {
     const uint64_t l_implicit_part = l_key >> infix_size_;
     const uint64_t l_explicit_part = l_key & BITMASK(infix_size_);
     const uint64_t r_implicit_part = r_key >> infix_size_;
     const uint64_t r_explicit_part = r_key & BITMASK(infix_size_);
-    const uint64_t *occupieds = store.ptr + 2;
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
 
     if (l_implicit_part < r_implicit_part) {
         if (NextOccupied(store, l_implicit_part) < r_implicit_part)
@@ -4452,13 +4456,13 @@ inline bool Diva<int_optimized, payload_type>::RangeQueryInfixStore(InfixStore &
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::PointQueryInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::PointQueryInfixStore(InfixStore &store, const uint64_t key, const uint32_t total_implicit) const {
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
 
-    const uint64_t *occupieds = store.ptr + 2;
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
 
     if (!get_bitmap_bit(occupieds, implicit_part))
         return false;
@@ -4480,8 +4484,8 @@ inline bool Diva<int_optimized, payload_type>::PointQueryInfixStore(InfixStore &
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &store, const uint32_t total_implicit) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::ResizeInfixStore(InfixStore &store, const uint32_t total_implicit) {
     // TODO: Optimize further?
     uint32_t size_grade = store.GetSizeGrade();
     const uint64_t infix_count = store.GetFullSlotCount();
@@ -4538,8 +4542,8 @@ inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &stor
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::ShrinkInfixStoreInfixSize(InfixStore &store, const uint32_t new_infix_size) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint64_t infix_count = store.GetFullSlotCount();
     const uint32_t slot_count = scaled_sizes_[size_grade];
@@ -4547,7 +4551,7 @@ inline void Diva<int_optimized, payload_type>::ShrinkInfixStoreInfixSize(InfixSt
     InfixStore new_store(slot_count, new_infix_size, size_grade, payload_size_);
 
     // Copy the occupieds and runends bitmaps
-    const uint32_t total_bitmap_size = 128 + infix_store_target_size + slot_count;
+    const uint32_t total_bitmap_size = 64 * num_metadata_offset_words + infix_store_target_size + slot_count;
     memcpy(new_store.ptr, store.ptr, (total_bitmap_size + 7) / 8);
     uint8_t *new_store_byte_ptr = reinterpret_cast<uint8_t *>(new_store.ptr);
     new_store_byte_ptr[(total_bitmap_size + 7) / 8 - 1] &= BITMASK(total_bitmap_size % 8);
@@ -4561,8 +4565,10 @@ inline void Diva<int_optimized, payload_type>::ShrinkInfixStoreInfixSize(InfixSt
         }
     }
     if constexpr (payload_type == PayloadType::FixedLength) {
-        const uint32_t old_payloads_pos = 128 + infix_store_target_size + slot_count * (infix_size_ + 1);
-        const uint32_t new_payloads_pos = 128 + infix_store_target_size + slot_count * (new_infix_size + 1);
+        const uint32_t old_payloads_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                                        + slot_count * (infix_size_ + 1);
+        const uint32_t new_payloads_pos = 64 * num_metadata_offset_words + infix_store_target_size 
+                                        + slot_count * (new_infix_size + 1);
         copy_bitmap_to_bitmap(store.ptr, old_payloads_pos, new_store.ptr, new_payloads_pos, slot_count * payload_size_);
     }
     new_store.ptr[1] = store.ptr[1];    // Transfer the sample payloads
@@ -4571,10 +4577,10 @@ inline void Diva<int_optimized, payload_type>::ShrinkInfixStoreInfixSize(InfixSt
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
-                                                                    const uint32_t total_implicit, const bool zero_out,
-                                                                    const uint64_t *payload_list) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::LoadListToInfixStore(InfixStore &store, const uint64_t *list, const uint32_t list_len,
+                                                                const uint32_t total_implicit, const bool zero_out,
+                                                                const uint64_t *payload_list) {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t total_size = scaled_sizes_[size_grade];
 #ifdef DEBUG
@@ -4601,8 +4607,8 @@ inline void Diva<int_optimized, payload_type>::LoadListToInfixStore(InfixStore &
 #endif // DEBUG
     */
 
-    uint64_t *occupieds = store.ptr + 2;
-    uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     uint64_t old_implicit_part = list[0] >> infix_size_;
     l[0] = GetMappedPos(old_implicit_part, size_grade, implicit_scalar);
     r[0] = l[0];
@@ -4675,11 +4681,11 @@ inline void Diva<int_optimized, payload_type>::LoadListToInfixStore(InfixStore &
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::InfixStore Diva<int_optimized, payload_type>::AllocateInfixStoreWithList(const uint64_t *list,
-                                                                                                                            const uint32_t list_len,
-                                                                                                                            const uint32_t total_implicit,
-                                                                                                                            const uint64_t *payload_list) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::InfixStore Diva<diva_type, payload_type>::AllocateInfixStoreWithList(const uint64_t *list,
+                                                                                                                    const uint32_t list_len,
+                                                                                                                    const uint32_t total_implicit,
+                                                                                                                    const uint64_t *payload_list) {
     const uint32_t scaled_len = (size_scalars_[size_scalar_shrink_grow_sep] * list_len) >> scale_shift;
     uint32_t size_grade;
     for (size_grade = 0; size_grade < size_scalar_count && scaled_sizes_[size_grade] < scaled_len; size_grade++);
@@ -4696,13 +4702,13 @@ inline typename Diva<int_optimized, payload_type>::InfixStore Diva<int_optimized
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::GetInfixList(const InfixStore &store, uint64_t *res,
-                                                                uint64_t *res_payload) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::GetInfixList(const InfixStore &store, uint64_t *res,
+                                                            uint64_t *res_payload) const {
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t store_size = scaled_sizes_[size_grade];
-    const uint64_t *occupieds = store.ptr + 2;
-    const uint64_t *runends = store.ptr + 2 + infix_store_target_size / 64;
+    const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
     uint64_t implicit_part = occupieds[0] & 1ULL ? 0 : NextOccupied(store, 0);
     uint32_t ind = 0;
     for (int32_t i = 0; i < store_size; i++) {
@@ -4716,7 +4722,8 @@ inline uint32_t Diva<int_optimized, payload_type>::GetInfixList(const InfixStore
 #ifdef DEBUG
                 assert(res_payload != nullptr);
 #endif // DEBUG
-                const uint32_t slot_and_bitmap_size = 128 + infix_store_target_size + store_size * (infix_size_ + 1);
+                const uint32_t slot_and_bitmap_size = 64 * num_metadata_offset_words + infix_store_target_size 
+                                                    + store_size * (infix_size_ + 1);
                 const uint32_t pos_in = slot_and_bitmap_size + payload_size_ * i;
                 const uint32_t pos_out = payload_size_ * ind;
                 copy_bitmap_to_bitmap(store.ptr, pos_in, res_payload, pos_out, payload_size_);
@@ -4762,10 +4769,10 @@ inline uint32_t Diva<int_optimized, payload_type>::GetInfixList(const InfixStore
 /*****************************************************************************
  **                                 Iterator                                **
  *****************************************************************************/
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *parent,
-                                                             std::string_view start, std::string_view end,
-                                                             std::function<bool(const uint64_t *)> should_remove):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Iterator::Iterator(Diva<diva_type, payload_type> *parent,
+                                                         std::string_view start, std::string_view end,
+                                                         std::function<bool(const uint64_t *)> should_remove):
         filter_(parent),
         should_remove_(should_remove),
         first_store_to_fetched_and_delete_(should_remove != nullptr) {
@@ -4786,11 +4793,11 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *parent,
-                                                             const uint8_t *start, uint32_t start_len,
-                                                             const uint8_t *end, uint32_t end_len,
-                                                             std::function<bool(const uint64_t *)> should_remove):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Iterator::Iterator(Diva<diva_type, payload_type> *parent,
+                                                         const uint8_t *start, uint32_t start_len,
+                                                         const uint8_t *end, uint32_t end_len,
+                                                         std::function<bool(const uint64_t *)> should_remove):
         filter_(parent),
         should_remove_(should_remove),
         first_store_to_fetched_and_delete_(should_remove != nullptr) {
@@ -4811,10 +4818,10 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized, payload_type> *filter,
-                                                             uint64_t start, uint64_t end, 
-                                                             std::function<bool(const uint64_t *)> should_remove):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Iterator::Iterator(Diva<diva_type, payload_type> *filter,
+                                                         uint64_t start, uint64_t end, 
+                                                         std::function<bool(const uint64_t *)> should_remove):
         filter_(filter),
         should_remove_(should_remove),
         first_store_to_fetched_and_delete_(should_remove != nullptr) {
@@ -4834,8 +4841,8 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(Diva<int_optimized,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized, payload_type>::Iterator::operator=(const Iterator &other) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator& Diva<diva_type, payload_type>::Iterator::operator=(const Iterator &other) {
     assert(filter_ == other.filter_);
 
     SetNextToFetch(other.next_to_fetch_.str, other.next_to_fetch_.length);
@@ -4856,8 +4863,8 @@ inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::Iterator(const Iterator& other):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Iterator::Iterator(const Iterator& other):
         filter_(other.filter_),
         shared_(other.shared_),
         ignore_(other.ignore_),
@@ -4876,8 +4883,8 @@ inline Diva<int_optimized, payload_type>::Iterator::Iterator(const Iterator& oth
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized, payload_type>::Iterator::operator++() {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator& Diva<diva_type, payload_type>::Iterator::operator++() {
     if constexpr (payload_type == PayloadType::FixedLength) {
         if (should_remove_) {
             FetchDelete();
@@ -4891,18 +4898,18 @@ inline typename Diva<int_optimized, payload_type>::Iterator& Diva<int_optimized,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::Iterator::operator++(int) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator Diva<diva_type, payload_type>::Iterator::operator++(int) {
     auto old = *this;
     operator++();
     return old;
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline std::pair<typename Diva<int_optimized, payload_type>::Iterator::KeyType, uint32_t> Diva<int_optimized, payload_type>::Iterator::operator*() {
+template <DivaType diva_type, PayloadType payload_type>
+inline std::pair<typename Diva<diva_type, payload_type>::Iterator::KeyType, uint32_t> Diva<diva_type, payload_type>::Iterator::operator*() {
     if (!IsValid()) {
-        if constexpr (int_optimized)
+        if constexpr (diva_type == DivaType::Int)
             return {0, 0};
         else 
             return {nullptr, 0};
@@ -4951,7 +4958,7 @@ inline std::pair<typename Diva<int_optimized, payload_type>::Iterator::KeyType, 
         memcpy(current_key_contents_, shared_prefix_, key_length);
 
     // Return the reconstructed key
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         uint64_t res = 0;
         memcpy(&res, current_key_contents_, key_length);
         return {__builtin_bswap64(res), bit_counts_[ind_]};
@@ -4963,8 +4970,8 @@ inline std::pair<typename Diva<int_optimized, payload_type>::Iterator::KeyType, 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Iterator::operator==(const Iterator& rhs) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Iterator::operator==(const Iterator& rhs) const {
     // TODO: Ensure this makes sense
     if (filter_ != rhs.filter_ || infixes_ != rhs.infixes_)
         return false;
@@ -4977,14 +4984,14 @@ inline bool Diva<int_optimized, payload_type>::Iterator::operator==(const Iterat
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Iterator::operator!=(const Iterator& rhs) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Iterator::operator!=(const Iterator& rhs) const {
     return !(*this == rhs);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Iterator::GetPayload(uint64_t *out) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Iterator::GetPayload(uint64_t *out) const {
     static_assert(payload_type == PayloadType::FixedLength);
     assert(ind_ < infixes_.size());
     copy_bitmap_to_bitmap(payloads_.data(), filter_->payload_size_ * ind_,
@@ -4993,15 +5000,15 @@ inline void Diva<int_optimized, payload_type>::Iterator::GetPayload(uint64_t *ou
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Iterator::SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Iterator::SetDeleteFunction(std::function<bool(const uint64_t *)> should_remove) {
     should_remove_ = should_remove;
     first_store_to_fetched_and_delete_ = (should_remove != nullptr);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Iterator::SetNextToFetchFromExtraction(const InfiniteByteString key, uint64_t extraction) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Iterator::SetNextToFetchFromExtraction(const InfiniteByteString key, uint64_t extraction) {
     const uint32_t extraction_size = implicit_ + filter_->infix_size_;
     const uint32_t key_length_bits = shared_ + ignore_ + extraction_size;
     const uint32_t key_length = (key_length_bits + 7) / 8;
@@ -5040,8 +5047,8 @@ inline void Diva<int_optimized, payload_type>::Iterator::SetNextToFetchFromExtra
     SetNextToFetch(next_to_fetch_contents_, key_length);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Iterator::Fetch() {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Iterator::Fetch() {
     ind_ = 0;
     infixes_.clear();
     infixes_.reserve(64);
@@ -5071,7 +5078,7 @@ IteratorRefetchLowerUpperBounds:
     }
 
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
@@ -5124,7 +5131,7 @@ IteratorRefetchLowerUpperBounds:
     uint64_t implicit_part_r = extraction_r >> filter_->infix_size_;
     uint64_t explicit_part_r = extraction_r & BITMASK(filter_->infix_size_);
 
-    const uint64_t *occupieds = infix_store.ptr + 2;
+    const uint64_t *occupieds = infix_store.ptr + num_metadata_offset_words;
     if (!get_bitmap_bit(occupieds, implicit_part_l)) {
         implicit_part_l = filter_->NextOccupied(infix_store, implicit_part_l);
         explicit_part_l = 0;
@@ -5194,8 +5201,8 @@ IteratorRefetchLowerUpperBounds:
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Iterator::FetchDelete() {
     ind_ = 0;
     infixes_.clear();
     bit_counts_.clear();
@@ -5219,7 +5226,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     }
 
     uint64_t prev_key_word, next_key_word;
-    if constexpr (int_optimized) {
+    if constexpr (diva_type == DivaType::Int) {
         prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
         prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
         next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
@@ -5312,38 +5319,38 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(std::string_view start,
-                                                                                std::string_view end,
-                                                                                std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator Diva<diva_type, payload_type>::GetIterator(std::string_view start,
+                                                                                                   std::string_view end,
+                                                                                                   std::function<bool(const uint64_t *)> should_remove) {
     return Iterator(this, start, end, should_remove);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(const uint8_t *start, const uint32_t start_len,
-                                                                                                        const uint8_t *end, const uint32_t end_len,
-                                                                                                        std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator Diva<diva_type, payload_type>::GetIterator(const uint8_t *start, const uint32_t start_len,
+                                                                                                   const uint8_t *end, const uint32_t end_len,
+                                                                                                   std::function<bool(const uint64_t *)> should_remove) {
     return Iterator(this, start, start_len, end, end_len, should_remove);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(uint64_t start, uint64_t end,
-                                                                            std::function<bool(const uint64_t *)> should_remove) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Iterator Diva<diva_type, payload_type>::GetIterator(uint64_t start, uint64_t end,
+                                                                                                   std::function<bool(const uint64_t *)> should_remove) {
     return Iterator(this, start, end, should_remove);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::~Iterator() {
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Iterator::~Iterator() {
     infixes_.clear();
     bit_counts_.clear();
     payloads_.clear();
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Iterator::IsValid() const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Iterator::IsValid() const {
     return ind_ < infixes_.size() || next_to_fetch_.str;
 }
 
@@ -5351,15 +5358,16 @@ inline bool Diva<int_optimized, payload_type>::Iterator::IsValid() const {
 /*****************************************************************************
  **                                  Infix                                  **
  *****************************************************************************/
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::Infix(const uint64_t infix, const InfixStore& infix_store, 
-      uint32_t slot_pos, uint32_t slot_size):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::Infix(const uint64_t infix, const InfixStore& infix_store, 
+                                                   uint32_t slot_pos, uint32_t slot_size):
         infix_(infix) {
-    DeserializeFromInfixStore(infix_store, slot_pos, slot_size);
+    DeserializeFromPtr(infix_store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
+                       slot_size * slot_pos, slot_size);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::Infix(const Infix& other):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::Infix(const Infix& other):
         infix_(other.infix_),
         num_suffixes_(other.num_suffixes_),
         num_suffix_bits_(other.num_suffix_bits_),
@@ -5370,9 +5378,9 @@ inline Diva<int_optimized, payload_type>::Infix::Infix(const Infix& other):
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Infix&
-Diva<int_optimized, payload_type>::Infix::operator=(const Infix& other) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Infix&
+Diva<diva_type, payload_type>::Infix::operator=(const Infix& other) {
     infix_ = other.infix_;
     num_suffixes_ = other.num_suffixes_;
     num_suffix_bits_ = other.num_suffix_bits_;
@@ -5383,8 +5391,8 @@ Diva<int_optimized, payload_type>::Infix::operator=(const Infix& other) {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Infix::operator==(const Infix& rhs) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Infix::operator==(const Infix& rhs) const {
     if (infix_ != rhs.infix_ || trie_.size() != rhs.trie_.size() || trie_suffixes_.size() != rhs.trie_suffixes_.size())
         return false;
     if (num_suffixes_ != rhs.num_suffixes_)
@@ -5400,30 +5408,30 @@ inline bool Diva<int_optimized, payload_type>::Infix::operator==(const Infix& rh
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Infix::HasPrefixKeys() const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Infix::HasPrefixKeys() const {
     return num_prefix_keys_ > 0;
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::SetHasPrefixKeys(bool has_prefix_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::SetHasPrefixKeys(bool has_prefix_keys) {
     num_prefix_keys_ = has_prefix_keys;
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::UpdateNumPrefixKeys(int64_t delta) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::UpdateNumPrefixKeys(int64_t delta) {
     num_prefix_keys_ += delta;
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetNumPrefixKeys() const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetNumPrefixKeys() const {
     return num_prefix_keys_ - (num_prefix_keys_ > 0);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline int32_t Diva<int_optimized, payload_type>::Infix::CompareStringToBitmap(const void *bitmap, uint32_t bitmap_pos,
-                                                                               const InfiniteByteString str, uint32_t str_pos,
-                                                                               uint32_t num_bits_to_compare) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline int32_t Diva<diva_type, payload_type>::Infix::CompareStringToBitmap(const void *bitmap, uint32_t bitmap_pos,
+                                                                           const InfiniteByteString str, uint32_t str_pos,
+                                                                           uint32_t num_bits_to_compare) const {
     int64_t match_len = 0;
     const uint32_t bitmap_pos_start = bitmap_pos;
     bitmap_pos += num_bits_to_compare;
@@ -5451,10 +5459,10 @@ inline int32_t Diva<int_optimized, payload_type>::Infix::CompareStringToBitmap(c
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(uint64_t bits,
-                                                                    uint32_t bit_count) {
+inline void Diva<diva_type, payload_type>::Infix::AddBitsToTrie(uint64_t bits,
+                                                                uint32_t bit_count) {
     if (num_trie_bits_ + bit_count >= 64 * trie_.size())
         trie_.push_back(0);
     write_bits_to_bitmap(trie_.data(), num_trie_bits_, bits, bit_count);
@@ -5462,11 +5470,11 @@ inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(uint64_t bit
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const void *bits,
-                                                                    uint32_t bit_count,
-                                                                    uint32_t bit_offset) {
+inline void Diva<diva_type, payload_type>::Infix::AddBitsToTrie(const void *bits,
+                                                                uint32_t bit_count,
+                                                                uint32_t bit_offset) {
     if (num_trie_bits_ + bit_count >= 64 * trie_.size())
         trie_.resize((num_trie_bits_ + bit_count) / 64 + 1);
     write_bits_from_string_to_bitmap(trie_.data(), num_trie_bits_, bits, bit_offset, bit_count);
@@ -5474,11 +5482,11 @@ inline void Diva<int_optimized, payload_type>::Infix::AddBitsToTrie(const void *
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::Infix::AddBitsFromBitmapToTrie(const void *bits,
-                                                                              uint32_t bit_count,
-                                                                              uint32_t bit_offset) {
+inline void Diva<diva_type, payload_type>::Infix::AddBitsFromBitmapToTrie(const void *bits,
+                                                                          uint32_t bit_count,
+                                                                          uint32_t bit_offset) {
     if (num_trie_bits_ + bit_count >= 64 * trie_.size())
         trie_.resize((num_trie_bits_ + bit_count) / 64 + 1);
     copy_bitmap_to_bitmap(bits, bit_offset, trie_.data(), num_trie_bits_, bit_count);
@@ -5486,9 +5494,9 @@ inline void Diva<int_optimized, payload_type>::Infix::AddBitsFromBitmapToTrie(co
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t counter) {
+inline void Diva<diva_type, payload_type>::Infix::AddCounterToTrie(uint64_t counter) {
     uint32_t digit_count = GetCounterDigitCount(counter);
     uint32_t bit_pos = digit_count + 1;
     uint64_t counter_encoding = 1ULL << digit_count;
@@ -5500,9 +5508,9 @@ inline void Diva<int_optimized, payload_type>::Infix::AddCounterToTrie(uint64_t 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetCounterDigitCount(uint64_t counter) const {
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetCounterDigitCount(uint64_t counter) const {
     uint32_t digit_count = 1;
     for (uint64_t pw = 1UL << varlen_counter_encoding_fragment_length; pw < counter; pw <<= varlen_counter_encoding_fragment_length)
         digit_count++;
@@ -5510,12 +5518,12 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetCounterDigitCount(u
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const InfiniteByteString suffix,
-                                                                      uint32_t suffix_bit_count,
-                                                                      uint32_t suffix_bit_pos,
-                                                                      uint32_t slot_size) {
+inline void Diva<diva_type, payload_type>::Infix::AddSuffixToTrie(const InfiniteByteString suffix,
+                                                                  uint32_t suffix_bit_count,
+                                                                  uint32_t suffix_bit_pos,
+                                                                  uint32_t slot_size) {
     assert(!trie_.empty());
     const uint32_t added_bit_count = ((suffix_bit_count - suffix_bit_pos) / (slot_size - 1) + 1) * slot_size;
     if (num_suffix_bits_ + added_bit_count >= 64 * trie_suffixes_.size()) {
@@ -5529,14 +5537,14 @@ inline void Diva<int_optimized, payload_type>::Infix::AddSuffixToTrie(const Infi
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
+template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
-inline uint32_t Diva<int_optimized, payload_type>::Infix::WriteSuffixToSuffixes(const InfiniteByteString suffix,
-                                                                                uint32_t suffix_len,
-                                                                                uint32_t suffix_offset,
-                                                                                uint32_t write_pos,
-                                                                                uint32_t actual_suffix_len,
-                                                                                uint32_t slot_size) {
+inline uint32_t Diva<diva_type, payload_type>::Infix::WriteSuffixToSuffixes(const InfiniteByteString suffix,
+                                                                            uint32_t suffix_len,
+                                                                            uint32_t suffix_offset,
+                                                                            uint32_t write_pos,
+                                                                            uint32_t actual_suffix_len,
+                                                                            uint32_t slot_size) {
     assert(!trie_.empty());
 
     const uint32_t orig_write_pos = write_pos;
@@ -5554,12 +5562,12 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::WriteSuffixToSuffixes(
 
 
 // Assumes `key_1` and `key_2` are identical up to `key_start_bit`-th bit.
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(const uint8_t *key_1,
-                                                                             uint32_t bit_length_1,
-                                                                             const uint8_t *key_2,
-                                                                             uint32_t bit_length_2,
-                                                                             uint32_t key_start_bit) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetSharedPrefixLen(const uint8_t *key_1,
+                                                                         uint32_t bit_length_1,
+                                                                         const uint8_t *key_2,
+                                                                         uint32_t bit_length_2,
+                                                                         uint32_t key_start_bit) const {
     uint32_t res = 0, bit_pos = key_start_bit;
     uint64_t read_1, read_2;
     const uint32_t min_length = std::min(bit_length_1, bit_length_2);
@@ -5580,11 +5588,11 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(con
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(const InfiniteByteString key_1,
-                                                                             uint32_t start_bit_1,
-                                                                             const uint8_t *key_2,
-                                                                             uint32_t bit_count_2) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetSharedPrefixLen(const InfiniteByteString key_1,
+                                                                         uint32_t start_bit_1,
+                                                                         const uint8_t *key_2,
+                                                                         uint32_t bit_count_2) const {
     uint32_t res = 0, bit_pos_1 = start_bit_1, bit_pos_2 = 0;
     uint64_t read_1, read_2;
     uint32_t delta, num_bits_to_copy;
@@ -5603,13 +5611,13 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSharedPrefixLen(con
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::BuildTrie(const InfiniteByteString *keys,
-                                                                uint32_t key_count, 
-                                                                uint32_t key_start_bit, 
-                                                                uint32_t slot_size,
-                                                                bool force_prefix_keys,
-                                                                bool store_full_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::BuildTrie(const InfiniteByteString *keys,
+                                                            uint32_t key_count, 
+                                                            uint32_t key_start_bit, 
+                                                            uint32_t slot_size,
+                                                            bool force_prefix_keys,
+                                                            bool store_full_keys) {
     num_suffixes_ = 0;
     num_suffix_bits_ = 0;
     num_prefix_keys_ = 0;
@@ -5660,12 +5668,12 @@ inline void Diva<int_optimized, payload_type>::Infix::BuildTrie(const InfiniteBy
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::BuildTrieRecurse(const InfiniteByteString *keys,
-                                                                       uint32_t key_count, 
-                                                                       uint32_t key_start_bit, 
-                                                                       uint32_t slot_size,
-                                                                       bool store_full_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::BuildTrieRecurse(const InfiniteByteString *keys,
+                                                                   uint32_t key_count, 
+                                                                   uint32_t key_start_bit, 
+                                                                   uint32_t slot_size,
+                                                                   bool store_full_keys) {
     if (key_count == 1) {   // Base Case
         AddBitsToTrie(1, 1);
         const uint32_t bit_length = keys[0].length;
@@ -5726,8 +5734,8 @@ inline void Diva<int_optimized, payload_type>::Infix::BuildTrieRecurse(const Inf
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetActualSuffixLen(uint32_t slot_size) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetActualSuffixLen(uint32_t slot_size) const {
     const uint32_t key_count = GetNumPrefixKeys() + num_suffixes_;
     const uint32_t actual_suffix_len = slot_size * key_count < num_trie_bits_ ? 0 
                                        : (slot_size * key_count - num_trie_bits_) / num_suffixes_;
@@ -5735,22 +5743,22 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetActualSuffixLen(uin
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixBitPos(uint32_t suffix_rank,
-                                                                          uint32_t slot_size,
-                                                                          int32_t actual_suffix_len_,
-                                                                          uint32_t prev_suffix_bit_pos) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetSuffixBitPos(uint32_t suffix_rank,
+                                                                      uint32_t slot_size,
+                                                                      int32_t actual_suffix_len_,
+                                                                      uint32_t prev_suffix_bit_pos) const {
     return GetSuffixBitPos(trie_suffixes_.data(), suffix_rank,
                            slot_size, actual_suffix_len_, prev_suffix_bit_pos);
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixBitPos(const uint64_t *ptr,
-                                                                          uint32_t suffix_rank,
-                                                                          uint32_t slot_size,
-                                                                          int32_t actual_suffix_len_,
-                                                                          uint32_t prev_suffix_bit_pos) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetSuffixBitPos(const uint64_t *ptr,
+                                                                      uint32_t suffix_rank,
+                                                                      uint32_t slot_size,
+                                                                      int32_t actual_suffix_len_,
+                                                                      uint32_t prev_suffix_bit_pos) const {
     const uint32_t actual_suffix_len = actual_suffix_len_ == -1 ? GetActualSuffixLen(slot_size) 
                                                                 : actual_suffix_len_;
     uint32_t res = prev_suffix_bit_pos;
@@ -5768,10 +5776,10 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixBitPos(const 
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline std::pair<uint32_t, uint32_t> Diva<int_optimized, payload_type>::Infix::GetSuffixLength(uint32_t suffix_bit_pos,
-                                                                                               uint32_t slot_size,
-                                                                                               int32_t actual_suffix_len_) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline std::pair<uint32_t, uint32_t> Diva<diva_type, payload_type>::Infix::GetSuffixLength(uint32_t suffix_bit_pos,
+                                                                                           uint32_t slot_size,
+                                                                                           int32_t actual_suffix_len_) const {
     const uint32_t actual_suffix_len = actual_suffix_len_ == -1 ? GetActualSuffixLen(slot_size)
                                                                 : actual_suffix_len_;
     uint64_t suffix_read_buf = 0, suffix;
@@ -5791,12 +5799,12 @@ inline std::pair<uint32_t, uint32_t> Diva<int_optimized, payload_type>::Infix::G
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixString(uint32_t suffix_bit_pos,
-                                                                          uint32_t slot_size,
-                                                                          uint8_t *res,
-                                                                          uint32_t res_bit_pos,
-                                                                          int32_t actual_suffix_len_) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline uint32_t Diva<diva_type, payload_type>::Infix::GetSuffixString(uint32_t suffix_bit_pos,
+                                                                      uint32_t slot_size,
+                                                                      uint8_t *res,
+                                                                      uint32_t res_bit_pos,
+                                                                      int32_t actual_suffix_len_) const {
     uint32_t res_len_with_meta = 0;
     const uint32_t actual_suffix_len = actual_suffix_len_ == -1 ? GetActualSuffixLen(slot_size)
                                                                 : actual_suffix_len_;
@@ -5823,11 +5831,11 @@ inline uint32_t Diva<int_optimized, payload_type>::Infix::GetSuffixString(uint32
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Infix::QueryTrie(const InfiniteByteString l_key,
-                                                                const InfiniteByteString r_key, 
-                                                                uint32_t key_start_bit,
-                                                                uint32_t slot_size) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Infix::QueryTrie(const InfiniteByteString l_key,
+                                                            const InfiniteByteString r_key, 
+                                                            uint32_t key_start_bit,
+                                                            uint32_t slot_size) const {
     TrieIterator it(trie_.data());
     int32_t last_depth = -1;
     while (true) {
@@ -5908,10 +5916,10 @@ inline bool Diva<int_optimized, payload_type>::Infix::QueryTrie(const InfiniteBy
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::AdjustActualSuffixLen(uint32_t old_actual_suffix_len,
-                                                                            uint32_t new_actual_suffix_len,
-                                                                            uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::AdjustActualSuffixLen(uint32_t old_actual_suffix_len,
+                                                                        uint32_t new_actual_suffix_len,
+                                                                        uint32_t slot_size) {
     std::vector<uint64_t> trie_suffixes_backup = trie_suffixes_;
     trie_suffixes_.clear();
     uint64_t read_buf = 0;
@@ -5971,9 +5979,9 @@ inline void Diva<int_optimized, payload_type>::Infix::AdjustActualSuffixLen(uint
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::SwitchTrieEncoding(bool has_prefix_keys, uint32_t slot_size,
-                                                                         int32_t old_actual_suffix_len) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::SwitchTrieEncoding(bool has_prefix_keys, uint32_t slot_size,
+                                                                     int32_t old_actual_suffix_len) {
     if (trie_[0] & 1UL) {   // The entire trie is just a leaf, so just have to adjust actual suffix length if needed
         SetHasPrefixKeys(has_prefix_keys);
         const uint32_t actual_suffix_len = num_suffix_bits_;
@@ -6031,10 +6039,10 @@ inline void Diva<int_optimized, payload_type>::Infix::SwitchTrieEncoding(bool ha
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::InsertTrie(const InfiniteByteString key,
-                                                                 uint32_t key_start_bit,
-                                                                 uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteString key,
+                                                             uint32_t key_start_bit,
+                                                             uint32_t slot_size) {
     TrieIterator it(trie_.data());
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
@@ -6145,7 +6153,7 @@ inline void Diva<int_optimized, payload_type>::Infix::InsertTrie(const InfiniteB
                 write_bits_to_bitmap(trie_.data(), last_bit_pos + 4 + varlen_counter_encoding_fragment_length, 1, 1);
                 break;
             }
-            else if ((children & 2) == 0 && key.GetBit(key_start_bit + depth) == 1) {
+            else if ((children & 0b10) == 0 && key.GetBit(key_start_bit + depth) == 1) {
                 found_exact_match = false;
                 write_bits_to_bitmap(trie_.data(), last_bit_pos + 3 + varlen_counter_encoding_fragment_length, 1, 1);
                 AddBitsToTrie(0, 1);
@@ -6298,10 +6306,10 @@ inline void Diva<int_optimized, payload_type>::Infix::InsertTrie(const InfiniteB
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::DeleteTrie(const InfiniteByteString key,
-                                                                 uint32_t key_start_bit,
-                                                                 uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::DeleteTrie(const InfiniteByteString key,
+                                                             uint32_t key_start_bit,
+                                                             uint32_t slot_size) {
     // TODO: Perhaps it would be faster to handle deletes without getting the full strings?
     auto [keys, keys_contents] = GetStrings(slot_size);
     int32_t remove_candidate = -1;
@@ -6318,9 +6326,9 @@ inline void Diva<int_optimized, payload_type>::Infix::DeleteTrie(const InfiniteB
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline std::pair<std::vector<typename Diva<int_optimized, payload_type>::InfiniteByteString>, std::vector<uint8_t>> 
-Diva<int_optimized, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
+template <DivaType diva_type, PayloadType payload_type>
+inline std::pair<std::vector<typename Diva<diva_type, payload_type>::InfiniteByteString>, std::vector<uint8_t>> 
+Diva<diva_type, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
     std::vector<InfiniteByteString> res;
     std::vector<uint8_t> res_contents;
     res_contents.reserve(4096);
@@ -6373,10 +6381,10 @@ Diva<int_optimized, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-int32_t Diva<int_optimized, payload_type>::Infix::GetLongestMatch(const InfiniteByteString key, 
-                                                                  uint32_t key_start_bit,
-                                                                  uint32_t slot_size) const {
+template <DivaType diva_type, PayloadType payload_type>
+int32_t Diva<diva_type, payload_type>::Infix::GetLongestMatch(const InfiniteByteString key, 
+                                                              uint32_t key_start_bit,
+                                                              uint32_t slot_size) const {
     TrieIterator it(trie_.data());
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
@@ -6430,11 +6438,11 @@ int32_t Diva<int_optimized, payload_type>::Infix::GetLongestMatch(const Infinite
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::AdaptTrie(const InfiniteByteString key, 
-                                                         uint32_t key_start_bit,
-                                                         uint32_t adapt_length,
-                                                         uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString key, 
+                                                     uint32_t key_start_bit,
+                                                     uint32_t adapt_length,
+                                                     uint32_t slot_size) {
     TrieIterator it(trie_.data());
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
@@ -6543,9 +6551,9 @@ void Diva<int_optimized, payload_type>::Infix::AdaptTrie(const InfiniteByteStrin
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-std::vector<typename Diva<int_optimized, payload_type>::Infix>
-Diva<int_optimized, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+std::vector<typename Diva<diva_type, payload_type>::Infix>
+Diva<diva_type, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uint32_t slot_size) {
     const int32_t num_split_bits = num_bits;
     std::vector<Infix> res;
     uint64_t current_prefix = 0;
@@ -6684,8 +6692,8 @@ Diva<int_optimized, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uin
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::Merge(const Infix& other, uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::Merge(const Infix& other, uint32_t slot_size) {
     auto [keys, keys_contents] = GetStrings(slot_size);
     auto [other_keys, other_keys_contents] = other.GetStrings(slot_size);
     keys.insert(keys.end(), other_keys.begin(), other_keys.end());
@@ -6693,11 +6701,11 @@ void Diva<int_optimized, payload_type>::Infix::Merge(const Infix& other, uint32_
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::PrependPrefix(const InfiniteByteString prefix,
-                                                             uint32_t prefix_offset,
-                                                             uint32_t prefix_len,
-                                                             uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::PrependPrefix(const InfiniteByteString prefix,
+                                                         uint32_t prefix_offset,
+                                                         uint32_t prefix_len,
+                                                         uint32_t slot_size) {
     if (trie_.empty()) {                                // Doesn't have trie, so it's okay to sacrifice information
         const int32_t lowbit_position = lowbit_pos(infix_);
         infix_ >>= prefix_len;
@@ -6735,10 +6743,10 @@ void Diva<int_optimized, payload_type>::Infix::PrependPrefix(const InfiniteByteS
         PrependPrefixToTrie(prefix, prefix_offset, prefix_len);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::PrependPrefixToTrie(const InfiniteByteString prefix,
-                                                                   uint32_t prefix_offset,
-                                                                   uint32_t prefix_len) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::PrependPrefixToTrie(const InfiniteByteString prefix,
+                                                               uint32_t prefix_offset,
+                                                               uint32_t prefix_len) {
     uint32_t lowbit_bit_pos = 0;
     while ((trie_[lowbit_bit_pos / 64] >> (lowbit_bit_pos % 64)) == 0)
         lowbit_bit_pos += 64 - lowbit_bit_pos % 64;
@@ -6803,10 +6811,10 @@ void Diva<int_optimized, payload_type>::Infix::PrependPrefixToTrie(const Infinit
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::SerializeToPtr(void *ptr,
-                                                              uint32_t bit_pos,
-                                                              uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::SerializeToPtr(void *ptr,
+                                                          uint32_t bit_pos,
+                                                          uint32_t slot_size) {
     write_bits_to_bitmap(ptr, bit_pos, infix_, slot_size);
     bit_pos += slot_size;
 
@@ -6832,10 +6840,11 @@ void Diva<int_optimized, payload_type>::Infix::SerializeToPtr(void *ptr,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-void Diva<int_optimized, payload_type>::Infix::DeserializeFromPtr(void *ptr,
-                                                                  uint32_t bit_pos,
-                                                                  uint32_t slot_size) {
+template <DivaType diva_type, PayloadType payload_type>
+void Diva<diva_type, payload_type>::Infix::DeserializeFromPtr(void *ptr,
+                                                              uint32_t bit_pos,
+                                                              uint32_t slot_size) {
+    // TODO: This has concurrency issues with the modification it makes to ptr. Make it work without modifying ptr.
     uint64_t read_buf;
     uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos;
     infix_ = read_data_from_bitmap(ptr, read_bit_pos, read_buf, read_buf_filled_len, slot_size);
@@ -6884,8 +6893,8 @@ void Diva<int_optimized, payload_type>::Infix::DeserializeFromPtr(void *ptr,
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-uint32_t Diva<int_optimized, payload_type>::Infix::GetNumSlots(uint32_t slot_size) const {
+template <DivaType diva_type, PayloadType payload_type>
+uint32_t Diva<diva_type, payload_type>::Infix::GetNumSlots(uint32_t slot_size) const {
     const uint32_t escape_sequence_cost = slot_size - highbit_pos(infix_);
     const uint64_t total_bit_count = slot_size + escape_sequence_cost + 1 + num_trie_bits_ + num_suffix_bits_;
     return (total_bit_count + slot_size - 1) / slot_size;
@@ -6895,26 +6904,26 @@ uint32_t Diva<int_optimized, payload_type>::Infix::GetNumSlots(uint32_t slot_siz
 /*****************************************************************************
  **                              Trie Iterator                              **
  *****************************************************************************/
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const void *buf):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::TrieIterator::TrieIterator(const void *buf):
         buf_(reinterpret_cast<const uint64_t *>(buf)) {
     depth_branch_.reserve(depth_reserve_size);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const Infix *infix):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::TrieIterator::TrieIterator(const Infix *infix):
         buf_(infix->trie_.data()) {
     depth_branch_.reserve(depth_reserve_size);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const Infix& infix): 
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::TrieIterator::TrieIterator(const Infix& infix): 
         buf_(infix.trie_.data()) {
     depth_branch_.reserve(depth_reserve_size);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(const TrieIterator& other):
+template <DivaType diva_type, PayloadType payload_type>
+inline Diva<diva_type, payload_type>::Infix::TrieIterator::TrieIterator(const TrieIterator& other):
         buf_(other.buf_),
         num_prefix_keys_read_(other.num_prefix_keys_read_),
         num_keys_read_(other.num_keys_read_),
@@ -6923,9 +6932,9 @@ inline Diva<int_optimized, payload_type>::Infix::TrieIterator::TrieIterator(cons
     depth_branch_.reserve(depth_reserve_size);
 }
 
-template <bool int_optimized, PayloadType payload_type>
-inline typename Diva<int_optimized, payload_type>::Infix::TrieIterator& 
-Diva<int_optimized, payload_type>::Infix::TrieIterator::operator=(const TrieIterator& other) {
+template <DivaType diva_type, PayloadType payload_type>
+inline typename Diva<diva_type, payload_type>::Infix::TrieIterator& 
+Diva<diva_type, payload_type>::Infix::TrieIterator::operator=(const TrieIterator& other) {
     buf_ = other.buf_;
     num_prefix_keys_read_ = other.num_prefix_keys_read_;
     num_keys_read_ = other.num_keys_read_;
@@ -6934,8 +6943,8 @@ Diva<int_optimized, payload_type>::Infix::TrieIterator::operator=(const TrieIter
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::Advance(bool has_prefix_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::TrieIterator::Advance(bool has_prefix_keys) {
     const bool is_leaf = AtLeaf();
     bit_pos_++;
     if (is_leaf) {
@@ -6984,14 +6993,14 @@ inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::Advance(bool
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtLeaf() {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Infix::TrieIterator::AtLeaf() {
     return (buf_[bit_pos_ / 64] >> (bit_pos_ % 64)) & 1;
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtPrefixKey(bool has_prefix_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline bool Diva<diva_type, payload_type>::Infix::TrieIterator::AtPrefixKey(bool has_prefix_keys) {
     if (!has_prefix_keys || AtLeaf())
         return false;
     uint64_t read_buf = 0;
@@ -7001,8 +7010,8 @@ inline bool Diva<int_optimized, payload_type>::Infix::TrieIterator::AtPrefixKey(
 }
 
 
-template <bool int_optimized, PayloadType payload_type>
-inline void Diva<int_optimized, payload_type>::Infix::TrieIterator::SkipSubtree(bool has_prefix_keys) {
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Infix::TrieIterator::SkipSubtree(bool has_prefix_keys) {
     const int32_t original_depth = depth_branch_.back().first;
     do {
         Advance(has_prefix_keys);

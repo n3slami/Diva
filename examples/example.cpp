@@ -3,7 +3,6 @@
  * @author Navid Eslami
  */
 #include <cstdint>
-#include <cstring>
 #include <random>
 #include <string>
 #include <vector>
@@ -36,8 +35,9 @@ int main() {
 
     // Normal Allocation
     {   
-        diva::Diva<false> normal_diva(infix_size, seed, load_factor);       // Can also be instantiated as `diva::Diva<>`.
-        diva::Diva<true> int_optimized_diva(infix_size, seed, load_factor);
+        diva::Diva<diva::DivaType::Standard>   normal_diva(infix_size, seed, load_factor);          // Can also be instantiated as `diva::Diva<>`.
+        diva::Diva<diva::DivaType::Int>        int_optimized_diva(infix_size, seed, load_factor);
+        diva::Diva<diva::DivaType::BinaryTrie> binary_trie_diva(infix_size, seed, load_factor);
     }
 
     const uint32_t n_keys = 10000;
@@ -51,10 +51,13 @@ int main() {
     std::sort(int_keys.begin(), int_keys.end());
 
     // Allocation with Bulk Loading
-    diva::Diva<false> normal_diva(infix_size, string_keys.begin(), string_keys.end(), 
-                                  seed, load_factor);
-    diva::Diva<true> int_optimized_diva(infix_size, int_keys.begin(), int_keys.end(), 
-                                        sizeof(uint64_t), seed, load_factor);
+    diva::Diva<diva::DivaType::Standard> normal_diva(infix_size,
+                                                     string_keys.begin(), string_keys.end(), 
+                                                     seed, load_factor);
+    diva::Diva<diva::DivaType::Int> int_optimized_diva(infix_size, 
+                                                       int_keys.begin(), int_keys.end(), 
+                                                       sizeof(uint64_t),
+                                                       seed, load_factor);
 
     // Insertions
     const uint32_t n_inserts = 10;
