@@ -1922,7 +1922,7 @@ inline uint64_t Diva<int_optimized, payload_type>::Size() const {
             if (store->ptr != nullptr) {
                 const uint64_t word_count = store->GetPtrWordCount(scaled_sizes_[store->GetSizeGrade()], infix_size_, payload_size_);
                 res += word_count * sizeof(uint64_t);
-                //res += (store->GetElemCount() * (infix_size_ + 1) + infix_store_target_size + 7) / 8;
+                //res += (store->GetFullSlotCount() * (infix_size_ + 1) + infix_store_target_size + 7) / 8;
             }
             last_tree_key = tree_key;
             last_tree_key_len = tree_key_len;
@@ -3955,7 +3955,7 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
         uint64_t infix_list[scaled_sizes_[size_grade]];
         uint64_t payload_list[scaled_sizes_[size_grade] * (payload_size_ + 63) / 64];
         const uint32_t sanity_infix_count = GetInfixList(store, infix_list, payload_list);
-        assert(sanity_infix_count == store.GetElemCount());
+        assert(sanity_infix_count == store.GetFullSlotCount());
     }
     {
         uint32_t occupied_count = 0, runend_count = 0;
@@ -4297,7 +4297,7 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
             popcnts[1] += __builtin_popcountll(runends[i] & mask);
         }
     }
-    store.UpdateElemCount(-static_cast<int32_t>(deleted_count));
+    store.UpdateFullSlotCount(-static_cast<int32_t>(deleted_count));
 
     /*
 #ifdef DEBUG
@@ -4319,7 +4319,7 @@ Diva<int_optimized, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &stor
         uint64_t infix_list[scaled_sizes_[size_grade]];
         uint64_t payload_list[scaled_sizes_[size_grade] * (payload_size_ + 63) / 64];
         const uint32_t sanity_infix_count = GetInfixList(store, infix_list, payload_list);
-        assert(sanity_infix_count == store.GetElemCount());
+        assert(sanity_infix_count == store.GetFullSlotCount());
     }
     for (uint32_t i = 0; i <= candidate_run_ind; i++) {
         for (uint32_t j = l[i]; j < r[i]; j++) {
@@ -5312,7 +5312,7 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
         if (size_grade) {
             const uint32_t threshold = (size_grade > 1 ? filter_->scaled_sizes_[size_grade - 2] 
                                                        : filter_->exception_scaled_size_);
-            if (infix_store.GetElemCount() <= threshold)
+            if (infix_store.GetFullSlotCount() <= threshold)
                 filter_->ResizeInfixStore(infix_store, total_implicit);
         }
     }
