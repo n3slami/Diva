@@ -354,10 +354,12 @@ inline void shift_bitmap_left_unaligned(uint64_t *ptr, const uint32_t l, const u
 
 
 // Assumes word-aligned buffers
-//__attribute__((always_inline))
-inline void copy_bitmap_to_bitmap(const uint64_t *in, uint32_t pos_in,
-                                        uint64_t *out, uint32_t pos_out,
+__attribute__((always_inline))
+inline void copy_bitmap_to_bitmap(const void *in_, uint32_t pos_in,
+                                        void *out_, uint32_t pos_out,
                                   const uint32_t num_bits_to_copy) {
+    const uint64_t *in = reinterpret_cast<const uint64_t *>(in_);
+    uint64_t *out = reinterpret_cast<uint64_t *>(out_);
     const uint32_t buf_size = 8 * sizeof(uint64_t);
     const uint32_t pos_in_end = pos_in + num_bits_to_copy;
     while (pos_in < pos_in_end) {
