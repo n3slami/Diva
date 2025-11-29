@@ -2519,6 +2519,114 @@ public:
     }
 
 
+    static void Merge() {
+        const uint32_t N = 10;
+        const uint32_t slot_size = 5;
+        const uint32_t key_start_bit = 6;
+        const uint32_t rng_seed = 1380;
+        std::mt19937_64 rng(rng_seed);
+
+        SUBCASE("no prefix keys") {
+            const uint32_t min_key_len = 6;
+            const uint32_t max_key_len = 17;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix_a(infix_value);
+            Diva<>::Infix infix_b(infix_value);
+
+            SUBCASE("small slots") {
+                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.Merge(infix_b, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 48;
+                check_infix.trie_.push_back(0b111110000100011001000101110100110011100110001000);
+                check_infix.num_suffixes_ = 10;
+                check_infix.num_suffix_bits_ = 10;
+                check_infix.trie_suffixes_.push_back(0b0);
+                AssertInfix(infix_a, check_infix);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.Merge(infix_b, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 0;
+                check_infix.num_trie_bits_ = 48;
+                check_infix.trie_.push_back(0b111110000100011001000101110100110011100110001000);
+                check_infix.num_suffixes_ = 10;
+                check_infix.num_suffix_bits_ = 50;
+                check_infix.trie_suffixes_.push_back(0b100001000011100111001010100001100010010111001000);
+                AssertInfix(infix_a, check_infix);
+            }
+        }
+
+        SUBCASE("prefix keys") {
+            const uint32_t min_key_len = 1;
+            const uint32_t max_key_len = 10;
+
+            uint8_t keys_contents[N][max_key_len + 1] = {};
+            Diva<>::InfiniteByteString keys[N];
+            for (uint32_t i = 0; i < N; i++) {
+                const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+                keys[i] = {keys_contents[i], 8 * key_len};
+                for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                    keys_contents[i][j] = rng();
+            }
+            std::sort(keys, keys + N);
+            
+            const uint64_t infix_value = 1;
+            Diva<>::Infix infix_a(infix_value);
+            Diva<>::Infix infix_b(infix_value);
+
+            SUBCASE("small slots") {
+                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.Merge(infix_b, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 3;
+                check_infix.num_trie_bits_ = 60;
+                check_infix.trie_.push_back(0b111001010001101111000100011011001100011010011011000100001110);
+                check_infix.num_suffixes_ = 8;
+                check_infix.num_suffix_bits_ = 8;
+                check_infix.trie_suffixes_.push_back(0b0);
+                AssertInfix(infix_a, check_infix);
+            }
+            SUBCASE("wide slots") {
+                const uint32_t slot_size = 10;
+                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.Merge(infix_b, slot_size);
+
+                Diva<>::Infix check_infix(infix_value);
+                check_infix.num_prefix_keys_ = 2;
+                check_infix.num_trie_bits_ = 59;
+                check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100001110);
+                check_infix.num_suffixes_ = 9;
+                check_infix.num_suffix_bits_ = 76;
+                check_infix.trie_suffixes_.push_back(0b100000000011100000000000110100000000001110001100001011101010100);
+                check_infix.trie_suffixes_.push_back(0b111);
+                AssertInfix(infix_a, check_infix);
+            }
+        }
+    }
+
+
     static void PrependPrefix() {
         const uint32_t N = 10;
         const uint32_t slot_size = 5;
@@ -3032,7 +3140,7 @@ TEST_SUITE("infix") {
     }
 
     TEST_CASE("merge") {
-        //InfixTests::Merge();
+        InfixTests::Merge();
     }
 
     TEST_CASE("prepend prefix") {
