@@ -17,7 +17,7 @@
 
 namespace diva {
 
-typedef Diva<false, PayloadType::None> PayloadDiva;
+typedef Diva<DivaType::Standard, PayloadType::None> PayloadDiva;
 
 class InfixTests {
 public:
