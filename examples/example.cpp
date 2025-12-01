@@ -101,10 +101,6 @@ int main() {
     // Deletion of Byte String with Null Characters
     normal_diva.Delete(byte_string, 10);
 
-    // Shrink Infix Size (to save memory)
-    normal_diva.ShrinkInfixSize(infix_size - 1);
-    int_optimized_diva.ShrinkInfixSize(infix_size - 1);
-
     // Get Size (in bytes)
     normal_diva.Size();
     int_optimized_diva.Size();
