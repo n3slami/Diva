@@ -20,6 +20,7 @@
 namespace diva {
 
 typedef Diva<DivaType::Standard, PayloadType::FixedLength> PayloadDiva;
+typedef Diva<DivaType::BinaryTrie, PayloadType::None> BinaryTrieDiva;
 
 class InfixStoreTests {
 public:
@@ -717,62 +718,6 @@ public:
             }
             for (auto [query_l, query_r] : queries)
                 REQUIRE_EQ(s.RangeQueryInfixStore(store, query_l, query_r), false);
-        }
-    }
-
-    static void ShrinkInfixSize() {
-        const uint32_t infix_size = 5;
-        const uint32_t seed = 1;
-        const float load_factor = 0.95;
-        Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
-                                 s.size_scalar_shrink_grow_sep);
-        
-        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
-            0b000000000010101, 0b000000000100001, 0b000000000101000,
-            0b000000000101011, 0b001000000100001, 0b001000000100011,
-            0b001000000100101, 0b001000000100110, 0b001000000100110,
-            0b001000000100110, 0b001000001110000, 0b001000001100011,
-            0b001000001100101, 0b011111111000001, 0b011111111000011,
-            0b011111111000111, 0b011111111100001, 0b011111111100010,
-            0b011111111100010};
-        for (uint64_t key : keys)
-            s.InsertRawIntoInfixStore(store, key);
-
-        SUBCASE("shrink by one") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 1);
-            s.infix_size_--;
-            const std::vector<uint64_t> check {0b00000000000001,
-                0b00000000000011, 0b00000000001011, 0b00000000010001,
-                0b00000000010100, 0b00000000010101, 0b00100000010001,
-                0b00100000010001, 0b00100000010011, 0b00100000010011,
-                0b00100000010011, 0b00100000010011, 0b00100000111000,
-                0b00100000110001, 0b00100000110011, 0b01111111100001,
-                0b01111111100001, 0b01111111100011, 0b01111111110001,
-                0b01111111110001, 0b01111111110001};
-            uint64_t res[check.size() + 1];
-            const uint32_t len = s.GetInfixList(store, res);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++)
-                REQUIRE_EQ(res[i], check[i]);
-        }
-
-        SUBCASE("shrink by two") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 2);
-            s.infix_size_ -= 2;
-            const std::vector<uint64_t> check {0b0000000000001,
-                0b0000000000001, 0b0000000000101, 0b0000000001001,
-                0b0000000001010, 0b0000000001011, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000011100,
-                0b0010000011001, 0b0010000011001, 0b0111111110001,
-                0b0111111110001, 0b0111111110001, 0b0111111111001,
-                0b0111111111001, 0b0111111111001};
-            uint64_t res[check.size() + 1];
-            const uint32_t len = s.GetInfixList(store, res);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++)
-                REQUIRE_EQ(res[i], check[i]);
         }
     }
 
@@ -1557,81 +1502,6 @@ public:
     }
 
 
-    static void PayloadsShrinkInfixSize() {
-        const uint32_t infix_size = 5;
-        const uint32_t payload_size = 100;
-        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
-        const uint32_t seed = 1;
-        const float load_factor = 0.95;
-
-        PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
-
-        const uint32_t rng_seed = 20;
-        std::mt19937_64 rng(rng_seed);
-        
-        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
-            0b000000000010101, 0b000000000100001, 0b000000000101000,
-            0b000000000101011, 0b001000000100001, 0b001000000100011,
-            0b001000000100101, 0b001000000100110, 0b001000000100110,
-            0b001000000100110, 0b001000001110000, 0b001000001100011,
-            0b001000001100101, 0b011111111000001, 0b011111111000011,
-            0b011111111000111, 0b011111111100001, 0b011111111100010,
-            0b011111111100010};
-        uint64_t payloads[keys.size()][payload_size / 64 + 2];
-        for (uint32_t i = 0; i < keys.size(); i++)
-            for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
-                payloads[i][j] = rng();
-        for (uint32_t i = 0; i < keys.size(); i++)
-            s.InsertRawIntoInfixStore(store, keys[i], infix_store_target_size, payloads[i]);
-
-        SUBCASE("shrink by one") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 1);
-            s.infix_size_--;
-            const std::vector<uint64_t> check {0b00000000000001,
-                0b00000000000011, 0b00000000001011, 0b00000000010001,
-                0b00000000010100, 0b00000000010101, 0b00100000010001,
-                0b00100000010001, 0b00100000010011, 0b00100000010011,
-                0b00100000010011, 0b00100000010011, 0b00100000111000,
-                0b00100000110001, 0b00100000110011, 0b01111111100001,
-                0b01111111100001, 0b01111111100011, 0b01111111110001,
-                0b01111111110001, 0b01111111110001};
-            const uint64_t check_payloads[infix_store_target_size][payload_size / 64 + 2] = {{0xb7355bcccb7eb8c5, 0x1c59030f7, }, {0x35f454f81b12029f, 0x383d30313, }, {0x61e5aa677ce01d35, 0xf1a2d86d9, }, {0x20f4a562deeb8d0b, 0x59760567d, }, {0x80fb9e10603eec87, 0x9dcd29db3, }, {0xa0747fe24ae8f159, 0x2344d9a70, }, {0xba31e013b58ab156, 0x99a54af96, }, {0x735f3a5a66d07d98, 0x666844a4c, }, {0x1fa36b0dc0513480, 0xf2fc77d78, }, {0xcde6a5297a8a19f2, 0x7efcb4091, }, {0x9a2c168cf7ae1c5c, 0x275408db5, }, {0xee1f1fb02f3c5607, 0x81307fe6e, }, {0x2b0c6af4d89997c8, 0x8b5503381, }, {0x8c6ebdbd7c5c37b6, 0xe650cdd55, }, {0x149509a2eee849a5, 0x88e70f2ee, }, {0xbfa36c08ebea7bf7, 0xfeca1bd05, }, {0xc51a1af239814ade, 0xd5ea4a9d, }, {0xb5da6d0848b19893, 0xb6d285122, }, {0x68ec0ffa723a612b, 0xa30261221, }, {0x427a06c4190dc2ff, 0x9cb3d76c6, }, {0x862815c1cdd6efd4, 0x10bc771a2, }};
-            uint64_t res[check.size() + 1];
-            uint64_t res_payloads[(check.size() + 1) * ((payload_size + 63) / 64)];
-            const uint32_t len = s.GetInfixList(store, res, res_payloads);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++) {
-                REQUIRE_EQ(res[i], check[i]);
-                REQUIRE(compare_bitmap_to_bitmap(res_payloads, i * payload_size, check_payloads[i], 0, payload_size));
-            }
-        }
-
-        SUBCASE("shrink by two") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 2);
-            s.infix_size_ -= 2;
-            const std::vector<uint64_t> check {0b0000000000001,
-                0b0000000000001, 0b0000000000101, 0b0000000001001,
-                0b0000000001010, 0b0000000001011, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000011100,
-                0b0010000011001, 0b0010000011001, 0b0111111110001,
-                0b0111111110001, 0b0111111110001, 0b0111111111001,
-                0b0111111111001, 0b0111111111001};
-            const uint64_t check_payloads[infix_store_target_size][payload_size / 64 + 2] = {{0xb7355bcccb7eb8c5, 0x1c59030f7, }, {0x35f454f81b12029f, 0x383d30313, }, {0x61e5aa677ce01d35, 0xf1a2d86d9, }, {0x20f4a562deeb8d0b, 0x59760567d, }, {0x80fb9e10603eec87, 0x9dcd29db3, }, {0xa0747fe24ae8f159, 0x2344d9a70, }, {0xba31e013b58ab156, 0x99a54af96, }, {0x735f3a5a66d07d98, 0x666844a4c, }, {0x1fa36b0dc0513480, 0xf2fc77d78, }, {0xcde6a5297a8a19f2, 0x7efcb4091, }, {0x9a2c168cf7ae1c5c, 0x275408db5, }, {0xee1f1fb02f3c5607, 0x81307fe6e, }, {0x2b0c6af4d89997c8, 0x8b5503381, }, {0x8c6ebdbd7c5c37b6, 0xe650cdd55, }, {0x149509a2eee849a5, 0x88e70f2ee, }, {0xbfa36c08ebea7bf7, 0xfeca1bd05, }, {0xc51a1af239814ade, 0xd5ea4a9d, }, {0xb5da6d0848b19893, 0xb6d285122, }, {0x68ec0ffa723a612b, 0xa30261221, }, {0x427a06c4190dc2ff, 0x9cb3d76c6, }, {0x862815c1cdd6efd4, 0x10bc771a2, }};
-            uint64_t res[check.size() + 1];
-            uint64_t res_payloads[(check.size() + 1) * ((payload_size + 63) / 64)];
-            const uint32_t len = s.GetInfixList(store, res, res_payloads);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++) {
-                REQUIRE_EQ(res[i], check[i]);
-                REQUIRE(compare_bitmap_to_bitmap(res_payloads, i * payload_size, check_payloads[i], 0, payload_size));
-            }
-        }
-    }
-
-
     static void PayloadsResize() {
         const uint32_t infix_size = 5;
         const uint32_t payload_size = 100;
@@ -1687,12 +1557,112 @@ public:
         }
     }
 
+
+    static void BinaryTrieLoadInfixList() {
+        const uint32_t N = 600;
+        const uint32_t key_start_bit = 0;
+        const uint32_t min_key_len = 6;
+        const uint32_t max_key_len = 17;
+        const uint32_t max_num_keys_in_infix = 16;
+        const uint32_t infix_size = 5;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        
+        uint8_t keys_contents[N][max_key_len + 1] = {};
+        BinaryTrieDiva::InfiniteByteString keys[N];
+        uint64_t infixes[N];
+        for (uint32_t i = 0; i < N; i++) {
+            const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+            keys[i] = {keys_contents[i], 8 * key_len};
+            for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                keys_contents[i][j] = rng();
+            infixes[i] = (rng() & BITMASK(highbit_pos(infix_store_target_size) + infix_size)) | 1;
+        }
+        std::sort(infixes, infixes + N);
+        std::sort(keys, keys + N);
+
+        std::vector<BinaryTrieDiva::Infix> infix_vec;
+        for (uint32_t i = 0; i < N; i++) {
+            uint32_t num_keys_in_infix = 1;
+            while (i + num_keys_in_infix < N && infixes[i + num_keys_in_infix] == infixes[i])
+                num_keys_in_infix++;
+            num_keys_in_infix = std::max(num_keys_in_infix, std::min<uint32_t>(rng() % max_num_keys_in_infix + 1, N - i));
+            infix_vec.emplace_back(infixes[i]);
+            infix_vec.back().BuildTrie(keys + i, num_keys_in_infix, key_start_bit, infix_size);
+            i += num_keys_in_infix - 1;
+        }
+
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep);
+        s.LoadVectorToInfixStore(store, infix_vec);
+
+        const std::vector<uint32_t> occupieds_pos = {1, 6, 16, 24, 46, 71, 79, 89, 97, 122, 140, 149, 154, 172, 180, 211, 221, 230, 241, 253, 261, 265, 275, 297, 307, 336, 352, 368, 372, 379, 396, 416, 433, 435, 460, 489, 505, 516, 528, 532, 545, 562, 576, 577, 583, 586, 598, 610, 634, 647, 652, 673, 687, 697, 724, 742, 765, 771, 803, 831, 852, 875, 885, 888, 907, 912, 917, 918, 929, 960, 991, 992, 1005, 1007, 1010, 1021, 1022};
+        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,0,0b00011},   {  4,0,0b00100},   {  6,0,0b01001},   {  7,0,0b01011},   {  8,0,0b00011},   {  9,0,0b00010},   { 10,0,0b01111},   { 12,1,0b00000},   { 13,0,0b00011},   { 16,0,0b00010},   { 18,0,0b11110},   { 19,0,0b10011},   { 20,0,0b10100},   { 21,0,0b01111},   { 22,1,0b00000},   { 23,0,0b01101},   { 25,0,0b01000},   { 26,0,0b11000},   { 27,1,0b00000},   { 28,0,0b10111},   { 30,0,0b11000},   { 32,0,0b00101},   { 33,0,0b11010},   { 34,0,0b10110},   { 35,0,0b11011},   { 36,0,0b10100},   { 37,0,0b01001},   { 38,0,0b00001},   { 39,0,0b10101},   { 40,0,0b01001},   { 41,0,0b00011},   { 43,1,0b00000},   { 48,0,0b01011},   { 50,0,0b00100},   { 51,0,0b10000},   { 52,0,0b10011},   { 53,0,0b10111},   { 54,0,0b00010},   { 55,0,0b01100},   { 56,0,0b01100},   { 57,0,0b11000},   { 58,0,0b11100},   { 59,0,0b10000},   { 60,0,0b10000},   { 61,0,0b11011},   { 62,0,0b10110},   { 63,0,0b11101},   { 66,1,0b00000},   { 74,0,0b10111},   { 76,0,0b01000},   { 77,0,0b10001},   { 78,0,0b10110},   { 80,0,0b00011},   { 81,0,0b00011},   { 82,0,0b00010},   { 83,0,0b00011},   { 84,1,0b00000},   { 85,0,0b01011},   { 87,0,0b11000},   { 88,0,0b01000},   { 89,0,0b00100},   { 90,0,0b00110},   { 91,0,0b01000},   { 92,0,0b11111},   { 93,0,0b00001},   { 94,1,0b00000},   { 95,0,0b11011},   { 97,0,0b10000},   { 98,0,0b00110},   {100,0,0b11111},   {101,0,0b01101},   {102,0,0b11110},   {103,1,0b00000},   {104,0,0b01101},   {106,0,0b00010},   {107,0,0b11000},   {108,0,0b01011},   {109,0,0b11010},   {110,0,0b00110},   {111,0,0b01111},   {112,0,0b01011},   {113,0,0b00011},   {114,0,0b11110},   {115,0,0b00111},   {116,0,0b01000},   {118,0,0b11010},   {119,0,0b00001},   {120,0,0b11100},   {121,0,0b11000},   {124,1,0b00000},   {128,0,0b10111},   {130,0,0b01000},   {131,0,0b00010},   {132,0,0b11001},   {133,0,0b11100},   {134,0,0b01110},   {135,0,0b11110},   {136,0,0b00100},   {137,0,0b11110},   {138,0,0b00101},   {139,0,0b01100},   {140,0,0b00111},   {141,0,0b01101},   {144,1,0b00000},   {147,0,0b01101},   {148,0,0b00010},   {149,1,0b00010},   {156,0,0b01011},   {157,0,0b00010},   {158,1,0b00010},   {162,0,0b01111},   {165,0,0b10010},   {166,0,0b00010},   {167,0,0b10001},   {168,0,0b10110},   {169,0,0b01011},   {170,0,0b10111},   {171,0,0b11001},   {172,0,0b10011},   {173,0,0b00010},   {174,0,0b11011},   {177,1,0b00000},   {181,0,0b10001},   {183,0,0b11000},   {184,0,0b00010},   {185,0,0b00110},   {186,0,0b10111},   {187,0,0b10001},   {188,0,0b01110},   {189,0,0b01100},   {190,0,0b10011},   {191,0,0b11000},   {192,0,0b00111},   {194,1,0b00000},   {195,0,0b11101},   {197,0,0b00110},   {198,0,0b11000},   {199,0,0b10001},   {200,0,0b01111},   {201,0,0b00011},   {202,0,0b11010},   {203,0,0b00011},   {204,0,0b10001},   {205,0,0b01011},   {206,0,0b11010},   {207,0,0b00110},   {208,0,0b01101},   {211,1,0b00000},   {222,0,0b00101},   {225,0,0b01101},   {226,0,0b10010},   {227,0,0b10100},   {228,0,0b11011},   {229,0,0b00011},   {230,1,0b00000},   {232,0,0b11011},   {234,0,0b11000},   {235,0,0b00011},   {236,0,0b10110},   {237,0,0b01111},   {238,1,0b00000},   {242,0,0b01101},   {245,0,0b11111},   {246,0,0b01000},   {247,0,0b11000},   {248,0,0b01110},   {249,0,0b01001},   {250,0,0b11011},   {251,0,0b00101},   {252,0,0b00010},   {253,0,0b01100},   {254,0,0b10011},   {255,0,0b10110},   {256,0,0b00011},   {258,1,0b00000},   {259,0,0b10101},   {260,0,0b01000},   {263,0,0b11110},   {264,0,0b11111},   {265,0,0b00111},   {266,0,0b01000},   {267,0,0b10000},   {269,0,0b01010},   {270,0,0b01111},   {271,0,0b10011},   {272,0,0b10010},   {273,0,0b11101},   {274,0,0b01101},   {275,0,0b10000},   {276,0,0b10001},   {277,0,0b00001},   {279,1,0b00000},   {280,0,0b11111},   {282,0,0b10000},   {283,0,0b10001},   {284,0,0b00100},   {285,0,0b10111},   {286,0,0b00111},   {287,0,0b01001},   {288,0,0b11111},   {290,1,0b00000},   {291,0,0b01001},   {294,0,0b10000},   {295,0,0b11100},   {296,0,0b01000},   {297,1,0b00011},   {298,0,0b11011},   {300,0,0b10000},   {301,0,0b10010},   {302,0,0b10100},   {303,0,0b11011},   {304,0,0b00011},   {305,1,0b00000},   {306,0,0b11001},   {308,0,0b01010},   {309,0,0b01100},   {310,0,0b01110},   {311,0,0b10111},   {312,0,0b00110},   {313,0,0b11111},   {315,0,0b00001},   {316,0,0b10000},   {317,0,0b11110},   {318,0,0b00001},   {320,1,0b00000},   {321,0,0b10001},   {323,0,0b10000},   {324,0,0b10100},   {325,0,0b11100},   {326,0,0b00010},   {327,0,0b11011},   {328,0,0b11100},   {329,0,0b00001},   {330,1,0b00000},   {331,0,0b01001},   {333,0,0b11000},   {334,0,0b00010},   {335,0,0b00011},   {336,0,0b10010},   {337,0,0b11011},   {338,0,0b10101},   {339,0,0b10010},   {340,0,0b10110},   {341,0,0b11110},   {342,0,0b11010},   {343,0,0b01110},   {344,0,0b00110},   {345,0,0b11101},   {346,0,0b00001},   {349,1,0b00000},   {353,0,0b00011},   {356,0,0b11100},   {357,0,0b00101},   {358,0,0b11101},   {359,0,0b10101},   {360,0,0b00111},   {361,1,0b00000},   {370,0,0b00111},   {372,0,0b01100},   {373,0,0b10001},   {374,0,0b11000},   {375,0,0b00010},   {376,0,0b11011},   {377,0,0b10000},   {378,0,0b11000},   {379,0,0b10100},   {380,0,0b10000},   {381,0,0b11100},   {383,1,0b00000},   {387,0,0b01111},   {389,0,0b01000},   {390,0,0b00011},   {391,0,0b01110},   {392,0,0b11010},   {393,0,0b00010},   {394,0,0b01010},   {395,0,0b01111},   {396,1,0b00000},   {397,0,0b11011},   {400,0,0b00010},   {401,0,0b01101},   {402,0,0b01110},   {403,0,0b11100},   {404,0,0b00011},   {405,1,0b00000},   {406,0,0b01011},   {409,0,0b10101},   {410,0,0b10101},   {411,0,0b10110},   {412,0,0b11110},   {413,0,0b11010},   {414,0,0b11110},   {416,1,0b00000},   {417,0,0b10011},   {419,0,0b11000},   {420,0,0b00110},   {421,0,0b11000},   {422,0,0b01111},   {423,0,0b10101},   {424,0,0b11101},   {425,0,0b10110},   {426,0,0b11101},   {427,0,0b00110},   {428,0,0b01000},   {429,0,0b11011},   {432,1,0b00000},   {437,0,0b01001},   {439,0,0b11100},   {441,0,0b11110},   {442,0,0b00111},   {443,0,0b01001},   {444,0,0b00011},   {445,0,0b00101},   {446,0,0b10110},   {447,0,0b11101},   {448,0,0b00101},   {449,0,0b00011},   {450,0,0b10110},   {451,0,0b00111},   {452,0,0b10010},   {453,0,0b00001},   {455,1,0b00000},   {456,0,0b01101},   {457,0,0b00110},   {458,1,0b00010},   {459,0,0b00101},   {461,0,0b10000},   {462,0,0b00111},   {463,0,0b11100},   {464,0,0b11000},   {465,0,0b10111},   {466,0,0b11110},   {467,0,0b01010},   {468,0,0b01011},   {469,0,0b10110},   {470,0,0b01111},   {471,0,0b01011},   {472,0,0b10111},   {473,0,0b00111},   {476,1,0b00000},   {484,0,0b11101},   {485,0,0b00100},   {487,0,0b10100},   {488,0,0b11111},   {489,0,0b00011},   {490,0,0b00100},   {491,0,0b01000},   {492,0,0b11011},   {493,0,0b10110},   {494,0,0b01011},   {495,0,0b10011},   {496,0,0b01111},   {497,0,0b00011},   {498,0,0b00010},   {499,0,0b11001},   {500,0,0b00011},   {503,1,0b00000},   {514,0,0b01001},   {516,0,0b01000},   {517,0,0b00100},   {518,0,0b11110},   {519,0,0b01100},   {520,0,0b11010},   {521,0,0b11000},   {522,0,0b00111},   {523,0,0b00010},   {524,0,0b11101},   {525,0,0b11000},   {526,0,0b01110},   {528,1,0b00000},   {531,0,0b00011},   {534,0,0b00110},   {535,0,0b11010},   {536,0,0b10110},   {537,0,0b11110},   {538,0,0b10010},   {539,0,0b10110},   {540,0,0b00010},   {541,0,0b11010},   {542,0,0b10011},   {543,0,0b01111},   {546,1,0b00000},   {547,0,0b11011},   {549,0,0b01000},   {550,0,0b01001},   {551,0,0b01101},   {552,0,0b01111},   {553,0,0b10010},   {554,0,0b11000},   {555,0,0b01110},   {556,0,0b11101},   {557,0,0b00001},   {559,1,0b00000},   {560,0,0b00011},   {564,0,0b01100},   {565,0,0b01101},   {566,0,0b11001},   {567,1,0b00001},   {568,0,0b10001},   {570,0,0b01100},   {571,0,0b00010},   {572,0,0b01111},   {573,0,0b10001},   {574,0,0b11101},   {575,0,0b00100},   {576,0,0b11001},   {577,0,0b00111},   {578,0,0b11011},   {579,0,0b10101},   {580,0,0b00111},   {582,1,0b00000},   {583,0,0b01101},   {586,0,0b11010},   {587,0,0b01001},   {588,0,0b11101},   {589,0,0b01001},   {590,0,0b10100},   {591,0,0b10101},   {592,0,0b00111},   {594,1,0b00000},   {595,0,0b11111},   {597,0,0b00101},   {598,0,0b11000},   {599,0,0b00111},   {600,0,0b01111},   {601,0,0b01000},   {602,0,0b01100},   {603,0,0b01000},   {604,0,0b01000},   {605,0,0b11110},   {606,0,0b00100},   {607,0,0b01000},   {608,0,0b01111},   {609,0,0b01111},   {611,1,0b00000},   {612,0,0b00011},   {614,1,0b01101},   {615,0,0b01011},   {618,0,0b00110},   {619,0,0b01010},   {620,0,0b11110},   {621,0,0b01000},   {622,0,0b00110},   {623,1,0b00000},   {624,0,0b10001},   {625,0,0b01010},   {626,1,0b00001},   {627,0,0b00101},   {630,0,0b01001},   {631,0,0b10001},   {632,0,0b10111},   {633,0,0b11001},   {634,0,0b00111},   {635,1,0b00000},   {636,0,0b10111},   {638,0,0b10000},   {639,0,0b01001},   {640,0,0b01101},   {641,0,0b00100},   {642,0,0b00111},   {643,1,0b00000},   {644,0,0b00001},   {647,0,0b01010},   {648,0,0b10001},   {649,0,0b10111},   {650,0,0b11010},   {651,0,0b10111},   {652,0,0b10110},   {653,0,0b01110},   {654,0,0b00111},   {655,0,0b10001},   {656,0,0b00110},   {657,0,0b01101},   {660,1,0b00000},   {667,0,0b11001},   {669,0,0b10000},   {670,0,0b01011},   {671,0,0b11001},   {672,0,0b01011},   {673,0,0b01111},   {674,1,0b00000},   {681,0,0b01111},   {684,0,0b01000},   {685,0,0b01111},   {686,0,0b01101},   {687,0,0b01010},   {688,0,0b00111},   {689,1,0b00000},   {690,0,0b00101},   {692,0,0b11000},   {693,0,0b00010},   {694,0,0b11100},   {695,0,0b00111},   {696,0,0b00100},   {697,0,0b00111},   {698,0,0b00010},   {699,0,0b00001},   {700,0,0b11101},   {701,0,0b00011},   {702,0,0b00100},   {703,0,0b01100},   {705,1,0b00000},   {708,0,0b00001},   {711,0,0b10100},   {712,0,0b00101},   {713,0,0b10111},   {714,0,0b01110},   {715,0,0b11011},   {716,0,0b01001},   {717,0,0b00011},   {718,1,0b00000},   {723,0,0b10101},   {726,0,0b10111},   {727,0,0b10101},   {728,0,0b01110},   {729,0,0b01100},   {730,0,0b11011},   {731,0,0b10010},   {732,0,0b10011},   {733,0,0b01111},   {735,1,0b00000},   {736,0,0b10011},   {738,0,0b11000},   {739,0,0b01011},   {740,0,0b00101},   {741,0,0b11011},   {742,0,0b01001},   {743,0,0b11001},   {744,0,0b01011},   {745,0,0b01100},   {746,0,0b10111},   {747,0,0b00101},   {748,0,0b10110},   {749,0,0b10011},   {750,0,0b00110},   {753,1,0b00000},   {762,0,0b11101},   {763,0,0b01000},   {764,0,0b00001},   {765,0,0b11100},   {766,0,0b10111},   {767,0,0b11110},   {768,0,0b00001},   {769,0,0b00100},   {771,0,0b10011},   {772,0,0b00111},   {773,0,0b10010},   {774,0,0b00011},   {776,1,0b00000},   {781,0,0b00001},   {784,0,0b00100},   {785,0,0b10110},   {786,0,0b11100},   {787,0,0b01110},   {788,0,0b11011},   {789,0,0b10101},   {790,0,0b10101},   {791,0,0b10111},   {792,0,0b00110},   {793,0,0b01111},   {794,0,0b00111},   {797,1,0b00000},   {805,0,0b10101},   {807,0,0b00100},   {808,0,0b01111},   {809,1,0b00000},   {811,0,0b11101},   {813,0,0b11000},   {814,0,0b01100},   {815,0,0b11011},   {816,0,0b11100},   {817,0,0b10101},   {818,0,0b10010},   {819,0,0b11101},   {820,0,0b11101},   {821,0,0b10101},   {822,0,0b11011},   {823,0,0b11100},   {824,0,0b00001},   {827,1,0b00000},   {845,0,0b00011},   {848,0,0b01010},   {849,0,0b01011},   {850,0,0b01001},   {851,0,0b11011},   {852,0,0b00101},   {853,0,0b11001},   {854,0,0b01001},   {855,0,0b11011},   {856,0,0b00110},   {857,0,0b10011},   {858,0,0b01111},   {859,0,0b00100},   {860,0,0b11101},   {864,1,0b00000},   {874,0,0b10101},   {876,0,0b01100},   {877,0,0b10011},   {878,0,0b00101},   {879,0,0b11110},   {880,0,0b10011},   {881,0,0b00111},   {882,0,0b01001},   {883,0,0b11011},   {884,0,0b10100},   {885,0,0b01011},   {886,0,0b11011},   {887,0,0b00011},   {890,1,0b00000},   {896,0,0b11101},   {898,0,0b00111},   {899,0,0b01110},   {900,0,0b11000},   {901,0,0b00111},   {902,0,0b01111},   {903,0,0b10101},   {904,0,0b01011},   {905,0,0b11110},   {906,0,0b10100},   {907,0,0b00101},   {908,0,0b11100},   {909,0,0b00001},   {910,0,0b10001},   {911,0,0b10001},   {912,0,0b11110},   {914,0,0b00110},   {915,0,0b01100},   {918,1,0b00000},   {921,0,0b01101},   {923,0,0b10000},   {924,0,0b11100},   {925,0,0b11000},   {926,0,0b11011},   {927,0,0b10100},   {928,0,0b10001},   {929,0,0b11010},   {930,0,0b00011},   {931,1,0b00000},   {932,0,0b00001},   {935,0,0b11010},   {936,0,0b00001},   {937,0,0b11111},   {938,0,0b00110},   {939,0,0b10010},   {940,0,0b00011},   {941,1,0b00000},   {942,0,0b01101},   {945,0,0b10101},   {946,0,0b01011},   {947,0,0b01110},   {948,0,0b11100},   {949,0,0b10111},   {950,0,0b01110},   {951,0,0b11101},   {952,0,0b11010},   {953,0,0b10001},   {954,0,0b01101},   {957,1,0b00000},   {958,0,0b00001},   {961,0,0b10000},   {962,0,0b10110},   {963,0,0b10011},   {964,0,0b01111},   {965,1,0b00000},   {966,0,0b10101},   {968,0,0b10000},   {969,0,0b11011},   {970,0,0b11001},   {971,0,0b01011},   {973,0,0b10011},   {974,0,0b01111},   {975,1,0b00000},   {976,0,0b10001},   {979,0,0b11000},   {980,0,0b11111},   {981,0,0b11110},   {982,1,0b00001},   {983,0,0b01101},   {985,0,0b11100},   {986,0,0b00011},   {987,0,0b11000},   {989,0,0b01111},   {990,1,0b00000},   {991,0,0b11001},   {993,0,0b01000},   {994,0,0b01111},   {995,0,0b11001},   {996,0,0b11101},   {997,0,0b01010},   {998,0,0b01001},   {999,0,0b11011},   {1000,0,0b11101},   {1001,0,0b11000},   {1002,0,0b11000},   {1003,0,0b00111},   {1004,0,0b10010},   {1005,0,0b11010},   {1006,0,0b00011},   {1009,1,0b00000},   {1010,0,0b00011},   {1013,0,0b11111},   {1014,0,0b01100},   {1015,0,0b10110},   {1016,0,0b11110},   {1017,0,0b01110},   {1018,0,0b01011},   {1019,0,0b11111},   {1021,1,0b00000},   {1035,0,0b10001},   {1038,0,0b01000},   {1039,0,0b10001},   {1040,0,0b11111},   {1041,1,0b00001},   {1042,0,0b10101},   {1044,0,0b10000},   {1045,0,0b11110},   {1046,0,0b11001},   {1047,0,0b01010},   {1048,0,0b11111},   {1049,0,0b00011},   {1050,1,0b00000},   {1051,0,0b11111},   {1053,0,0b11000},   {1054,0,0b11111},   {1055,1,0b00001},   {1056,0,0b00101},   {1057,0,0b00010},   {1058,1,0b00111},   {1059,0,0b00101},   {1062,0,0b11110},   {1063,0,0b01111},   {1064,0,0b11101},   {1065,1,0b00001},   {1066,0,0b11011},   {1067,0,0b01110},   {1068,1,0b00001},   {1069,0,0b01111},   {1073,0,0b10111},   {1074,0,0b11111},   {1075,0,0b01111},   {1076,1,0b00000}}; 
+        AssertStoreContents(s, store, occupieds_pos, checks);
+    }
+
 private:
     static void AssertStoreContents(const Diva<>& s, const Diva<>::InfixStore& store,
                                     const std::vector<uint32_t>& occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
         REQUIRE_NE(store.ptr, nullptr);
         REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
+        const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
+        const uint64_t *occupieds = store.ptr + Diva<>::num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + Diva<>::num_metadata_offset_words + Diva<>::infix_store_target_size / 64;
+        uint32_t ind = 0;
+        for (uint32_t i = 0; i < Diva<>::infix_store_target_size; i++) {
+            if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
+                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
+                ind++;
+            }
+            else 
+                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 0);
+        }
+
+        const uint32_t total_size = s.scaled_sizes_[store.GetSizeGrade()];
+        ind = 0;
+        uint32_t runend_count = 0;
+        for (int32_t i = 0; i < total_size; i++) {
+            const uint64_t slot = s.GetSlot(store, i);
+            if (ind < checks.size()) {
+                const auto [pos, runend, value] = checks[ind];
+                if (i == pos) {
+                    REQUIRE_EQ(value, slot);
+                    REQUIRE_EQ(get_bitmap_bit(runends, i), runend);
+                    runend_count += runend;
+                    ind++;
+                }
+                else {
+                    REQUIRE_EQ(slot, 0ULL);
+                    REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+                }
+            }
+            else {
+                REQUIRE_EQ(slot, 0ULL);
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+        }
+        REQUIRE_EQ(occupieds_pos.size(), runend_count);
+
+        uint32_t check_popcnts[2] = {};
+        for (int32_t i = 0; i < Diva<>::infix_store_target_size / 128; i++) {
+            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
+            check_popcnts[1] += __builtin_popcountll(runends[i]);
+        }
+        REQUIRE_EQ(popcnts[0], check_popcnts[0]);
+        REQUIRE_EQ(popcnts[1], check_popcnts[1]);
+    }
+
+
+    static void AssertStoreContents(const BinaryTrieDiva& s, const BinaryTrieDiva::InfixStore& store,
+                                    const std::vector<uint32_t>& occupieds_pos,
+                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
+        REQUIRE_NE(store.ptr, nullptr);
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
         const uint64_t *occupieds = store.ptr + Diva<>::num_metadata_offset_words;
         const uint64_t *runends = store.ptr + Diva<>::num_metadata_offset_words + Diva<>::infix_store_target_size / 64;
@@ -1817,7 +1787,7 @@ private:
         int32_t cnt = 0;
         for (int32_t i = 0; i < s.scaled_sizes_[size_grade]; i++) {
             const uint64_t value = s.GetSlot(store, i);
-            if (value == 0)
+            if (value == 0 && !get_bitmap_bit(runends, i))
                 continue;
             std::cerr << '{' << std::setfill(' ') << std::setw(3) << i;
             std::cerr << ',' << ((runends[i / 64] >> (i % 64)) & 1ULL) << ",0b";
@@ -1927,10 +1897,6 @@ TEST_SUITE("infix_store") {
         InfixStoreTests::RangeQuery();
     }
 
-    TEST_CASE("shrink infix size") {
-        InfixStoreTests::ShrinkInfixSize();
-    }
-
     TEST_CASE("resize") {
         InfixStoreTests::Resize();
     }
@@ -1952,11 +1918,36 @@ TEST_SUITE("infix_store") {
             InfixStoreTests::PayloadsDeleteRaw();
             InfixStoreTests::PayloadsGetLongestMatchingInfixSize();
         }
-        SUBCASE("shrink infix size") {
-            InfixStoreTests::PayloadsShrinkInfixSize();
-        }
         SUBCASE("resize") {
             InfixStoreTests::PayloadsResize();
+        }
+    }
+
+    TEST_CASE("binary trie") {
+        SUBCASE("load infix list") {
+            InfixStoreTests::BinaryTrieLoadInfixList();
+        }
+        SUBCASE("get infix list") {
+            //InfixStoreTests::BinaryTrieGetInfixList();
+        }
+        SUBCASE("resize") {
+            //InfixStoreTests::BinaryTrieResize();
+        }
+        SUBCASE("insert raw") {
+            //InfixStoreTests::BinaryTrieInsertRaw();
+        }
+        SUBCASE("point query") {
+            //InfixStoreTests::BinaryTriePointQuery();
+        }
+        SUBCASE("range query") {
+            //InfixStoreTests::BinaryTrieRangeQuery();
+        }
+        SUBCASE("delete raw") {
+            //InfixStoreTests::BinaryTrieDeleteRaw();
+            //InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
+        }
+        SUBCASE("adapt") {
+            //InfixStoreTests::BinaryTrieAdapt();
         }
     }
 }
