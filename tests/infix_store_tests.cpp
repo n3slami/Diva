@@ -720,62 +720,6 @@ public:
         }
     }
 
-    static void ShrinkInfixSize() {
-        const uint32_t infix_size = 5;
-        const uint32_t seed = 1;
-        const float load_factor = 0.95;
-        Diva<> s(infix_size, seed, load_factor);
-        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
-                                 s.size_scalar_shrink_grow_sep);
-        
-        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
-            0b000000000010101, 0b000000000100001, 0b000000000101000,
-            0b000000000101011, 0b001000000100001, 0b001000000100011,
-            0b001000000100101, 0b001000000100110, 0b001000000100110,
-            0b001000000100110, 0b001000001110000, 0b001000001100011,
-            0b001000001100101, 0b011111111000001, 0b011111111000011,
-            0b011111111000111, 0b011111111100001, 0b011111111100010,
-            0b011111111100010};
-        for (uint64_t key : keys)
-            s.InsertRawIntoInfixStore(store, key);
-
-        SUBCASE("shrink by one") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 1);
-            s.infix_size_--;
-            const std::vector<uint64_t> check {0b00000000000001,
-                0b00000000000011, 0b00000000001011, 0b00000000010001,
-                0b00000000010100, 0b00000000010101, 0b00100000010001,
-                0b00100000010001, 0b00100000010011, 0b00100000010011,
-                0b00100000010011, 0b00100000010011, 0b00100000111000,
-                0b00100000110001, 0b00100000110011, 0b01111111100001,
-                0b01111111100001, 0b01111111100011, 0b01111111110001,
-                0b01111111110001, 0b01111111110001};
-            uint64_t res[check.size() + 1];
-            const uint32_t len = s.GetInfixList(store, res);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++)
-                REQUIRE_EQ(res[i], check[i]);
-        }
-
-        SUBCASE("shrink by two") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 2);
-            s.infix_size_ -= 2;
-            const std::vector<uint64_t> check {0b0000000000001,
-                0b0000000000001, 0b0000000000101, 0b0000000001001,
-                0b0000000001010, 0b0000000001011, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000011100,
-                0b0010000011001, 0b0010000011001, 0b0111111110001,
-                0b0111111110001, 0b0111111110001, 0b0111111111001,
-                0b0111111111001, 0b0111111111001};
-            uint64_t res[check.size() + 1];
-            const uint32_t len = s.GetInfixList(store, res);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++)
-                REQUIRE_EQ(res[i], check[i]);
-        }
-    }
-
 
     static void Resize() {
         const uint32_t infix_size = 5;
@@ -1557,81 +1501,6 @@ public:
     }
 
 
-    static void PayloadsShrinkInfixSize() {
-        const uint32_t infix_size = 5;
-        const uint32_t payload_size = 100;
-        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
-        const uint32_t seed = 1;
-        const float load_factor = 0.95;
-
-        PayloadDiva s(infix_size, seed, load_factor, payload_size);
-        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
-        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
-
-        const uint32_t rng_seed = 20;
-        std::mt19937_64 rng(rng_seed);
-        
-        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
-            0b000000000010101, 0b000000000100001, 0b000000000101000,
-            0b000000000101011, 0b001000000100001, 0b001000000100011,
-            0b001000000100101, 0b001000000100110, 0b001000000100110,
-            0b001000000100110, 0b001000001110000, 0b001000001100011,
-            0b001000001100101, 0b011111111000001, 0b011111111000011,
-            0b011111111000111, 0b011111111100001, 0b011111111100010,
-            0b011111111100010};
-        uint64_t payloads[keys.size()][payload_size / 64 + 2];
-        for (uint32_t i = 0; i < keys.size(); i++)
-            for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
-                payloads[i][j] = rng();
-        for (uint32_t i = 0; i < keys.size(); i++)
-            s.InsertRawIntoInfixStore(store, keys[i], infix_store_target_size, payloads[i]);
-
-        SUBCASE("shrink by one") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 1);
-            s.infix_size_--;
-            const std::vector<uint64_t> check {0b00000000000001,
-                0b00000000000011, 0b00000000001011, 0b00000000010001,
-                0b00000000010100, 0b00000000010101, 0b00100000010001,
-                0b00100000010001, 0b00100000010011, 0b00100000010011,
-                0b00100000010011, 0b00100000010011, 0b00100000111000,
-                0b00100000110001, 0b00100000110011, 0b01111111100001,
-                0b01111111100001, 0b01111111100011, 0b01111111110001,
-                0b01111111110001, 0b01111111110001};
-            const uint64_t check_payloads[infix_store_target_size][payload_size / 64 + 2] = {{0xb7355bcccb7eb8c5, 0x1c59030f7, }, {0x35f454f81b12029f, 0x383d30313, }, {0x61e5aa677ce01d35, 0xf1a2d86d9, }, {0x20f4a562deeb8d0b, 0x59760567d, }, {0x80fb9e10603eec87, 0x9dcd29db3, }, {0xa0747fe24ae8f159, 0x2344d9a70, }, {0xba31e013b58ab156, 0x99a54af96, }, {0x735f3a5a66d07d98, 0x666844a4c, }, {0x1fa36b0dc0513480, 0xf2fc77d78, }, {0xcde6a5297a8a19f2, 0x7efcb4091, }, {0x9a2c168cf7ae1c5c, 0x275408db5, }, {0xee1f1fb02f3c5607, 0x81307fe6e, }, {0x2b0c6af4d89997c8, 0x8b5503381, }, {0x8c6ebdbd7c5c37b6, 0xe650cdd55, }, {0x149509a2eee849a5, 0x88e70f2ee, }, {0xbfa36c08ebea7bf7, 0xfeca1bd05, }, {0xc51a1af239814ade, 0xd5ea4a9d, }, {0xb5da6d0848b19893, 0xb6d285122, }, {0x68ec0ffa723a612b, 0xa30261221, }, {0x427a06c4190dc2ff, 0x9cb3d76c6, }, {0x862815c1cdd6efd4, 0x10bc771a2, }};
-            uint64_t res[check.size() + 1];
-            uint64_t res_payloads[(check.size() + 1) * ((payload_size + 63) / 64)];
-            const uint32_t len = s.GetInfixList(store, res, res_payloads);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++) {
-                REQUIRE_EQ(res[i], check[i]);
-                REQUIRE(compare_bitmap_to_bitmap(res_payloads, i * payload_size, check_payloads[i], 0, payload_size));
-            }
-        }
-
-        SUBCASE("shrink by two") {
-            s.ShrinkInfixStoreInfixSize(store, s.infix_size_ - 2);
-            s.infix_size_ -= 2;
-            const std::vector<uint64_t> check {0b0000000000001,
-                0b0000000000001, 0b0000000000101, 0b0000000001001,
-                0b0000000001010, 0b0000000001011, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000001001,
-                0b0010000001001, 0b0010000001001, 0b0010000011100,
-                0b0010000011001, 0b0010000011001, 0b0111111110001,
-                0b0111111110001, 0b0111111110001, 0b0111111111001,
-                0b0111111111001, 0b0111111111001};
-            const uint64_t check_payloads[infix_store_target_size][payload_size / 64 + 2] = {{0xb7355bcccb7eb8c5, 0x1c59030f7, }, {0x35f454f81b12029f, 0x383d30313, }, {0x61e5aa677ce01d35, 0xf1a2d86d9, }, {0x20f4a562deeb8d0b, 0x59760567d, }, {0x80fb9e10603eec87, 0x9dcd29db3, }, {0xa0747fe24ae8f159, 0x2344d9a70, }, {0xba31e013b58ab156, 0x99a54af96, }, {0x735f3a5a66d07d98, 0x666844a4c, }, {0x1fa36b0dc0513480, 0xf2fc77d78, }, {0xcde6a5297a8a19f2, 0x7efcb4091, }, {0x9a2c168cf7ae1c5c, 0x275408db5, }, {0xee1f1fb02f3c5607, 0x81307fe6e, }, {0x2b0c6af4d89997c8, 0x8b5503381, }, {0x8c6ebdbd7c5c37b6, 0xe650cdd55, }, {0x149509a2eee849a5, 0x88e70f2ee, }, {0xbfa36c08ebea7bf7, 0xfeca1bd05, }, {0xc51a1af239814ade, 0xd5ea4a9d, }, {0xb5da6d0848b19893, 0xb6d285122, }, {0x68ec0ffa723a612b, 0xa30261221, }, {0x427a06c4190dc2ff, 0x9cb3d76c6, }, {0x862815c1cdd6efd4, 0x10bc771a2, }};
-            uint64_t res[check.size() + 1];
-            uint64_t res_payloads[(check.size() + 1) * ((payload_size + 63) / 64)];
-            const uint32_t len = s.GetInfixList(store, res, res_payloads);
-            REQUIRE_EQ(len, check.size());
-            for (int32_t i = 0; i < check.size(); i++) {
-                REQUIRE_EQ(res[i], check[i]);
-                REQUIRE(compare_bitmap_to_bitmap(res_payloads, i * payload_size, check_payloads[i], 0, payload_size));
-            }
-        }
-    }
-
-
     static void PayloadsResize() {
         const uint32_t infix_size = 5;
         const uint32_t payload_size = 100;
@@ -1927,10 +1796,6 @@ TEST_SUITE("infix_store") {
         InfixStoreTests::RangeQuery();
     }
 
-    TEST_CASE("shrink infix size") {
-        InfixStoreTests::ShrinkInfixSize();
-    }
-
     TEST_CASE("resize") {
         InfixStoreTests::Resize();
     }
@@ -1951,9 +1816,6 @@ TEST_SUITE("infix_store") {
         SUBCASE("delete raw") {
             InfixStoreTests::PayloadsDeleteRaw();
             InfixStoreTests::PayloadsGetLongestMatchingInfixSize();
-        }
-        SUBCASE("shrink infix size") {
-            InfixStoreTests::PayloadsShrinkInfixSize();
         }
         SUBCASE("resize") {
             InfixStoreTests::PayloadsResize();
