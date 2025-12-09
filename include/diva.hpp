@@ -13,12 +13,9 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
-#include <mutex>
 #include <random>
 #include <string_view>
 #include <tuple>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <x86intrin.h>
 
@@ -288,7 +285,7 @@ private:
         InfixStore(const uint32_t slot_count, const uint32_t slot_size,
                    const uint32_t size_grade, const uint32_t payload_size=0) {
             SetSizeGrade(size_grade);
-            const uint32_t word_count = GetPtrWordCount(slot_count, slot_size, payload_size);
+            const uint64_t word_count = GetPtrWordCount(slot_count, slot_size, payload_size);
             rwlock.store(0, std::memory_order::memory_order_release);
             ptr = new uint64_t[word_count];
             memset(ptr, 0, sizeof(uint64_t) * word_count);
@@ -312,9 +309,9 @@ private:
             memset(ptr, 0, GetPtrWordCount(slot_count, slot_size, payload_size) * sizeof(uint64_t));
         }
 
-        static uint32_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size, const uint32_t payload_size=0) {
+        static uint64_t GetPtrWordCount(const uint32_t slot_count, const uint32_t slot_size, const uint32_t payload_size=0) {
             if constexpr (payload_type == PayloadType::FixedLength)
-                return 2 + (Diva::infix_store_target_size + slot_count * (slot_size + 1 + payload_size) + 64 + 63) / 64;
+                return 2 + (Diva::infix_store_target_size + static_cast<uint64_t>(slot_count) * (slot_size + 1 + payload_size) + 64 + 63) / 64;
             return 2 + (Diva::infix_store_target_size + slot_count * (slot_size + 1) + 63) / 64;
         }
 
@@ -1053,8 +1050,8 @@ inline void Diva<int_optimized, payload_type>::InsertSimple(const InfiniteByteSt
         next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
     }
 
+    rwlock_lock_write(infix_store_ptr->rwlock);
     InfixStore& infix_store = *infix_store_ptr;
-    rwlock_lock_write(infix_store.rwlock);
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
     if (prev_key == key) {
@@ -1282,8 +1279,8 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
         next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
     }
 
+    rwlock_lock_write(infix_store_ptr->rwlock);
     InfixStore& infix_store = *infix_store_ptr;
-    rwlock_lock_write(infix_store.rwlock);
 
     if (prev_key == key) {
         // Add new sample payload
@@ -1301,14 +1298,14 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     const uint64_t separator = (extraction | 1ULL) - (prev_extraction & (BITMASK(implicit_size) << infix_size_));
 
     const uint32_t infix_list_len = infix_store.GetElemCount();
-    uint64_t infix_list_contents[infix_list_len > heap_alloc_threshold ? 1 : infix_list_len + 1];
-    uint64_t payload_list_contents[infix_list_len > heap_alloc_threshold ? 1 : infix_list_len * payload_size_ / (8 * sizeof(uint64_t)) + 1];
+    uint64_t infix_list_contents[infix_list_len > heap_alloc_threshold ? 1 : (infix_list_len + 1)];
+    uint64_t payload_list_contents[infix_list_len > heap_alloc_threshold ? 1 : (infix_list_len * payload_size_ / 64 + 1)];
     uint64_t *infix_list = infix_list_contents;
     uint64_t *payload_list = payload_list_contents;
     if (infix_list_len > heap_alloc_threshold) {
         infix_list = new uint64_t[infix_list_len + 1];
         if constexpr (payload_type == PayloadType::FixedLength)
-            payload_list = new uint64_t[infix_list_len * payload_size_ / (8 * sizeof(uint64_t)) + 1];
+            payload_list = new uint64_t[infix_list_len * payload_size_ / 64 + 1];
     }
     uint32_t infix_count;
     if constexpr (payload_type == PayloadType::FixedLength)
@@ -1339,7 +1336,7 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     const uint32_t right_half_len = infix_list_len - sep_r + num_partial_matches;
     if (num_partial_matches > 0) {
         infix_list_right_half_ptr = new uint64_t[right_half_len];
-        payload_list_right_half_ptr = new uint64_t[(right_half_len * payload_size_) / 64 + 2];
+        payload_list_right_half_ptr = new uint64_t[right_half_len * payload_size_ / 64 + 2];
         payload_list_right_half_offset = 0;
         uint64_t ind = 0;
         for (uint32_t i = split_pos; i < sep_r; i++) {
@@ -1400,7 +1397,7 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     if (left_list_len > heap_alloc_threshold) {
         left_infix_list = new uint64_t[left_list_len];
         if constexpr (payload_type == PayloadType::FixedLength)
-            left_payload_list = new uint64_t[(left_list_len * payload_size_ + 63) / 64 + 1];
+            left_payload_list = new uint64_t[left_list_len * payload_size_ / 64 + 2];
     }
     if constexpr (payload_type == PayloadType::FixedLength) {
         const uint32_t payload_list_offset = 0;
@@ -1430,7 +1427,7 @@ inline void Diva<int_optimized, payload_type>::InsertSplit(const InfiniteByteStr
     if (right_list_len > heap_alloc_threshold) {
         right_infix_list = new uint64_t[right_list_len];
         if constexpr (payload_type == PayloadType::FixedLength)
-            right_payload_list = new uint64_t[(right_list_len * payload_size_ + 63) / 64 + 1];
+            right_payload_list = new uint64_t[right_list_len * payload_size_ / 64 + 2];
     }
     if constexpr (payload_type == PayloadType::FixedLength) {
         UpdateInfixList(infix_list_right_half_ptr, right_half_len, shamt_gt,
@@ -2104,7 +2101,7 @@ inline uint32_t Diva<int_optimized, payload_type>::DeserializeInfixStore(const c
         offset += sizeof(store.num_sample_payloads);
     }
 
-    const uint32_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_, payload_size_);
+    const uint64_t word_count = store.GetPtrWordCount(scaled_sizes_[store.GetSizeGrade()], infix_size_, payload_size_);
     store.ptr = new uint64_t[word_count];
     memcpy(store.ptr, deser_buf + offset, word_count * sizeof(uint64_t));
     offset += word_count * sizeof(uint64_t);
@@ -2175,8 +2172,8 @@ inline void Diva<int_optimized, payload_type>::Delete(const uint8_t *input_key, 
         next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
     }
 
+    rwlock_lock_write(infix_store_ptr->rwlock);
     InfixStore& infix_store = *infix_store_ptr;
-    rwlock_lock_write(infix_store.rwlock);
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
     if (prev_key == key) {
@@ -4408,7 +4405,7 @@ inline void Diva<int_optimized, payload_type>::ResizeInfixStore(InfixStore &stor
 
     store.SetSizeGrade(size_grade);
     const uint32_t next_size = scaled_sizes_[size_grade];
-    const uint32_t word_count = InfixStore::GetPtrWordCount(next_size, infix_size_, payload_size_);
+    const uint64_t word_count = InfixStore::GetPtrWordCount(next_size, infix_size_, payload_size_);
     uint64_t *new_ptr = new uint64_t[word_count];
     store.ptr = new_ptr;
     if constexpr (payload_type == PayloadType::FixedLength)
@@ -5127,8 +5124,8 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
         next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
     }
 
+    rwlock_lock_write(infix_store_ptr->rwlock);
     InfixStore& infix_store = *infix_store_ptr;
-    rwlock_lock_write(infix_store.rwlock);
     filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
     if (next_to_fetch_ <= prev_key) {
         // Previous key was a partial key and a prefix of the query key
