@@ -54,9 +54,9 @@ static_assert(sizeof(struct wormmeta) == 32, "sizeof(wormmeta) != 32");
 struct wormkv64 { u64 key; void * ptr; }; // u64 keys (whu64)
 
 struct store_sim_hack {
-  u32 status;
-  au8 lock;
+  u64 status;
   u16 num_sample_payloads;
+  au8 lock;
   u64 ptr;
 };
 
