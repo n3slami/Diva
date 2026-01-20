@@ -195,7 +195,7 @@ public:
     public:
         Iterator(Diva<int_optimized, payload_type> *parent):
             filter_(parent) { }
-        ~Iterator();
+        ~Iterator() = default;
 
         Iterator(const Iterator& other);
         Iterator& operator=(const Iterator& other);
@@ -5220,13 +5220,6 @@ template <bool int_optimized, PayloadType payload_type>
 inline typename Diva<int_optimized, payload_type>::Iterator Diva<int_optimized, payload_type>::GetIterator(uint64_t start, uint64_t end,
                                                                             std::function<bool(const uint64_t *)> should_remove) {
     return Iterator(this, start, end, should_remove);
-}
-
-template <bool int_optimized, PayloadType payload_type>
-inline Diva<int_optimized, payload_type>::Iterator::~Iterator() {
-    infixes_.clear();
-    bit_counts_.clear();
-    payloads_.clear();
 }
 
 
