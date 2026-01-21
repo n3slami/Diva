@@ -2264,6 +2264,7 @@ inline bool Diva<int_optimized, payload_type>::CompareInfixes(uint64_t a, uint64
 }
 
 
+static uint32_t delete_merge_cnt = 0;
 template <bool int_optimized, PayloadType payload_type>
 inline void Diva<int_optimized, payload_type>::DeleteMerge(InfiniteByteString key) {
     const bool it_write_lock = true;
@@ -5118,7 +5119,6 @@ inline void Diva<int_optimized, payload_type>::Iterator::FetchDelete() {
     InfixStore& infix_store = *infix_store_ptr;
     filter_->UnlockLeaves(leaves_to_unlock, it_write_lock);
     if (next_to_fetch_ <= prev_key) {
-        // Previous key was a partial key and a prefix of the query key
         if (end_key_.str != nullptr && prev_key > end_key_) {
             rwlock_unlock_write(infix_store.rwlock);
             SetNextToFetch(nullptr, 0);
