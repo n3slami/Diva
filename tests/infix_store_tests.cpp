@@ -3,6 +3,7 @@
  * @author ---
  */
 
+#include <bitset>
 #include <cstddef>
 #include <filesystem>
 #include <random>
@@ -425,9 +426,8 @@ public:
             if (candidate & BITMASK(infix_size))
                 keys.push_back(candidate);
         }
-        std::sort(keys.begin(), keys.end(), [=](uint64_t a, uint64_t b) {
-                    return (a ^ (a & -a)) < (b ^ (b & -b));
-                });
+        std::sort(keys.begin(), keys.end(),
+                [&](uint64_t a, uint64_t b) { return s.CompareInfixes(a, b); });
         s.LoadListToInfixStore(store, keys.data(), keys.size());
 
         SUBCASE("single match, shift left") {
@@ -535,6 +535,1109 @@ public:
         REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b111111111111111), 0);
     }
 
+
+    static void GetInfixList() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Diva<> s(infix_size, seed, load_factor);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                s.size_scalar_shrink_grow_sep);
+
+        const std::vector<uint64_t> keys {0b000000000000001, 0b000000000000101,
+            0b000000000010101, 0b000000000100001, 0b000000000100011,
+            0b000000000100101, 0b001000000100001, 0b001000000100011,
+            0b001000000100101, 0b001000000100110, 0b001000000100110,
+            0b001000000100110, 0b001000001100001, 0b001000001100011,
+            0b001000001100101, 0b001111111000001, 0b001111111000010,
+            0b001111111000010, 0b001111111100001, 0b001111111100010,
+            0b001111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+        uint64_t res[keys.size() + 1];
+        const uint32_t len = s.GetInfixList(store, res);
+        REQUIRE_EQ(len, keys.size());
+        for (int32_t i = 0; i < keys.size(); i++)
+            REQUIRE_EQ(res[i], keys[i]);
+    }
+
+
+    static void LoadInfixList() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Diva<> s(infix_size, seed, load_factor);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
+
+        SUBCASE("fetch") {
+            const std::vector<uint64_t> keys {0b0000000000000001,
+                0b0000000000000101, 0b0000000000010101,
+                0b0000000000100001, 0b0000000000100011,
+                0b0000000000100101, 0b0001000000100001,
+                0b0001000000100011, 0b0001000000100110,
+                0b0001000000100110, 0b0001000000100110,
+                0b0001000000100101, 0b0001000001100001,
+                0b0001000001100011, 0b0001000001100101,
+                0b0001111111000010, 0b0001111111000010,
+                0b0001111111000001,  0b0001111111100010,
+                0b0001111111100010, 0b0001111111100001,
+                0b0111111111000010, 0b0111111111000010,
+                0b0111111111000001,  0b0111111111100010,
+                0b0111111111100010, 0b0111111111100001};
+            s.LoadListToInfixStore(store, keys.data(), keys.size());
+            uint64_t res[keys.size() + 1];
+            const uint32_t len = s.GetInfixList(store, res);
+            REQUIRE_EQ(len, keys.size());
+            for (int32_t i = 0; i < keys.size(); i++)
+                REQUIRE_EQ(res[i], keys[i]);
+        }
+
+        SUBCASE("vs. insert one by one") {
+            const uint32_t n_keys = Diva<>::infix_store_target_size;
+            const uint32_t rng_seed = 1;
+            std::mt19937_64 rng(rng_seed);
+            std::vector<uint64_t> keys;
+            for (int32_t i = 0; i < n_keys; i++)
+                keys.push_back((rng() & BITMASK(Diva<>::base_implicit_size + infix_size)) | 1ULL);
+            std::sort(keys.begin(), keys.end(), 
+                    [&](uint64_t a, uint64_t b) { return s.CompareInfixes(a, b); } );
+            s.LoadListToInfixStore(store, keys.data(), keys.size());
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("load_infix_list");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+    }
+
+
+    static void PointQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Diva<> s(infix_size, seed, load_factor);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep],
+                                 s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
+
+        const std::vector<uint64_t> keys {0b000000000000001,
+            0b000000000000101, 0b000000000010101,
+            0b000000000100001, 0b000000000101000,
+            0b000000000101011, 0b001000000100001,
+            0b001000000100011, 0b001000000100101,
+            0b001000000100110, 0b001000000100110,
+            0b001000000100110, 0b001000001110000,
+            0b001000001100011, 0b001000001100101,
+            0b001111111000001, 0b001111111000011,
+            0b001111111000111, 0b001111111100001,
+            0b001111111100010, 0b001111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+
+        SUBCASE("no false negatives") {
+            for (uint64_t key : keys)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, key), true);
+        }
+
+        SUBCASE("extensions of partial infix") {
+            std::vector<uint64_t> queries;
+            for (uint64_t key : keys)
+                for (uint64_t query_key = key - (key & -key); query_key < (key | (key - 1)); query_key++)
+                    queries.emplace_back(query_key);
+            for (uint64_t query : queries)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, query), true);
+        }
+
+        SUBCASE("negatives") {
+            std::vector<uint64_t> queries;
+            for (uint64_t query_key = 0; query_key < (1ULL << (s.infix_size_ + Diva<>::base_implicit_size)); query_key++) {
+                bool valid = true;
+                for (uint64_t key : keys)
+                    if (key - (key & -key) <= query_key && query_key <= (key | (key - 1))) {
+                        valid = false;
+                        break;
+                    }
+                if (valid)
+                    queries.emplace_back(query_key);
+            }
+            for (uint64_t query : queries)
+                REQUIRE_EQ(s.PointQueryInfixStore(store, query), false);
+        }
+    }
+
+
+    static void RangeQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        Diva<> s(infix_size, seed, load_factor);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep],
+                                 s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
+        
+        const uint32_t n_queries = 100000;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        const std::vector<uint64_t> keys {0b000000000000001,
+            0b000000000000101, 0b000000000010101,
+            0b000000000100001, 0b000000000101000,
+            0b000000000101011, 0b001000000100001,
+            0b001000000100011, 0b001000000100101,
+            0b001000000100110, 0b001000000100110,
+            0b001000000100110, 0b001000001110000,
+            0b001000001100011, 0b001000001100101,
+            0b011111111000001, 0b011111111000011,
+            0b011111111000111, 0b011111111100001,
+            0b011111111100010, 0b011111111100010};
+        for (uint64_t key : keys)
+            s.InsertRawIntoInfixStore(store, key);
+
+        SUBCASE("no false negatives") {
+            std::vector<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Diva<>::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Diva<>::base_implicit_size);
+                if (l > r)
+                    std::swap(l, r);
+
+                bool valid = false;
+                for (uint64_t key : keys) {
+                    const uint64_t key_l = key & (key - 1);
+                    const uint64_t key_r = key | (key - 1);
+                    if (std::max(key_l, l) <= std::min(key_r, r)) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if (valid)
+                    queries.emplace_back(l, r);
+            }
+            for (auto [query_l, query_r] : queries)
+                REQUIRE_EQ(s.RangeQueryInfixStore(store, query_l, query_r), true);
+        }
+
+        SUBCASE("negatives") {
+            std::vector<std::pair<uint64_t, uint64_t>> queries;
+            while (queries.size() < n_queries) {
+                uint64_t l = rng() & BITMASK(s.infix_size_ + Diva<>::base_implicit_size);
+                uint64_t r = rng() & BITMASK(s.infix_size_ + Diva<>::base_implicit_size);
+                if (l > r)
+                    std::swap(l, r);
+
+                bool valid = true;
+                for (uint64_t key : keys) {
+                    const uint64_t key_l = key - (key & -key);
+                    const uint64_t key_r = key | (key - 1);
+                    if (std::max(key_l, l) <= std::min(key_r, r)) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid)
+                    queries.emplace_back(l, r);
+            }
+            for (auto [query_l, query_r] : queries)
+                REQUIRE_EQ(s.RangeQueryInfixStore(store, query_l, query_r), false);
+        }
+    }
+
+
+    static void Resize() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        Diva<> s(infix_size, seed, load_factor);
+        Diva<>::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                 s.size_scalar_shrink_grow_sep);
+        
+        SUBCASE("expand") {
+            const uint32_t n_keys = s.scaled_sizes_[s.size_scalar_shrink_grow_sep] - 1;
+            std::vector<uint64_t> keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                keys.push_back((rng() & BITMASK(Diva<>::base_implicit_size + infix_size)) | 1UL);
+                s.InsertRawIntoInfixStore(store, keys.back());
+                REQUIRE_EQ(store.GetFullSlotCount(), i + 1);
+                uint64_t infix_list[n_keys];
+                REQUIRE_EQ(store.GetFullSlotCount(), s.GetInfixList(store, infix_list));
+                std::sort(keys.begin(), keys.end(),
+                        [&](uint64_t a, uint64_t b) { return s.CompareInfixes(a, b); });
+                for (int32_t j = 0; j < store.GetFullSlotCount(); j++)
+                    REQUIRE_EQ(keys[j], infix_list[j]);
+            }
+            s.ResizeInfixStore(store);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("resize/expand");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+        SUBCASE("contract") {
+            const uint32_t n_keys = s.scaled_sizes_[s.size_scalar_shrink_grow_sep] - 500;
+            for (int32_t i = 0; i < n_keys; i++)
+                s.InsertRawIntoInfixStore(store, (rng() & BITMASK(Diva<>::base_implicit_size + infix_size)) | 1ULL);
+            s.ResizeInfixStore(store);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("resize/contract");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+    }
+
+
+    static void PayloadsSanity() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const uint32_t payload_size = 100;
+        const float load_factor = 0.95;
+
+        SUBCASE("copy bitmap") {
+            uint64_t a[4], b[4];
+            a[0] = 0b0010100111010100110101011010100100101001110101001101010110101001;
+            a[1] = 0b1101000110111111111111111111111111110000000000000000000000000000;
+            a[2] = 0b0000000000000000000000000000011111111111111111111111111111111110;
+            a[3] = 0b0000000010101010101010101100110011001100110011001100110011001100;
+            b[0] = 0b0000000000000000000000000000000000000000000000000000000000000000;
+            b[1] = 0b0000000001110001110001110001110001110001110001110001110001110001;
+            b[2] = 0b0000000000000000000000000000000000000000000000000000000000000000;
+            b[3] = 0b1111111111111111111111111111111111111111111111111111111111111111;
+            copy_bitmap_to_bitmap(a, 10, b, 20, 110);
+            REQUIRE_EQ(b[0], 0b0101001101010110101001001010011101010011010100000000000000000000);
+            REQUIRE_EQ(b[1], 0b1111111111111111111111111100000000000000000000000000000010100111);
+            REQUIRE_EQ(b[2], 0b0000000000000000000000000000000000000000000000000000000000000010);
+            REQUIRE_EQ(b[3], 0b1111111111111111111111111111111111111111111111111111111111111111);
+
+            a[0] = 0b0010111010010011010011101010011101010111111100010100111010010101;
+            a[1] = 0b1001110101110000101010010011000000111010101111111111100101001001;
+            a[2] = 0b0001111111010100111111101010010001100001010100000011010101000010;
+            a[3] = 0b1010111010100011101010111111111100000000000101010101010101010101;
+            b[0] = 0b0000000000000000000000000000000000000000000000000000000000000000;
+            b[1] = 0b0000000001110001110001110001110001110001110001110001110001110001;
+            b[2] = 0b0000000000000000000000000000000000000000000000000000000000000000;
+            b[3] = 0b1111111111111111111111111111111111111111111111111111111111111111;
+            copy_bitmap_to_bitmap(a, 63, b, 125, 77);
+            REQUIRE_EQ(b[0], 0b0000000000000000000000000000000000000000000000000000000000000000);
+            REQUIRE_EQ(b[1], 0b0100000001110001110001110001110001110001110001110001110001110001);
+            REQUIRE_EQ(b[2], 0b1010011101011100001010100100110000001110101011111111111001010010);
+            REQUIRE_EQ(b[3], 0b1111111111111111111111111111111111111111111111111111110101010000);
+        }
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        PayloadDiva::InfixStore store(s.scaled_sizes_[s.size_scalar_shrink_grow_sep], s.infix_size_,
+                                      s.size_scalar_shrink_grow_sep, payload_size);
+        
+        SUBCASE("allocation") {
+            const std::vector<uint32_t> occupieds_pos = {};
+            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
+            const uint64_t check_payloads_contents[1][payload_size / 64 + 2] = {{0xb7355bcccb7eb8c5, 0x1c59030f7, }};
+            const uint64_t *check_payloads[1] = {&(check_payloads_contents[0][0])};
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        for (int32_t i = 0; i < total_slots; i++) {
+            s.SetSlot(store, i, i & BITMASK(s.infix_size_));
+            uint64_t payload[payload_size / 64 + 1];
+            memset(payload, 0, sizeof(payload));
+            const uint32_t set_bit_pos = i % payload_size;
+            payload[set_bit_pos / 64] = 1ULL << (set_bit_pos % 64);
+            s.SetPayload(store, i, payload);
+        }
+
+        SUBCASE("set and get") {
+            for (int32_t i = 0; i < total_slots; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (i & BITMASK(s.infix_size_)));
+                uint64_t expected_payload[payload_size / 64 + 1];
+                memset(expected_payload, 0, sizeof(expected_payload));
+                const uint32_t set_bit_pos = i % payload_size;
+                expected_payload[set_bit_pos / 64] = 1ULL << (set_bit_pos % 64);
+                uint64_t payload[payload_size / 64 + 1];
+                s.GetPayload(store, i, payload);
+                REQUIRE(compare_bitmap_to_bitmap(payload, 0, expected_payload, 0, payload_size));
+            }
+        }
+
+        s.ShiftSlotsRight(store, 10, 55, 5);
+        s.ShiftPayloadsRight(store, 10, 55, 5);
+
+        SUBCASE("shifting right") {
+            for (int32_t i = 0; i < total_slots; i++) {
+                int32_t j = i;
+                bool zero_payload = false;
+                if (10 <= i && i < 15) {
+                    j = 0;
+                    zero_payload = true;
+                }
+                else if (15 <= i && i < 60)
+                    j -= 5;
+                REQUIRE_EQ(s.GetSlot(store, i), (j & BITMASK(s.infix_size_)));
+                uint64_t expected_payload[payload_size / 64 + 1];
+                memset(expected_payload, 0, sizeof(expected_payload));
+                if (!zero_payload) {
+                    const uint32_t set_bit_pos = j % payload_size;
+                    expected_payload[set_bit_pos / 64] = 1ULL << (set_bit_pos % 64);
+                }
+                uint64_t payload[payload_size / 64 + 1];
+                s.GetPayload(store, i, payload);
+                REQUIRE(compare_bitmap_to_bitmap(payload, 0, expected_payload, 0, payload_size));
+            }
+        }
+
+        s.ShiftSlotsLeft(store, 70, 80, 20);
+        s.ShiftPayloadsLeft(store, 70, 80, 20);
+
+        SUBCASE("shifting left") {
+            for (int32_t i = 0; i < total_slots; i++) {
+                int32_t j = i;
+                bool zero_payload = false;
+                if (10 <= i && i < 15) {
+                    j = 0;
+                    zero_payload = true;
+                }
+                else if (15 <= i && i < 50)
+                    j -= 5;
+                else if (50 <= i && i < 60)
+                    j += 20;
+                else if (60 <= i && i < 80) {
+                    j = 0;
+                    zero_payload = true;
+                }
+                REQUIRE_EQ(s.GetSlot(store, i), (j & BITMASK(s.infix_size_)));
+                uint64_t expected_payload[payload_size / 64 + 1];
+                memset(expected_payload, 0, sizeof(expected_payload));
+                if (!zero_payload) {
+                    const uint32_t set_bit_pos = j % payload_size;
+                    expected_payload[set_bit_pos / 64] = 1ULL << (set_bit_pos % 64);
+                }
+                uint64_t payload[payload_size / 64 + 1];
+                s.GetPayload(store, i, payload);
+                REQUIRE(compare_bitmap_to_bitmap(payload, 0, expected_payload, 0, payload_size));
+            }
+        }
+    }
+
+
+    static void PayloadsInsertRaw() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const float load_factor = 0.95;
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+        uint64_t *runends = store.ptr + PayloadDiva::num_metadata_offset_words + PayloadDiva::infix_store_target_size / 64;
+        uint64_t inserts[100], payloads[100][payload_size / 64 + 2];
+        uint64_t read_payload[payload_size / 64 + 2];
+        memset(payloads, 0, sizeof(payloads));
+
+        inserts[0] = 0b0100000000001100;
+        payloads[0][(payload_size - 10) / 64] = rng();
+        inserts[1] = 0b0100000000001011;
+        payloads[1][(payload_size - 10) / 64] = rng();
+        inserts[2] = 0b0100000000001101;
+        payloads[2][(payload_size - 10) / 64] = rng();
+        inserts[3] = 0b0100000000001110;
+        payloads[3][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[0], infix_store_target_size, payloads[0]);
+        s.InsertRawIntoInfixStore(store, inserts[2], infix_store_target_size, payloads[2]);
+        s.InsertRawIntoInfixStore(store, inserts[1], infix_store_target_size, payloads[1]);
+        s.InsertRawIntoInfixStore(store, inserts[3], infix_store_target_size, payloads[3]);
+        SUBCASE("insertion and shifting of a single run") {
+            for (int32_t i = 0; i < 4; i++) {
+                REQUIRE_EQ(s.GetSlot(store, 538 + i), (inserts[i] & BITMASK(infix_size)));
+                s.GetPayload(store, 538 + i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i], 0, payload_size));
+            }
+            for (int32_t i = 538; i < 541; i++)
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            REQUIRE_EQ(get_bitmap_bit(runends, 541), 1);
+        }
+
+        inserts[4] = 0b0011111111100001;
+        payloads[4][(payload_size - 10) / 64] = rng();
+        inserts[5] = 0b0011111111100010;
+        payloads[5][(payload_size - 10) / 64] = rng();
+        inserts[6] = 0b0011111111100100;
+        payloads[6][(payload_size - 10) / 64] = rng();
+        inserts[7] = 0b0011111111100011;
+        payloads[7][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[4], infix_store_target_size, payloads[4]);
+        s.InsertRawIntoInfixStore(store, inserts[5], infix_store_target_size, payloads[5]);
+        s.InsertRawIntoInfixStore(store, inserts[6], infix_store_target_size, payloads[6]);
+        s.InsertRawIntoInfixStore(store, inserts[7], infix_store_target_size, payloads[7]);
+        SUBCASE("insertion and shifting of a new run that shifts an old run") {
+            for (int32_t i = 537; i < 540; i++) { 
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 537 + 4] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 537 + 4], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 540), (inserts[7] & BITMASK(infix_size)));
+            s.GetPayload(store, 540, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[7], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 540), 1);
+            for (int32_t i = 541; i < 544; i++) { 
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 541] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 541], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 544), (inserts[3] & BITMASK(infix_size)));
+            s.GetPayload(store, 544, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[3], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 544), 1);
+        }
+
+        inserts[0] = 0b0000000000000001;
+        payloads[0][(payload_size - 10) / 64] = rng();
+        inserts[1] = 0b0000000000000001;
+        payloads[1][(payload_size - 10) / 64] = rng();
+        inserts[2] = 0b0000000000000010;
+        payloads[2][(payload_size - 10) / 64] = rng();
+        inserts[3] = 0b0000000000000011;
+        payloads[3][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[1], infix_store_target_size, payloads[1]);
+        s.InsertRawIntoInfixStore(store, inserts[3], infix_store_target_size, payloads[3]);
+        s.InsertRawIntoInfixStore(store, inserts[0], infix_store_target_size, payloads[0]);
+        s.InsertRawIntoInfixStore(store, inserts[2], infix_store_target_size, payloads[2]);
+        SUBCASE("insertion and shifting at the very beginning of the array") {
+            for (int32_t i = 0; i < 3; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 3), (inserts[3] & BITMASK(infix_size)));
+            s.GetPayload(store, 3, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[3], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 3), 1);
+        }
+
+        SUBCASE("inserting new runs in between two touching runs: 0 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), 0b00000);
+            s.GetPayload(store, 4, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[99], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 0);
+            REQUIRE_EQ(s.GetSlot(store, 5), 0b00000);
+            s.GetPayload(store, 5, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[99], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 0);
+        }
+
+        inserts[5] = 0b0000000001111111;
+        payloads[5][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[5], infix_store_target_size, payloads[5]);
+        SUBCASE("inserting new runs in between two touching runs: 1 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), (inserts[5] & BITMASK(infix_size)));
+            s.GetPayload(store, 4, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[5], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 1);
+            REQUIRE_EQ(s.GetSlot(store, 5), 0b00000);
+            s.GetPayload(store, 5, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[99], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 0);
+        }
+
+        inserts[4] = 0b0000000000110101;
+        payloads[4][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[4], infix_store_target_size, payloads[4]);
+        SUBCASE("inserting new runs in between two touching runs: 2 slots added") {
+            REQUIRE_EQ(s.GetSlot(store, 4), (inserts[4] & BITMASK(infix_size)));
+            s.GetPayload(store, 4, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[4], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 4), 1);
+            REQUIRE_EQ(s.GetSlot(store, 5), (inserts[5] & BITMASK(infix_size)));
+            s.GetPayload(store, 5, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[5], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 5), 1);
+        }
+
+        inserts[0] = 0b0111111110100001;
+        payloads[0][(payload_size - 10) / 64] = rng();
+        inserts[1] = 0b0111111110100010;
+        payloads[1][(payload_size - 10) / 64] = rng();
+        inserts[2] = 0b0111111110100011;
+        payloads[2][(payload_size - 10) / 64] = rng();
+        inserts[3] = 0b0111111110100111;
+        payloads[3][(payload_size - 10) / 64] = rng();
+        inserts[4] = 0b0111111111100001;
+        payloads[4][(payload_size - 10) / 64] = rng();
+        inserts[5] = 0b0111111111100001;
+        payloads[5][(payload_size - 10) / 64] = rng();
+        inserts[6] = 0b0111111111100010;
+        payloads[6][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[0], infix_store_target_size, payloads[0]);
+        s.InsertRawIntoInfixStore(store, inserts[5], infix_store_target_size, payloads[5]);
+        s.InsertRawIntoInfixStore(store, inserts[4], infix_store_target_size, payloads[4]);
+        s.InsertRawIntoInfixStore(store, inserts[1], infix_store_target_size, payloads[1]);
+        s.InsertRawIntoInfixStore(store, inserts[6], infix_store_target_size, payloads[6]);
+        s.InsertRawIntoInfixStore(store, inserts[2], infix_store_target_size, payloads[2]);
+        s.InsertRawIntoInfixStore(store, inserts[3], infix_store_target_size, payloads[3]);
+        SUBCASE("insertion and shifting at the very end of the array") {
+            for (int32_t i = 1070; i < 1073; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 1070] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 1070], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 1073), (inserts[3] & BITMASK(infix_size)));
+            s.GetPayload(store, 1073, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[3], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 1073), 1);
+            for (int32_t i = 1074; i < 1076; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 1074 + 4] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 1074 + 4], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 1076), (inserts[6] & BITMASK(infix_size)));
+            s.GetPayload(store, 1076, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[6], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 1076), 1);
+        }
+
+        inserts[7] = 0b0111111111011101;
+        payloads[7][(payload_size - 10) / 64] = rng();
+        inserts[8] = 0b0111111111011110;
+        payloads[8][(payload_size - 10) / 64] = rng();
+        inserts[9] = 0b0111111111011111;
+        payloads[9][(payload_size - 10) / 64] = rng();
+        s.InsertRawIntoInfixStore(store, inserts[9], infix_store_target_size, payloads[9]);
+        s.InsertRawIntoInfixStore(store, inserts[7], infix_store_target_size, payloads[7]);
+        s.InsertRawIntoInfixStore(store, inserts[8], infix_store_target_size, payloads[8]);
+        SUBCASE("insertion and shifting in between touching runs at the very end of the array") {
+            for (int32_t i = 1067; i < 1070; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 1067] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 1067], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 1070), (inserts[3] & BITMASK(infix_size)));
+            s.GetPayload(store, 1070, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[3], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 1070), 1);
+            for (int32_t i = 1071; i < 1073; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 1071 + 7] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 1071 + 7], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 1073), (inserts[9] & BITMASK(infix_size)));
+            s.GetPayload(store, 1073, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[9], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 1073), 1);
+            for (int32_t i = 1074; i < 1076; i++) {
+                REQUIRE_EQ(s.GetSlot(store, i), (inserts[i - 1074 + 4] & BITMASK(infix_size)));
+                s.GetPayload(store, i, read_payload);
+                REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[i - 1074 + 4], 0, payload_size));
+                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
+            }
+            REQUIRE_EQ(s.GetSlot(store, 1076), (inserts[6] & BITMASK(infix_size)));
+            s.GetPayload(store, 1076, read_payload);
+            REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, payloads[6], 0, payload_size));
+            REQUIRE_EQ(get_bitmap_bit(runends, 1076), 1);
+        }
+    }
+
+
+    static void PayloadsGetInfixList() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const float load_factor = 0.95;
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+
+        const std::vector<uint64_t> keys {0b000000000000001,
+            0b000000000000101, 0b000000000010101,
+            0b000000000100001, 0b000000000100011,
+            0b000000000100101, 0b001000000100001,
+            0b001000000100011, 0b001000000100101,
+            0b001000000100110, 0b001000000100110,
+            0b001000000100110, 0b001000001100001,
+            0b001000001100011, 0b001000001100101,
+            0b001111111000001, 0b001111111000010,
+            0b001111111000010, 0b001111111100001,
+            0b001111111100010, 0b001111111100010};
+        uint64_t payloads[keys.size() + 1][payload_size / 64 + 2];
+        for (uint32_t i = 0; i < keys.size(); i++) {
+            for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
+                payloads[i][j] = rng();
+        }
+        SUBCASE("get infix list") {
+            for (uint32_t i = 0; i < keys.size(); i++) {
+                const uint64_t key = keys[i];
+                s.InsertRawIntoInfixStore(store, key, infix_store_target_size, payloads[i]);
+            }
+
+            // Adjust the payloads with the same infixes that have to be reversed
+            int32_t adjust_l = 0;
+            for (int32_t i = 1; i < keys.size(); i++) {
+                if (keys[i] != keys[i - 1]) {
+                    for (int32_t j = 0; j < (i - adjust_l) / 2; j++)
+                        for (int32_t k = 0; k < payload_size / 64 + 2; k++)
+                            std::swap(payloads[adjust_l + j][k], payloads[i - j - 1][k]);
+                    adjust_l = i;
+                }
+            }
+            if (adjust_l < keys.size() - 1) {
+                for (int32_t j = 0; j < (keys.size() - adjust_l) / 2; j++)
+                    for (int32_t k = 0; k < payload_size / 64 + 2; k++)
+                        std::swap(payloads[adjust_l + j][k], payloads[keys.size() - j - 1][k]);
+            }
+
+            uint64_t res[keys.size() + 1], read_payloads[(keys.size() * payload_size + 63) / 64];
+            const uint32_t len = s.GetInfixList(store, res, read_payloads);
+            REQUIRE_EQ(len, keys.size());
+            for (int32_t i = 0; i < keys.size(); i++) {
+                REQUIRE_EQ(res[i], keys[i]);
+                REQUIRE(compare_bitmap_to_bitmap(read_payloads, payload_size * i, payloads[i], 0, payload_size));
+            }
+        }
+    }
+
+
+    static void PayloadsLoadInfixList() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const float load_factor = 0.95;
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+
+        uint64_t payloads[(infix_store_target_size + 1) * (payload_size / 64 + 2)];
+        for (uint32_t i = 0; i < (infix_store_target_size + 1) * (payload_size / 64 + 2); i++)
+            payloads[i] = rng();
+
+        SUBCASE("fetch") {
+            const std::vector<uint64_t> keys {0b0000000000000001,
+                0b0000000000000101, 0b0000000000010101,
+                0b0000000000100001, 0b0000000000100011,
+                0b0000000000100101, 0b0001000000100001,
+                0b0001000000100011, 0b0001000000100110,
+                0b0001000000100110, 0b0001000000100110,
+                0b0001000000100101, 0b0001000001100001,
+                0b0001000001100011, 0b0001000001100101,
+                0b0001111111000010, 0b0001111111000010,
+                0b0001111111000001, 0b0001111111100010,
+                0b0001111111100010, 0b0001111111100001,
+                0b0111111111000010, 0b0111111111000010,
+                0b0111111111000001, 0b0111111111100010,
+                0b0111111111100010, 0b0111111111100001};
+            s.LoadListToInfixStore(store, keys.data(), keys.size(), infix_store_target_size, true, payloads);
+            uint64_t res[keys.size() + 1], read_payloads[(keys.size() * payload_size + 63) / 64];
+            const uint32_t len = s.GetInfixList(store, res, read_payloads);
+            REQUIRE_EQ(len, keys.size());
+            for (int32_t i = 0; i < keys.size(); i++) {
+                REQUIRE_EQ(res[i], keys[i]);
+                REQUIRE(compare_bitmap_to_bitmap(read_payloads, payload_size * i, payloads, payload_size * i, payload_size));
+            }
+        }
+
+        SUBCASE("vs. insert one by one") {
+            const uint32_t n_keys = infix_store_target_size;
+            const uint32_t rng_seed = 1;
+            std::mt19937_64 rng(rng_seed);
+            std::vector<uint64_t> keys;
+            for (int32_t i = 0; i < n_keys; i++) {
+                keys.push_back((rng() & BITMASK(PayloadDiva::base_implicit_size + infix_size)) | 1ULL);
+
+                uint64_t tmp_payload[payload_size / 64 + 2];
+                copy_bitmap_to_bitmap(payloads, payload_size * i, tmp_payload, 0, payload_size);
+                s.InsertRawIntoInfixStore(store, keys[keys.size() - 1], infix_store_target_size, tmp_payload);
+            }
+            std::sort(keys.begin(), keys.end(),
+                    [&](uint64_t a, uint64_t b) { return s.CompareInfixes(a, b); });
+            s.LoadListToInfixStore(store, keys.data(), keys.size(), infix_store_target_size, true, payloads);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/load_infix_list");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/load_infix_list", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+    }
+
+
+    static void PayloadsDeleteRaw() {
+        const uint32_t infix_size = 5;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        std::vector<uint64_t> keys {0b000000010011000,
+            0b000000010010100, 0b000000010010110,
+            0b000000010010101, 0b000000010011111,
+            0b000000010110101, 0b000000010110111,
+            0b000000010111001, 0b000000011111011,
+            0b000000100011011, 0b000000100011111,
+            0b000000111100001, 0b000000111100011,
+            0b000000111100111, 0b111111010000001,
+            0b111111101100101, 0b111111101100111,
+            0b111111110011111, 0b111111110110101,
+            0b111111111011000, 0b111111111010100,
+            0b111111111010110, 0b111111111010101,
+            0b111111111011111, 0b111111111100001,
+            0b111111111100011};
+        while (keys.size() < infix_store_target_size) {
+            const uint64_t candidate = rng() & BITMASK(Diva<>::base_implicit_size + infix_size);
+            if (candidate & BITMASK(infix_size))
+                keys.push_back(candidate);
+        }
+        std::sort(keys.begin(), keys.end(), 
+                [&](uint64_t a, uint64_t b) { return s.CompareInfixes(a, b); });
+
+        uint64_t payloads[(keys.size() + 1) * (payload_size / 64 + 2)];
+        for (uint32_t i = 0; i < (keys.size() + 1) * (payload_size / 64 + 2); i++)
+            payloads[i] = rng();
+
+        s.LoadListToInfixStore(store, keys.data(), keys.size(), infix_store_target_size, true, payloads);
+
+        SUBCASE("single match, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b000000010011111);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/delete/single_match/shift_left");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/delete/single_match/shift_left", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+
+        SUBCASE("choose from multiple matches, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b000000010010101, infix_store_target_size, 
+                    [](const uint64_t *payload) { return payload[0] == 0xb45c4694c48e921f; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/multiple_matches/shift_left/1");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/multiple_matches/shift_left/1", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+
+            s.DeleteRawFromInfixStore(store, 0b000000010010101);
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/multiple_matches/shift_left/2");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/multiple_matches/shift_left/2", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+        }
+
+        SUBCASE("destroy run, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b00000011111011, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0x10c8fd5b4b0459bc; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/destroy_run/shift_left/1");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/destroy_run/shift_left/1", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+            s.DeleteRawFromInfixStore(store, 0b00000011111011, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0x19b28ae9e8437575; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/destroy_run/shift_left/2");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/destroy_run/shift_left/2", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+        }
+
+        SUBCASE("end of run, shift left") {
+            s.DeleteRawFromInfixStore(store, 0b000000010011111, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0xfb9c2e1f14d77d65; });
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/delete/end_of_run/shift_left");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/delete/end_of_run/shift_left", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+
+        SUBCASE("single match, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b111111111011111, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0xbfe6180250364ecf; });
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/delete/single_match/shift_right");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/delete/single_match/shift_right", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+
+        SUBCASE("multiple matches, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b111111111010101, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0x5a53fa59c2975c9; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/multiple_matches/shift_right/1");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/multiple_matches/shift_right/1", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+            s.DeleteRawFromInfixStore(store, 0b111111111010101);
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/multiple_matches/shift_right/2");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/multiple_matches/shift_right/2", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+        }
+
+        SUBCASE("destroy run, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b111111110110101, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0xb71307c72019bed6; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/destroy_run/shift_right/1");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/destroy_run/shift_right/1", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+            s.DeleteRawFromInfixStore(store, 0b111111110110101, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0xa9822db95c22d90e; });
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("payloads/delete/destroy_run/shift_right/2");
+                uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+                uint64_t *check_payloads[infix_store_target_size + 100];
+                for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                    check_payloads[i] = &(check_payloads_contents[i][0]);
+                ReadStorePayloadsFromFile("payloads/delete/destroy_run/shift_right/2", payload_size, check_payloads);
+                AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+            }
+        }
+
+        SUBCASE("end of run, shift right") {
+            s.DeleteRawFromInfixStore(store, 0b111111111100011, infix_store_target_size, 
+                                      [](const uint64_t *payload) { return payload[0] == 0xa84843ffeafb62b2; });
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/delete/end_of_run/shift_right");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/delete/end_of_run/shift_right", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+
+        uint64_t lone_payload[payload_size / 64 + 2];
+        for (uint32_t i = 0; i < payload_size / 64 + 2; i++)
+            lone_payload[i] = rng();
+        s.InsertRawIntoInfixStore(store, 0b010000000010101, infix_store_target_size, lone_payload);
+        SUBCASE("lone run with single slot") {
+            s.DeleteRawFromInfixStore(store, 0b010000000010101, infix_store_target_size, 
+                                      [=](const uint64_t *payload) { return payload[0] == lone_payload[0]; });
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/delete/lone_run_with_single_slot");
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[infix_store_target_size + 100];
+            for (uint32_t i = 0; i < infix_store_target_size + 100; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/delete/lone_run_with_single_slot", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+    }
+
+
+    static void PayloadsGetLongestMatchingInfixSize() {
+        const uint32_t infix_size = 5;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+
+        const uint32_t rng_seed = 20;
+        std::mt19937_64 rng(rng_seed);
+
+        const std::vector<uint64_t> keys {0b000000010011000,
+            0b000000010010100, 0b000000010010110,
+            0b000000010010101, 0b000000010011111,
+            0b000000010110101, 0b000000010110111,
+            0b000000010111001, 0b000000011111011,
+            0b000000100011011, 0b000000100011111,
+            0b000000111100001, 0b000000111100011,
+            0b000000111100111, 0b000100111110000,
+            0b000100111110010, 0b000100111110011,
+            0b111111010000001, 0b111111101100101,
+            0b111111101100111, 0b111111110011111,
+            0b111111110110101, 0b111111111011000,
+            0b111111111010100, 0b111111111010110,
+            0b111111111010101, 0b111111111011111,
+            0b111111111100001, 0b111111111100011};
+        uint64_t payloads[(keys.size() + 1) * (payload_size / 64 + 2)];
+        for (uint32_t i = 0; i < (keys.size() + 1) * (payload_size / 64 + 2); i++)
+            payloads[i] = rng();
+
+        s.LoadListToInfixStore(store, keys.data(), keys.size(), infix_store_target_size, true, payloads);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                    [] (const uint64_t *payload) { return true; }),
+                infix_size);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x8edaa78f2fc77d78; }),
+                infix_size);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x513480a1777ab79; }),
+                infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110011, infix_store_target_size,
+                    [] (const uint64_t *payload) { return false; }),
+                0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return true; }),
+                infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x513480a1777ab79; }),
+                infix_size - 1);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111110001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return false; }),
+                0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return true; }),
+                infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return payload[0] == 0x88158666844a4c73; }),
+                infix_size - 4);
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b000100111100001, infix_store_target_size,
+                    [] (const uint64_t *payload) { return false; }),
+                0);
+
+        REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b111111111111111, infix_store_target_size,
+                    [] (const uint64_t *payload) { return true; }),
+                0);
+    }
+
+
+    static void PayloadsResize() {
+        const uint32_t infix_size = 5;
+        const uint32_t payload_size = 100;
+        const uint32_t infix_store_target_size = PayloadDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        
+        PayloadDiva s(infix_size, seed, load_factor, payload_size);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        PayloadDiva::InfixStore store(total_slots, s.infix_size_, s.size_scalar_shrink_grow_sep, payload_size);
+
+        SUBCASE("expand") {
+            const uint32_t n_keys = s.scaled_sizes_[s.size_scalar_shrink_grow_sep] - 1;
+            for (int32_t i = 0; i < n_keys; i++) {
+                uint64_t payload[payload_size / 64 + 2];
+                for (uint32_t i = 0; i < payload_size / 64 + 2; i++)
+                    payload[i] = rng();
+                s.InsertRawIntoInfixStore(store, (rng() & BITMASK(Diva<>::base_implicit_size + infix_size)) | 1ULL,
+                                          infix_store_target_size, payload);
+            }
+            s.ResizeInfixStore(store);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/resize/expand");
+            const uint32_t payload_count = 2 * infix_store_target_size;
+            uint64_t check_payloads_contents[payload_count][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[payload_count];
+            for (uint32_t i = 0; i < payload_count; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/resize/expand", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+        SUBCASE("contract") {
+            const uint32_t n_keys = s.scaled_sizes_[s.size_scalar_shrink_grow_sep] - 500;
+            for (int32_t i = 0; i < n_keys; i++) {
+                uint64_t payload[payload_size / 64 + 2];
+                for (uint32_t i = 0; i < payload_size / 64 + 2; i++)
+                    payload[i] = rng();
+                s.InsertRawIntoInfixStore(store, (rng() & BITMASK(Diva<>::base_implicit_size + infix_size)) | 1ULL,
+                                          infix_store_target_size, payload);
+            }
+            s.ResizeInfixStore(store);
+
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("payloads/resize/contract");
+            const uint32_t payload_count = infix_store_target_size + 100;
+            uint64_t check_payloads_contents[infix_store_target_size + 100][payload_size / 64 + 2] = {};
+            uint64_t *check_payloads[payload_count];
+            for (uint32_t i = 0; i < payload_count; i++)
+                check_payloads[i] = &(check_payloads_contents[i][0]);
+            ReadStorePayloadsFromFile("payloads/resize/contract", payload_size, check_payloads);
+            AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
+        }
+    }
+
     static void BinaryTrieLoadInfixList() {
         const uint32_t N = 600;
         const uint32_t key_start_bit = 0;
@@ -588,7 +1691,9 @@ public:
 private:
     static void WriteStoreContentsToFile(std::string path,
                                          const std::vector<uint32_t> &occupieds_pos, 
-                                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks) {
+                                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks,
+                                         const uint64_t * const *payloads = nullptr,
+                                         uint32_t payload_size = 0) {
         const std::string path_prefix = "./tests/data/infix_store/";
         path = path_prefix + path;
         std::ofstream fout;
@@ -602,6 +1707,14 @@ private:
         fout.write(reinterpret_cast<const char *>(checks.data()),
                 checks.size() * sizeof(checks[0]));
         fout.close();
+
+        if (payloads != nullptr) {
+            fout.open(path + "/payloads", std::ios::out | std::ios::binary);
+            const uint32_t payload_size_bytes = sizeof(uint64_t) * ((payload_size + 63) / 64);
+            for (int32_t i = 0; i < checks.size(); i++)
+                fout.write(reinterpret_cast<const char *>(payloads[i]), payload_size_bytes);
+            fout.close();
+        }
     }
 
     static std::pair<std::vector<uint32_t>, std::vector<std::tuple<uint32_t, bool, uint64_t>>>
@@ -631,21 +1744,37 @@ private:
         return {std::move(occupieds_pos), std::move(checks)};
     }
 
+    static void ReadStorePayloadsFromFile(std::string path,
+                                          uint32_t payload_size,
+                                          uint64_t **out) {
+        const std::string path_prefix = "./tests/data/infix_store/";
+        path = path_prefix + path;
+        std::ifstream fin;
+
+        const std::string payloads_path = path + "/payloads";
+        const uint32_t payloads_n_bytes = std::filesystem::file_size(payloads_path);
+        const uint32_t payload_size_bytes = sizeof(uint64_t) * ((payload_size + 63) / 64);
+        fin.open(payloads_path, std::ios::in | std::ios::binary);
+        for (int32_t i = 0; i < payloads_n_bytes / payload_size_bytes; i++)
+            fin.read(reinterpret_cast<char *>(out[i]), payload_size_bytes);
+        fin.close();
+    }
+
     template <DivaType diva_type, PayloadType payload_type>
     static void AssertStoreContents(const Diva<diva_type, payload_type> &s,
                                     const typename Diva<diva_type, payload_type>::InfixStore &store,
                                     const std::vector<uint32_t> &occupieds_pos,
                                     const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks,
-                                    const uint64_t **check_payloads = nullptr) {
+                                    const uint64_t * const *check_payloads = nullptr) {
         REQUIRE_NE(store.ptr, nullptr);
         if constexpr (diva_type != DivaType::BinaryTrie)
             REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
         if constexpr (payload_type == PayloadType::FixedLength)
             assert(check_payloads != nullptr);
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-        const uint64_t *occupieds = store.ptr + Diva<>::num_metadata_offset_words;
-        const uint64_t *runends = store.ptr + Diva<>::num_metadata_offset_words +
-            Diva<>::infix_store_target_size / 64;
+        const uint64_t *occupieds = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words
+                                    + Diva<>::infix_store_target_size / 64;
         uint32_t ind = 0;
         for (uint32_t i = 0; i < Diva<>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
@@ -699,9 +1828,9 @@ private:
                            const typename Diva<diva_type, payload_type>::InfixStore &store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-        const uint64_t *occupieds = store.ptr + Diva<>::num_metadata_offset_words;
-        const uint64_t *runends = store.ptr + Diva<>::num_metadata_offset_words +
-            Diva<>::infix_store_target_size / 64;
+        const uint64_t *occupieds = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words
+                                  + Diva<>::infix_store_target_size / 64;
 
         std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
         std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetFullSlotCount() << std::endl;
@@ -755,100 +1884,106 @@ private:
 };
 
 TEST_SUITE("infix_store") {
-  TEST_CASE("allocation") {
-      InfixStoreTests::Allocation(); 
-  }
+    TEST_CASE("allocation") {
+        InfixStoreTests::Allocation(); 
+    }
 
-  TEST_CASE("shifting slots") {
-      InfixStoreTests::ShiftingSlots(); 
-  }
+    TEST_CASE("shifting slots") {
+        InfixStoreTests::ShiftingSlots(); 
+    }
 
-  TEST_CASE("shifting runends") {
-      InfixStoreTests::ShiftingRunends(); 
-  }
+    TEST_CASE("shifting runends") {
+        InfixStoreTests::ShiftingRunends(); 
+    }
 
-  TEST_CASE("insert") {
-      InfixStoreTests::InsertRaw(); 
-  }
+    TEST_CASE("insert") {
+        InfixStoreTests::InsertRaw(); 
+    }
 
-  TEST_CASE("delete") {
-    SUBCASE("delete raw") {
-        InfixStoreTests::DeleteRaw(); 
+    TEST_CASE("delete") {
+        SUBCASE("delete raw") {
+            InfixStoreTests::DeleteRaw(); 
+        }
+        SUBCASE("get longest matching infix size") {
+            InfixStoreTests::GetLongestMatchingInfixSize();
+        }
     }
-    SUBCASE("get longest matching infix size") {
-      InfixStoreTests::GetLongestMatchingInfixSize();
-    }
-  }
 
-  TEST_CASE("get infix list") {
-    // InfixStoreTests::GetInfixList();
-  }
+    TEST_CASE("get infix list") {
+        InfixStoreTests::GetInfixList();
+    }
 
-  TEST_CASE("load infix list") {
-    // InfixStoreTests::LoadInfixList();
-  }
+    TEST_CASE("load infix list") {
+        InfixStoreTests::LoadInfixList();
+    }
 
-  TEST_CASE("point query") {
-    // InfixStoreTests::PointQuery();
-  }
+    TEST_CASE("point query") {
+        InfixStoreTests::PointQuery();
+    }
 
-  TEST_CASE("range query") {
-    // InfixStoreTests::RangeQuery();
-  }
+    TEST_CASE("range query") {
+        InfixStoreTests::RangeQuery();
+    }
 
-  TEST_CASE("resize") {
-    // InfixStoreTests::Resize();
-  }
+    TEST_CASE("resize") {
+        InfixStoreTests::Resize();
+    }
 
-  TEST_CASE("payloads") {
-    SUBCASE("sanity") {
-      // InfixStoreTests::PayloadsSanity();
+    TEST_CASE("payloads") {
+        SUBCASE("sanity") {
+            InfixStoreTests::PayloadsSanity();
+        }
+        SUBCASE("insert raw") {
+            InfixStoreTests::PayloadsInsertRaw();
+        }
+        SUBCASE("get infix list") {
+            InfixStoreTests::PayloadsGetInfixList();
+        }
+        SUBCASE("load infix list") {
+            InfixStoreTests::PayloadsLoadInfixList();
+        }
+        SUBCASE("delete raw") {
+            InfixStoreTests::PayloadsDeleteRaw();
+            InfixStoreTests::PayloadsGetLongestMatchingInfixSize();
+        }
+        SUBCASE("resize") {
+            InfixStoreTests::PayloadsResize();
+        }
     }
-    SUBCASE("insert raw") {
-      // InfixStoreTests::PayloadsInsertRaw();
-    }
-    SUBCASE("get infix list") {
-      // InfixStoreTests::PayloadsGetInfixList();
-    }
-    SUBCASE("load infix list") {
-      // InfixStoreTests::PayloadsLoadInfixList();
-    }
-    SUBCASE("delete raw") {
-      // InfixStoreTests::PayloadsDeleteRaw();
-      // InfixStoreTests::PayloadsGetLongestMatchingInfixSize();
-    }
-    SUBCASE("resize") {
-      // InfixStoreTests::PayloadsResize();
-    }
-  }
 
-  TEST_CASE("binary trie") {
-    SUBCASE("load infix list") {
-        InfixStoreTests::BinaryTrieLoadInfixList(); 
+    TEST_CASE("binary trie") {
+        SUBCASE("load infix list") {
+            InfixStoreTests::BinaryTrieLoadInfixList(); 
+        }
+        SUBCASE("get infix list") {
+            // InfixStoreTests::BinaryTrieGetInfixList();
+        }
+        SUBCASE("resize") {
+            // InfixStoreTests::BinaryTrieResize();
+        }
+        SUBCASE("insert raw") {
+            // InfixStoreTests::BinaryTrieInsertRaw();
+        }
+        SUBCASE("point query") {
+            // InfixStoreTests::BinaryTriePointQuery();
+        }
+        SUBCASE("range query") {
+            // InfixStoreTests::BinaryTrieRangeQuery();
+        }
+        SUBCASE("delete raw") {
+            // InfixStoreTests::BinaryTrieDeleteRaw();
+            // InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
+        }
+        SUBCASE("adapt") {
+            // InfixStoreTests::BinaryTrieAdapt();
+        }
     }
-    SUBCASE("get infix list") {
-      // InfixStoreTests::BinaryTrieGetInfixList();
-    }
-    SUBCASE("resize") {
-      // InfixStoreTests::BinaryTrieResize();
-    }
-    SUBCASE("insert raw") {
-      // InfixStoreTests::BinaryTrieInsertRaw();
-    }
-    SUBCASE("point query") {
-      // InfixStoreTests::BinaryTriePointQuery();
-    }
-    SUBCASE("range query") {
-      // InfixStoreTests::BinaryTrieRangeQuery();
-    }
-    SUBCASE("delete raw") {
-      // InfixStoreTests::BinaryTrieDeleteRaw();
-      // InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
-    }
-    SUBCASE("adapt") {
-      // InfixStoreTests::BinaryTrieAdapt();
-    }
-  }
 }
 
 } // namespace diva
+
+//PrintStore(s, store);
+//std::vector<uint32_t> occupieds_pos = {};
+//std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {};
+//WriteStoreContentsToFile("delete/lone_run_with_single_slot", occupieds_pos, checks);
+//std::cerr << "WEEEEEEEEELP" << std::endl;
