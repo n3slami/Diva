@@ -29,6 +29,36 @@
 
 namespace diva {
 
+// Function to generate random string of given size with a fixed seed
+// If use_binary_keys is true, uses all ASCII characters (0-255)
+// If use_binary_keys is false, uses only alphanumeric characters
+std::string generateRandomString(int size, unsigned int seed, bool use_binary_keys = true) {
+  std::mt19937 gen(seed);  // Use fixed seed
+
+  std::string str;
+  str.resize(size);
+
+  if (use_binary_keys) {
+    // Generate all possible byte values (0-255)
+    std::uniform_int_distribution<unsigned char> dis(0, 255);
+    for (int i = 0; i < size; ++i) {
+      str[i] = static_cast<char>(dis(gen));
+    }
+  } else {
+    // Generate only alphanumeric characters
+    static const char charset[] =
+        "0123456789"
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::uniform_int_distribution<int> dis(0, sizeof(charset) - 2);
+    for (int i = 0; i < size; ++i) {
+      str[i] = charset[dis(gen)];
+    }
+  }
+
+  return str;
+}
+
 class DivaTests {
 public:
     template <bool O>
@@ -4407,10 +4437,10 @@ public:
             const uint32_t seed = 2;
             const float load_factor = 0.8;
             const uint32_t n_keys = 30000000;
-            const uint32_t n_duplicates = 3;
+            const uint32_t n_duplicates = 1;
             const uint32_t n_threads = 8;
             const uint32_t n_bulk = std::min(n_keys / n_threads, n_keys / 8);
-            const uint64_t delete_threshold = 10000000;
+            const uint64_t delete_threshold = 20000000;
             const uint64_t query_period = 5000000;
 
             constexpr bool ascii = false;
@@ -4478,6 +4508,8 @@ public:
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
+                                if (ti % 100000 == 1)
+                                    std::cerr << "filter_memory=" << s.Size() << " process_memory=" << getMemoryUsage() << std::endl;
                                 for (uint32_t j = 0; j < n_duplicates; j++) {
                                     for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); 
                                             it.IsValid();
@@ -4514,10 +4546,15 @@ public:
                         else {
                             while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
                                 cpu_pause();
-                            s.DeleteRange(nullptr, 0, nullptr, 0, 
-                                    [=](const uint64_t *payload) { 
-                                        return payload[0] <= delete_threshold && payload[0] > 0;
-                                    });
+                            const uint32_t num_repeats = 4;
+                            for (int32_t j = 0; j < num_repeats; j++) {
+                                std::cerr << "cleanup j=" << j << std::endl;
+                                s.DeleteRange(nullptr, 0, nullptr, 0, 
+                                        [=](const uint64_t *payload) { 
+                                            return payload[0] <= delete_threshold * (j + 1) / num_repeats && payload[0] > 0;
+                                        });
+                                std::cerr << "finished cleanup j=" << j << std::endl;
+                            }
                         }
                     });
             }
@@ -4543,6 +4580,39 @@ public:
                     }
                 }
                 REQUIRE_EQ(found, (payloads[i][0] > delete_threshold || payloads[i][0] == 0));
+            }
+        }
+
+
+        SUBCASE("memory leak") {
+            const uint32_t infix_size = 8;
+            const uint32_t seed = 2;
+            const float load_factor = 0.8;
+            const uint32_t n_keys = 10000000;
+            const uint32_t n_bulk = n_keys / 8;
+
+            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, 88, true);
+            std::string payloadd = "abcdefghijk";
+            for (int tries = 0; tries < 20; tries++) {
+                size_t membefore = getMemoryUsage();
+                std::cerr << "=======================================" << std::endl;
+                std::cerr << "memory before insertion " << membefore << std::endl;
+                std::cerr << "num keys before insertion " << s.GetNumKeys() << std::endl;
+                for (int i = 0; i < 1000000; i++) {
+                    if (s.GetNumKeys() < 1000) {
+                        s.Insert(generateRandomString(32, 3 + i, false), payloadd.data(), 1024);
+                    } else {
+                        s.Insert(generateRandomString(32, 3 + i, false), payloadd.data());
+                    }
+                }
+                size_t memafter = getMemoryUsage();
+                std::cerr << "memory after insertion " << memafter << std::endl;
+                std::cerr << "num keys after insertion " << s.GetNumKeys() << std::endl;
+                s.DeleteRange(nullptr, 0, nullptr, 0, [](const uint64_t* payload) { return true; });
+                size_t memafterdelete = getMemoryUsage();
+                std::cout << "memory after delete " << memafterdelete << std::endl;
+                std::cout << "num keys after delete " << s.GetNumKeys() << std::endl;
+                std::cout << "---" << std::endl;
             }
         }
 

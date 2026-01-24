@@ -5,7 +5,10 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <immintrin.h>
+#include <iostream>
+#include <sstream>
 
 #define MAX_VALUE(nbits) ((1ULL << (nbits)) - 1)
 #define BITMASK(nbits)                                    \
@@ -470,4 +473,24 @@ inline void rwlock_unlock_write(std::atomic<lock_t>& lock) {
     lock.fetch_sub(rwlock_write_bit, std::memory_order::memory_order_release);
 }
 
+
+inline size_t getMemoryUsage() {
+  std::ifstream statm("/proc/self/statm");
+  if (!statm) {
+    std::cerr << "Error reading /proc/self/statm" << std::endl;
+    return -1;
+  }
+
+  std::string line;
+  std::getline(statm, line);
+  std::istringstream iss(line);
+  size_t totalMemoryPages, residentMemoryPages;
+  iss >> totalMemoryPages >> residentMemoryPages;
+
+  // Convert to bytes (assuming page size of 4KB)
+  size_t pageSize = sysconf(_SC_PAGESIZE); // Get page size in bytes
+  size_t memoryUsage = residentMemoryPages * pageSize;
+
+  return memoryUsage; // Memory usage in bytes
+}
 
