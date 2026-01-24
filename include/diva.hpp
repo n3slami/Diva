@@ -3942,16 +3942,6 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
     }
     SetOccupiedBit(store, implicit_part);
     store.UpdateFullSlotCount(num_slots_filled);
-
-    {
-        uint32_t cnt_occupieds = 0;
-        for (uint32_t i = 0; i < infix_store_target_size; i++)
-            cnt_occupieds += GetOccupiedBit(store, i);
-        uint32_t cnt_runends = 0;
-        for (uint32_t i = 0; i < scaled_sizes_[size_grade]; i++)
-            cnt_runends += GetRunendBit(store, i);
-        assert(cnt_occupieds == cnt_runends);
-    }
 }
 
 
