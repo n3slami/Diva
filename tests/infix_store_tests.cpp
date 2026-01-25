@@ -1638,15 +1638,15 @@ public:
         }
     }
 
-    static void BinaryTrieLoadInfixList() {
+
+    static void BinaryTrieLoadInfixVector() {
         const uint32_t N = 600;
         const uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 16;
         const uint32_t infix_size = 5;
-        const uint32_t infix_store_target_size =
-            BinaryTrieDiva::infix_store_target_size;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
         const uint32_t rng_seed = 2;
@@ -1687,6 +1687,58 @@ public:
             ReadStoreContentsFromFile("binary_trie/load_infix_list");
         AssertStoreContents(s, store, occupieds_pos, checks);
     }
+
+
+    static void BinaryTrieGetInfixVector() {
+        const uint32_t N = 600;
+        const uint32_t key_start_bit = 0;
+        const uint32_t min_key_len = 6;
+        const uint32_t max_key_len = 17;
+        const uint32_t max_num_keys_in_infix = 16;
+        const uint32_t infix_size = 5;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        uint8_t keys_contents[N][max_key_len + 1] = {};
+        BinaryTrieDiva::InfiniteByteString keys[N];
+        uint64_t infixes[N];
+        for (uint32_t i = 0; i < N; i++) {
+            const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+            keys[i] = {keys_contents[i], 8 * key_len};
+            for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                keys_contents[i][j] = rng();
+            infixes[i] = (rng() & BITMASK(highbit_pos(infix_store_target_size) + infix_size)) | 1;
+        }
+        std::sort(infixes, infixes + N);
+        std::sort(keys, keys + N);
+
+        std::vector<BinaryTrieDiva::Infix> infix_vec;
+        for (uint32_t i = 0; i < N; i++) {
+            uint32_t num_keys_in_infix = 1;
+            while (i + num_keys_in_infix < N && infixes[i + num_keys_in_infix] == infixes[i])
+                num_keys_in_infix++;
+            num_keys_in_infix = std::max(num_keys_in_infix,
+                                         std::min<uint32_t>(rng() % max_num_keys_in_infix + 1, N - i));
+            infix_vec.emplace_back(infixes[i]);
+            infix_vec.back().BuildTrie(keys + i, num_keys_in_infix, key_start_bit, infix_size);
+            i += num_keys_in_infix - 1;
+        }
+
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_,
+                s.size_scalar_shrink_grow_sep);
+        s.LoadVectorToInfixStore(store, infix_vec);
+
+        auto reconstructed_infix_vec = s.GetInfixVector(store);
+        REQUIRE_EQ(reconstructed_infix_vec.size(), infix_vec.size());
+        for (int32_t i = 0; i < infix_vec.size(); i++)
+            REQUIRE_EQ(reconstructed_infix_vec[i], infix_vec[i]);
+    }
+
 
 private:
     static void WriteStoreContentsToFile(std::string path,
@@ -1881,6 +1933,26 @@ private:
         }
         std::cerr << std::dec << std::endl;
     }
+
+
+    static void PrintTrieAndTrieSuffixes(BinaryTrieDiva::Infix& infix) {
+        std::cerr << "has_prefix_keys=" << infix.HasPrefixKeys() 
+                  << " num_prefix_keys=" << infix.GetNumPrefixKeys() 
+                  << " num_suffixes=" << infix.num_suffixes_
+                  << " num_suffix_bits_=" << infix.num_suffix_bits_
+                  << " num_trie_bits=" << infix.num_trie_bits_ << std::endl;
+        std::cerr << "trie: ";
+        for (uint32_t i = 0; i < infix.trie_.size(); i++) {
+            for (uint32_t j = 0; j < 64; j++)
+                std::cerr << ((infix.trie_[i] >> j) & 1);
+        }
+        std::cerr << std::endl << "trie_suffixes: ";
+        for (uint32_t i = 0; i < infix.trie_suffixes_.size(); i++) {
+            for (uint32_t j = 0; j < 64; j++)
+                std::cerr << ((infix.trie_suffixes_[i] >> j) & 1);
+        }
+        std::cerr << std::endl;
+    }
 };
 
 TEST_SUITE("infix_store") {
@@ -1952,14 +2024,11 @@ TEST_SUITE("infix_store") {
     }
 
     TEST_CASE("binary trie") {
-        SUBCASE("load infix list") {
-            InfixStoreTests::BinaryTrieLoadInfixList(); 
+        SUBCASE("load infix vector") {
+            InfixStoreTests::BinaryTrieLoadInfixVector(); 
         }
-        SUBCASE("get infix list") {
-            // InfixStoreTests::BinaryTrieGetInfixList();
-        }
-        SUBCASE("resize") {
-            // InfixStoreTests::BinaryTrieResize();
+        SUBCASE("get infix vector") {
+            InfixStoreTests::BinaryTrieGetInfixVector();
         }
         SUBCASE("insert raw") {
             // InfixStoreTests::BinaryTrieInsertRaw();
@@ -1969,6 +2038,9 @@ TEST_SUITE("infix_store") {
         }
         SUBCASE("range query") {
             // InfixStoreTests::BinaryTrieRangeQuery();
+        }
+        SUBCASE("resize") {
+            // InfixStoreTests::BinaryTrieResize();
         }
         SUBCASE("delete raw") {
             // InfixStoreTests::BinaryTrieDeleteRaw();

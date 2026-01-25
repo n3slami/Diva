@@ -8,12 +8,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <endian.h>
+#include <exception>
 #include <functional>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <random>
+#include <stdexcept>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -370,11 +372,13 @@ private:
 
     class Infix {
         friend class InfixTests;
+        friend class InfixStoreTests;
 
     public: 
         class TrieIterator {
             friend class Diva<diva_type, payload_type>;
             friend class InfixTests;
+            friend class InfixStoreTests;
 
         public:
             const uint64_t *buf_;
@@ -403,12 +407,12 @@ private:
         uint32_t num_suffix_bits_ = 0;
         uint32_t num_prefix_keys_ = 0;
         uint32_t num_trie_bits_ = 0;
-        std::vector<uint64_t> trie_;
-        std::vector<uint64_t> trie_suffixes_;
+        std::vector<uint64_t> trie_ = {};
+        std::vector<uint64_t> trie_suffixes_ = {};
 
         Infix(const uint64_t infix=0):
                 infix_(infix) { }
-        Infix(const InfixStore& infix_store, uint32_t slot_pos, uint32_t slot_size);
+        Infix(uint64_t *ptr, uint32_t bit_pos, uint32_t slot_size);
         Infix(const Infix& other);
         ~Infix() = default;
 
@@ -4006,7 +4010,9 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
         const bool is_full_infix = current_slot & 1;
         if ((current_slot | mask) == (explicit_part | mask)) {
             if (is_full_infix && SlotHasTrie(store, current_pos, infix_size_)) {
-                infix_to_adapt = Infix(store, current_pos, infix_size_);
+                infix_to_adapt = Infix(store.ptr + num_metadata_offset_words, 
+                                       infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * current_pos,
+                                       infix_size_);
                 adapt_pos = infix_to_adapt.GetLongestMatch(original_key, original_key_start_bit, infix_size_) >= 0 ? current_pos
                           : adapt_pos;
                 break;
@@ -5212,7 +5218,7 @@ inline std::vector<typename Diva<diva_type, payload_type>::Infix>
 Diva<diva_type, payload_type>::GetInfixVector(const InfixStore &store, uint64_t *res_payload) const {
 #ifdef DEBUG
     if constexpr (payload_type == PayloadType::FixedLength)
-        assert(res_payload != nullptr);
+        throw std::runtime_error("Payloads are not yet implemented to work alongside the binary trie");
 #endif // DEBUG
     const uint32_t size_grade = store.GetSizeGrade();
     const uint32_t store_size = scaled_sizes_[size_grade];
@@ -5230,7 +5236,9 @@ Diva<diva_type, payload_type>::GetInfixVector(const InfixStore &store, uint64_t 
             res.emplace_back((implicit_part << infix_size_) | explicit_part);
             if constexpr (diva_type == DivaType::BinaryTrie) {
                 if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
-                    res.back() = Infix(store, i);
+                    res.back() = Infix(store.ptr + num_metadata_offset_words, 
+                                       infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * i,
+                                       infix_size_);
                     res.back().infix_ |= (implicit_part << infix_size_);
                     i += res.back().GetNumSlots(infix_size_) - 1;
                 }
@@ -5459,7 +5467,6 @@ inline std::pair<typename Diva<diva_type, payload_type>::Iterator::KeyType, uint
 
 template <DivaType diva_type, PayloadType payload_type>
 inline bool Diva<diva_type, payload_type>::Iterator::operator==(const Iterator& rhs) const {
-    // TODO: Ensure this makes sense
     if (filter_ != rhs.filter_ || infixes_ != rhs.infixes_)
         return false;
     if (ind_ == rhs.ind_) {
@@ -5846,11 +5853,10 @@ inline bool Diva<diva_type, payload_type>::Iterator::IsValid() const {
  **                                  Infix                                  **
  *****************************************************************************/
 template <DivaType diva_type, PayloadType payload_type>
-inline Diva<diva_type, payload_type>::Infix::Infix(const InfixStore& infix_store, 
-                                                   uint32_t slot_pos, 
+inline Diva<diva_type, payload_type>::Infix::Infix(uint64_t *ptr, 
+                                                   uint32_t bit_pos,
                                                    uint32_t slot_size) {
-    DeserializeFromPtr(infix_store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
-                       slot_size * slot_pos, slot_size);
+    DeserializeFromPtr(ptr, bit_pos, slot_size);
 }
 
 template <DivaType diva_type, PayloadType payload_type>
@@ -5875,12 +5881,13 @@ Diva<diva_type, payload_type>::Infix::operator=(const Infix& other) {
     num_trie_bits_ = other.num_trie_bits_;
     trie_ = other.trie_;
     trie_suffixes_ = other.trie_suffixes_;
+    return *this;
 }
 
 
 template <DivaType diva_type, PayloadType payload_type>
 inline bool Diva<diva_type, payload_type>::Infix::operator==(const Infix& rhs) const {
-    if (infix_ != rhs.infix_ || trie_.size() != rhs.trie_.size() || trie_suffixes_.size() != rhs.trie_suffixes_.size())
+    if (infix_ != rhs.infix_)
         return false;
     if (num_suffixes_ != rhs.num_suffixes_)
         return false;
@@ -5890,8 +5897,10 @@ inline bool Diva<diva_type, payload_type>::Infix::operator==(const Infix& rhs) c
         return false;
     if (num_trie_bits_ != rhs.num_trie_bits_)
         return false;
-    return (memcmp(trie_.data(), rhs.trie_.data(), trie_.size()) == 0) 
-            && (memcmp(trie_suffixes_.data(), rhs.trie_suffixes_.data(), trie_suffixes_.size()) == 0);
+    const uint32_t trie_size_bytes = sizeof(uint64_t) * ((num_trie_bits_ + 63) / 64);
+    const uint32_t trie_suffixes_size_bytes = sizeof(uint64_t) * ((num_suffix_bits_ + 63) / 64);
+    return (memcmp(trie_.data(), rhs.trie_.data(), trie_size_bytes) == 0) 
+        && (memcmp(trie_suffixes_.data(), rhs.trie_suffixes_.data(), trie_suffixes_size_bytes) == 0);
 }
 
 
@@ -7359,7 +7368,7 @@ void Diva<diva_type, payload_type>::Infix::DeserializeFromPtr(void *ptr,
     uint64_t second_slot = second_slot_backup;
     if (!(infix_ & 1))
         return;
-    else if (second_slot == 0 || (second_slot | (second_slot - 1)) >= infix_)
+    else if (second_slot != 0 && (second_slot | (second_slot - 1)) >= infix_)
         return;
     const uint64_t escape_sequence_cost = slot_size - highbit_pos(infix_);
 
