@@ -624,8 +624,8 @@ private:
     // Works with the inclusive-exclusive range [`l`, `r`).
     void ZeroOutPayloads(InfixStore &store, const uint32_t l, const uint32_t r);
 
-    uint32_t MakeRoomFromSlot(InfixStore &store, const uint32_t pos, const uint32_t num_slots,
-                              const bool in_run=false);
+    uint32_t MakeRoomFromSlot(InfixStore &store, const uint32_t pos, const uint32_t runend_pos,
+                              const uint32_t num_slots, bool in_run=true);
     bool SlotHasTrie(const InfixStore &store, const uint32_t pos, const uint32_t runend_pos) const;
     std::pair<bool, uint32_t> FindInfixInRun(const InfixStore &store,
                                              const int32_t runstart_pos, const int32_t runend_pos, 
@@ -3745,15 +3745,17 @@ inline int32_t Diva<diva_type, payload_type>::FindEmptySlotBefore(const InfixSto
 template <DivaType diva_type, PayloadType payload_type>
 inline uint32_t Diva<diva_type, payload_type>::MakeRoomFromSlot(InfixStore &store, 
                                                                 const uint32_t pos,
+                                                                const uint32_t runend_pos,
                                                                 const uint32_t num_slots,
-                                                                const bool in_run) {
-    const int32_t store_size = static_cast<int32_t>(scaled_sizes_[store.GetSizeGrade()]);
-    const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
+                                                                bool in_run) {
+    const uint32_t size_grade = store.GetSizeGrade();
+    const int32_t store_size = static_cast<int32_t>(scaled_sizes_[size_grade]);
     uint32_t empty_slots_to_right[num_slots], num_empty_slots_to_right = 0;
     uint32_t empty_slots_to_left[num_slots], num_empty_slots_to_left = 0;
+    in_run &= pos > runend_pos;
 
     // Find the empty slots
-    int32_t current_pos = pos;
+    int32_t current_pos = runend_pos;
     do {
         while ((num_empty_slots_to_right < num_slots && current_pos < store_size) 
                     && GetSlot(store, current_pos) == 0) {
@@ -3765,10 +3767,10 @@ inline uint32_t Diva<diva_type, payload_type>::MakeRoomFromSlot(InfixStore &stor
 
     // Check if we need to look to the left for empty slots
     if (num_empty_slots_to_right < num_slots) {
-        current_pos = FindEmptySlotBefore(store, pos);
+        current_pos = FindEmptySlotBefore(store, runend_pos);
         do {
             while ((num_empty_slots_to_right + num_empty_slots_to_left < num_slots && current_pos >= 0)
-                        && (GetSlot(store, current_pos) == 0 && !get_bitmap_bit(runends, current_pos))) {
+                        && (GetSlot(store, current_pos) == 0 && !GetRunendBit(store, current_pos))) {
                 empty_slots_to_left[num_empty_slots_to_left++] = current_pos;
                 current_pos--;
             }
@@ -3828,6 +3830,7 @@ inline std::pair<bool, uint32_t> Diva<diva_type, payload_type>::FindInfixInRun(c
                                                                                const int32_t runstart_pos,
                                                                                const int32_t runend_pos,
                                                                                const uint64_t explicit_part) {
+    const uint32_t size_grade = store.GetSizeGrade();
     for (int32_t i = runstart_pos; i <= runend_pos; i++) {
         const uint64_t current_slot = GetSlot(store, i);
         if (current_slot == explicit_part)
@@ -3837,7 +3840,9 @@ inline std::pair<bool, uint32_t> Diva<diva_type, payload_type>::FindInfixInRun(c
         else if (i < runend_pos && current_slot & 1) {  // There might be a trie we should skip
             if constexpr (diva_type == DivaType::BinaryTrie) {
                 if (SlotHasTrie(store, i, runend_pos)) {
-                    const Infix infix_to_skip(store, i, infix_size_);
+                    const Infix infix_to_skip(store.ptr + num_metadata_offset_words,
+                                              infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * i,
+                                              infix_size_);
                     i += infix_to_skip.GetNumSlots(infix_size_) - 1;
                 }
             }
@@ -3892,7 +3897,7 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
             should_make_room = previous_empty < mapped_pos;
         }
         if (should_make_room)
-            insert_pos = MakeRoomFromSlot(store, insert_pos, 1);
+            insert_pos = MakeRoomFromSlot(store, insert_pos, next_empty - 1, 1, false);
 #ifdef DEBUG
         assert(insert_pos < scaled_sizes_[size_grade]);
 #endif // DEBUG
@@ -3911,17 +3916,19 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
         auto [found, insert_pos] = FindInfixInRun(store, runstart_pos, runend_pos, explicit_part);
         if constexpr (diva_type == DivaType::BinaryTrie) {
             if (found) {
-                Infix infix_to_update(store, insert_pos, infix_size_);
+                Infix infix_to_update(store.ptr + num_metadata_offset_words,
+                                      infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * insert_pos,
+                                      infix_size_);
                 const uint32_t original_num_slots = infix_to_update.GetNumSlots(infix_size_);
                 infix_to_update.InsertTrie(original_key, original_key_start_bit, infix_size_);
                 const uint32_t new_num_slots = infix_to_update.GetNumSlots(infix_size_);
                 num_slots_filled = new_num_slots - original_num_slots;
                 if (new_num_slots > original_num_slots)
-                    insert_pos = MakeRoomFromSlot(store, insert_pos, new_num_slots - original_num_slots, insert_pos > runend_pos);
+                    insert_pos = MakeRoomFromSlot(store, insert_pos, runend_pos, new_num_slots - original_num_slots);
                 infix_to_update.SerializeToInfixStore(store, insert_pos, scaled_sizes_[size_grade], infix_size_);
             }
             else {
-                insert_pos = MakeRoomFromSlot(store, insert_pos, 1, insert_pos > runend_pos);
+                insert_pos = MakeRoomFromSlot(store, insert_pos, runend_pos, 1);
 #ifdef DEBUG
                 assert(insert_pos < scaled_sizes_[size_grade]);
 #endif // DEBUG
@@ -3935,7 +3942,7 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
             }
         }
         else {
-            insert_pos = MakeRoomFromSlot(store, insert_pos, 1, insert_pos > runend_pos);
+            insert_pos = MakeRoomFromSlot(store, insert_pos, runend_pos, 1);
 #ifdef DEBUG
             assert(insert_pos < scaled_sizes_[size_grade]);
 #endif // DEBUG
@@ -4048,7 +4055,7 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
             return;
         }
         if (new_num_slots > original_num_slots)
-            adapt_pos = MakeRoomFromSlot(store, adapt_pos, new_num_slots - original_num_slots);
+            adapt_pos = MakeRoomFromSlot(store, adapt_pos, runend_pos, new_num_slots - original_num_slots);
         infix_to_adapt.SerializeToInfixStore(store, adapt_pos, scaled_sizes_[size_grade], infix_size_);
     }
     else {
@@ -4069,7 +4076,7 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
                 AdaptRawInInfixStore(store, key, original_key, original_key_start_bit, adapt_length);
                 return;
             }
-            adapt_pos = MakeRoomFromSlot(store, adapt_pos, num_slots_filled);
+            adapt_pos = MakeRoomFromSlot(store, adapt_pos, runend_pos, num_slots_filled);
         }
         infix_to_adapt.SerializeToInfixStore(store, adapt_pos, scaled_sizes_[size_grade], infix_size_);
     }
@@ -4685,9 +4692,11 @@ inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const
             if ((current_slot | mask) == (explicit_part | mask)) {
                 if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
                     const Infix infix_to_query(store, i, infix_size_);
-                    res = max(res, infix_size_ + std::max(0, infix_to_query.GetLongestMatch(original_key,
-                                                                                            original_key_start_bit,
-                                                                                            infix_size_)));
+                    const int32_t trie_match_size = infix_to_query.GetLongestMatch(original_key,
+                                                                                   original_key_start_bit,
+                                                                                   infix_size_);
+                    res = trie_match_size > 0 ? std::max(res, infix_size_ + trie_match_size) 
+                                              : res;
                     break;
                 }
                 else 
@@ -5115,7 +5124,7 @@ inline void Diva<diva_type, payload_type>::LoadVectorToInfixStore(InfixStore &st
     store.SetFullSlotCount(slot_full_count);
 
     uint32_t write_head = 0, payload_write_head = 0;
-    for (uint32_t i = 0; i < l.size(); i++) {
+    for (uint32_t i = 0; i < l.size() - 1; i++) {
         for (uint32_t j = l[i]; j < r[i]; j += vec[write_head++].GetNumSlots(infix_size_)) {
             const uint64_t implicit_part = vec[write_head].infix_ >> infix_size_;
 #ifdef DEBUG
@@ -6423,8 +6432,8 @@ inline void Diva<diva_type, payload_type>::Infix::AdjustActualSuffixLen(uint32_t
     uint32_t read_bit_pos = 0, write_bit_pos = 0;
     for (uint32_t i = 0; i < num_suffixes_; i++) {
         uint64_t write_buf = 0;
-        uint32_t write_buf_filled_len = 0;
-        uint32_t write_len = new_actual_suffix_len - 1;
+        int32_t write_buf_filled_len = 0;
+        int32_t write_len = new_actual_suffix_len - 1;
         uint64_t data = read_data_from_bitmap(trie_suffixes_backup.data(), read_bit_pos,
                                               read_buf, read_buf_filled_len,
                                               old_actual_suffix_len);
@@ -6462,14 +6471,14 @@ inline void Diva<diva_type, payload_type>::Infix::AdjustActualSuffixLen(uint32_t
                 break;
             }
             write_bits_to_bitmap(trie_suffixes_.data(), write_bit_pos,
-                                 (write_buf >> std::max<int32_t>(write_buf_filled_len - write_len, 0)) 
+                                 (write_buf >> std::max(write_buf_filled_len - write_len, 0)) 
                                         | (1ULL << std::min(write_buf_filled_len, write_len)),
                                  write_len + 1);
             write_bit_pos += write_len + 1;
-            write_buf &= BITMASK(write_buf_filled_len - write_len);
+            write_buf &= BITMASK(std::max(write_buf_filled_len - write_len, 0));
             write_buf_filled_len -= write_len;
             write_len = slot_size - 1;
-        } while (static_cast<int32_t>(write_buf_filled_len) >= 0);
+        } while (write_buf_filled_len >= 0);
     }
     num_suffix_bits_ = write_bit_pos;
 }
@@ -6549,6 +6558,10 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
     bool found_exact_match = true;
     int32_t last_depth = -1, last_bit_pos = -1;
+    if (num_trie_bits_ == 1) {  // Might have only one suffix, so there's nothing to traverse
+        it.depth_branch_.clear();
+        goto InsertTrieAfterLoop;
+    }
     while (true) {
         it.Advance(has_prefix_keys);
         auto [depth, children] = it.depth_branch_.back();
@@ -6676,6 +6689,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
         last_depth = depth;
         last_bit_pos = it.bit_pos_;
     }
+InsertTrieAfterLoop:
     assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
     uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
 
@@ -6686,6 +6700,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
     memset(suffix_contents, 0, suffix_len / 8 + 8);
     const InfiniteByteString suffix = {suffix_contents, (suffix_len + 7) / 8};
     int32_t suffix_mismatch_pos = -1;
+    bool suffix_diff_bit = 0;
     if (found_exact_match) {
         GetSuffixString(suffix_bit_pos, slot_size, suffix_contents, 0, actual_suffix_len_backup);
         for (uint32_t i = 0; i < suffix_len; i += 64) {
@@ -6696,6 +6711,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
             if (diff) {
                 found_exact_match = false;
                 suffix_mismatch_pos = i + bits_to_compare - highbit_pos(diff) - 1;
+                suffix_diff_bit = key.GetBit(key_start_bit + depth + suffix_mismatch_pos);
                 break;
             }
         }
@@ -6734,7 +6750,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
                           num_suffix_bits_ - 1,
                           suffix_len_with_meta - suffix_bits_written);
         num_suffix_bits_ -= suffix_len_with_meta - suffix_bits_written;
-        if (key.GetBit(key_start_bit + depth + suffix_mismatch_pos))
+        if (suffix_diff_bit)
             suffix_bit_pos += suffix_bits_written;
     }
 
@@ -6767,7 +6783,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
             const uint32_t actual_suffix_len = GetActualSuffixLen(slot_size);
             if (actual_suffix_len != actual_suffix_len_backup) {
                 AdjustActualSuffixLen(actual_suffix_len_backup, actual_suffix_len, slot_size);
-                suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_ + key.GetBit(key_start_bit + depth + suffix_mismatch_pos), slot_size, actual_suffix_len);
+                suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_ + suffix_diff_bit, slot_size, actual_suffix_len);
                 auto [new_suffix_len, new_suffix_len_with_meta] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len);
                 suffix_len_with_meta = new_suffix_len_with_meta;
             }
@@ -6785,12 +6801,15 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
     }
 
     // Ensure that the suffixes follow the proper format with their "actual length"
-    num_suffixes_++;
+    num_suffixes_++;    // Ugly increment and decrement to make sure new suffix lengths
+                        // are computed for the new number of suffixes
     const uint32_t actual_suffix_len = GetActualSuffixLen(slot_size);
+    num_suffixes_--;
     if (actual_suffix_len != actual_suffix_len_backup) {
         AdjustActualSuffixLen(actual_suffix_len_backup, actual_suffix_len, slot_size);
-        suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_, slot_size, actual_suffix_len);
+        suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_ + suffix_diff_bit, slot_size, actual_suffix_len);
     }
+    num_suffixes_++;
 
     // Insert suffix
     if (num_suffix_bits_ + actual_suffix_len >= 64 * trie_suffixes_.size())
@@ -7326,30 +7345,39 @@ template <DivaType diva_type, PayloadType payload_type>
 void Diva<diva_type, payload_type>::Infix::SerializeToPtr(void *ptr,
                                                           uint32_t bit_pos,
                                                           uint32_t slot_size) const {
+    const uint32_t original_bit_pos = bit_pos;
     const uint64_t explicit_part = infix_ & BITMASK(slot_size);
-    write_bits_to_bitmap(ptr, bit_pos, explicit_part & BITMASK(slot_size), slot_size);
+    write_bits_to_bitmap(ptr, bit_pos, explicit_part, slot_size);
     bit_pos += slot_size;
     if (num_trie_bits_ == 0)
         return;
 
     const uint32_t escape_sequence_cost = slot_size - highbit_pos(explicit_part);
-    write_bits_to_bitmap(ptr, bit_pos, static_cast<uint64_t>(HasPrefixKeys()) << escape_sequence_cost,
+    write_bits_to_bitmap(ptr, bit_pos, 
+                         static_cast<uint64_t>(HasPrefixKeys()) << escape_sequence_cost,
                          escape_sequence_cost + 1);
+    bit_pos += escape_sequence_cost + 1;
     copy_bitmap_to_bitmap(trie_.data(), 0, 
-                          ptr, bit_pos + escape_sequence_cost + 1,
+                          ptr, bit_pos,
                           num_trie_bits_);
+    bit_pos += num_trie_bits_;
     copy_bitmap_to_bitmap(trie_suffixes_.data(), 0, 
-                          ptr, bit_pos + escape_sequence_cost + 1 + num_trie_bits_,
+                          ptr, bit_pos,
                           num_suffix_bits_);
+    bit_pos += num_suffix_bits_;
+    const uint32_t bit_pos_rem = (bit_pos - original_bit_pos) % slot_size;
+    write_bits_to_bitmap(ptr, bit_pos,
+                         0, (bit_pos_rem == 0 ? 0 : slot_size - bit_pos_rem));
 
     if (explicit_part != 1) {
         // Convert first slot to the correct format with an escape sequence
         uint64_t read_buf;
-        uint32_t read_buf_filled_len = 0, read_bit_pos = bit_pos;
+        uint32_t read_buf_filled_len = 0, read_bit_pos = original_bit_pos + slot_size;
         const uint64_t second_slot = read_data_from_bitmap(ptr, read_bit_pos,
                                                            read_buf, read_buf_filled_len,
                                                            slot_size);
-        write_bits_to_bitmap(ptr, bit_pos, second_slot >> escape_sequence_cost, slot_size);
+        write_bits_to_bitmap(ptr, original_bit_pos + slot_size,
+                             second_slot >> escape_sequence_cost, slot_size);
     }
 }
 
