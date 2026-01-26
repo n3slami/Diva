@@ -1331,6 +1331,8 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    // To query the binary tries
+    const uint32_t original_key_start_bit = shared + ignore + implicit_size + infix_size_;
 
     if constexpr (diva_type == DivaType::Int) {
         const uint64_t l_key_int = __builtin_bswap64(*((uint64_t *) l_key.str));
@@ -1354,7 +1356,8 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         const uint32_t total_implicit = next_implicit - prev_implicit + 1;
         const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
         const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
-        const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+        const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit,
+                                              l_key, r_key, original_key_start_bit);
 
         rwlock_unlock_read(infix_store.rwlock);
         return res;
@@ -1367,7 +1370,8 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         const uint32_t total_implicit = next_implicit - prev_implicit + 1;
         const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
         const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
-        const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit);
+        const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit,
+                                              l_key, r_key, original_key_start_bit);
 
         rwlock_unlock_read(infix_store.rwlock);
         return res;
@@ -4767,6 +4771,7 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                                                 const InfiniteByteString original_l_key,
                                                                 const InfiniteByteString original_r_key,
                                                                 const uint32_t original_key_start_bit) const {
+    const uint32_t store_size = scaled_sizes_[store.GetSizeGrade()];
     const uint64_t l_implicit_part = l_key >> infix_size_;
     const uint64_t l_explicit_part = l_key & BITMASK(infix_size_);
     const uint64_t r_implicit_part = r_key >> infix_size_;
@@ -4785,7 +4790,9 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
             if constexpr (diva_type == DivaType::BinaryTrie) {
                 if (current_slot_l <= r_explicit_part) {
                     if (current_slot == r_explicit_part && SlotHasTrie(store, runstart_pos, runend_pos)) {
-                        const Infix infix_to_query(store, runstart_pos, infix_size_);
+                        const Infix infix_to_query(store.ptr + num_metadata_offset_words,
+                                infix_store_target_size + store_size + infix_size_ * runstart_pos,
+                                infix_size_);
                         const uint8_t zero_key[1] = {0};
                         if (infix_to_query.QueryTrie({zero_key, 1}, original_r_key, original_key_start_bit, infix_size_))
                             return true;
@@ -4810,12 +4817,15 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                     const uint64_t current_slot_r = current_slot | (current_slot - 1);
                     if (current_slot_r >= l_explicit_part) {
                         if (current_slot == l_explicit_part && SlotHasTrie(store, runstart_pos, runend_pos)) {
-                            const Infix infix_to_query(store, runstart_pos, infix_size_);
+                            const Infix infix_to_query(store.ptr + num_metadata_offset_words,
+                                    infix_store_target_size + store_size + infix_size_ * runstart_pos,
+                                    infix_size_);
                             const uint32_t one_key_max_len = (infix_to_query.GetNumSlots(infix_size_) * infix_size_ + 7) / 8;
                             uint8_t one_key[one_key_max_len];
                             memset(one_key, 0xFF, one_key_max_len);
                             if (infix_to_query.QueryTrie(original_l_key, {one_key, one_key_max_len}, original_key_start_bit, infix_size_))
                                 return true;
+                            pos += infix_to_query.GetNumSlots(infix_size_) - 1;
                         }
                         else 
                             return true;
@@ -4849,7 +4859,9 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
         if constexpr (diva_type == DivaType::BinaryTrie) {
             if (current_slot_r >= l_explicit_part && current_slot_l <= r_explicit_part - 1) {
                 if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
-                    const Infix infix_to_query(store, i, infix_size_);
+                    const Infix infix_to_query(store.ptr + num_metadata_offset_words,
+                            infix_store_target_size + store_size + infix_size_ * i,
+                            infix_size_);
                     if (infix_to_query.QueryTrie(original_l_key, original_r_key, original_key_start_bit, infix_size_))
                         return true;
                     i += infix_to_query.GetNumSlots(infix_size_) - 1;
@@ -4861,8 +4873,10 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                 break;
             else if ((i < runend_pos && is_full_infix) 
                     && SlotHasTrie(store, i, runend_pos)) {     // There might be a trie we should skip
-                const Infix infix_to_query(store, i, infix_size_);
-                i += infix_to_query.GetNumSlots(infix_size_) - 1;
+                const Infix infix_to_skip(store.ptr + num_metadata_offset_words,
+                        infix_store_target_size + store_size + infix_size_ * i,
+                        infix_size_);
+                i += infix_to_skip.GetNumSlots(infix_size_) - 1;
             }
         }
         else {
@@ -6372,45 +6386,91 @@ inline bool Diva<diva_type, payload_type>::Infix::QueryTrie(const InfiniteByteSt
                                                             uint32_t slot_size) const {
     TrieIterator it(trie_.data());
     int32_t last_depth = -1;
+    int32_t diverge_depth = std::numeric_limits<int32_t>::max();
+    int32_t l_key_dont_care_depth = std::numeric_limits<int32_t>::max();
+    int32_t r_key_dont_care_depth = std::numeric_limits<int32_t>::max();
+    bool second_path = false;
     if (num_trie_bits_ == 1) {  // Might have only one suffix, so there's nothing to traverse
         it.depth_branch_.clear();
         goto QueryTrieAfterLoop;
     }
+QueryTrieDivergedPathRetry:
     while (true) {
         it.Advance(HasPrefixKeys());
         if (it.depth_branch_.empty())
             break;
         auto [depth, children] = it.depth_branch_.back();
+        if (last_depth >= depth)
+            last_depth = it.depth_branch_[it.depth_branch_.size() - 2].first;
+
+        bool l_key_dont_care = l_key_dont_care_depth <= depth || second_path;
+        bool r_key_dont_care = r_key_dont_care_depth <= depth || (diverge_depth <= depth && !second_path);
+        
+        // Compare l_key to path, or ignore
         const int32_t current_str_bit_pos = key_start_bit + last_depth + 1;
         const uint32_t compare_len = depth - last_depth - 1;
         const uint32_t compare_len_l = std::min<int32_t>(compare_len,
                         std::max(0, 8 * static_cast<int32_t>(l_key.length) - last_depth));
-        const int32_t compare_l = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_l,
-                                                        l_key, current_str_bit_pos, 
-                                                        compare_len_l);
-        if (compare_l > 0)
+        const int32_t compare_l = l_key_dont_care ? 0
+                : CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_l,
+                        l_key, current_str_bit_pos, 
+                        compare_len_l);
+        l_key_dont_care_depth = compare_l < 0 ? depth : l_key_dont_care_depth;
+
+        if (compare_l > 0) {
+            if (r_key_dont_care) {
+                it.SkipSubtree(HasPrefixKeys());
+                if (children == 0b11)
+                    it.SkipSubtree(HasPrefixKeys());
+                if (it.depth_branch_.back().first >= r_key_dont_care_depth)
+                    return true;
+                else if (it.depth_branch_.back().first >= diverge_depth) {
+                    if (it.AtLeaf())
+                        return true;
+                    second_path = true;
+                    continue;
+                }
+            }
             return false;
+        }
+
+        // Compare r_key to path, or ignore
         const uint32_t compare_len_r = std::min<int32_t>(compare_len,
                 std::max<int32_t>(0, 8 * static_cast<int32_t>(r_key.length) - current_str_bit_pos));
-        int32_t compare_r = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_r,
-                                                  r_key, current_str_bit_pos, 
-                                                  compare_len_r);
+        int32_t compare_r = r_key_dont_care ? 0
+                : CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_r,
+                        r_key, current_str_bit_pos, 
+                        compare_len_r);
         if (compare_len_r < compare_len) {
             uint8_t zeros[compare_len / 8 + 2] = {};
             compare_r = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len, 
                                               {zeros, compare_len / 8 + 2}, 0, 
                                               compare_len - compare_len_r);
         }
-        if (compare_r)
-            return compare_r > 0;
+        r_key_dont_care_depth = compare_r > 0 ? depth : r_key_dont_care_depth;
 
+        l_key_dont_care = l_key_dont_care_depth <= depth || second_path;
+        r_key_dont_care = r_key_dont_care_depth <= depth || (diverge_depth <= depth && !second_path);
+
+        if (l_key_dont_care && r_key_dont_care)
+            return true;
+        if (!r_key_dont_care && compare_r < 0)
+            return false;
         if (it.AtPrefixKey(HasPrefixKeys()))
             return true;
 
-        const uint32_t l_bit = l_key.GetBit(key_start_bit + depth);
-        const uint32_t r_bit = r_key.GetBit(key_start_bit + depth);
+        const uint32_t l_bit = l_key.GetBit(key_start_bit + depth) & (!l_key_dont_care);
+        const uint32_t r_bit = r_key.GetBit(key_start_bit + depth) | r_key_dont_care;
         if (r_bit == 0 && (children & 1) == 0)
             return false;
+        if (l_key_dont_care && (children & 1) == 1 && r_bit == 1)
+            return true;
+        if (l_bit == 0 && (children & 2) == 2 && r_key_dont_care)
+            return true;
+        if (!l_key_dont_care && !r_key_dont_care
+                && compare_l == 0 && compare_r == 0 
+                && children == 0b11 && ((l_bit ^ 1) & (r_bit & 1)))
+            diverge_depth = depth;
         if (l_bit == 1 && (children & 1) == 1)
             it.SkipSubtree(HasPrefixKeys());
 
@@ -6421,6 +6481,8 @@ inline bool Diva<diva_type, payload_type>::Infix::QueryTrie(const InfiniteByteSt
 QueryTrieAfterLoop:
     assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
     uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
+    const bool l_key_dont_care = l_key_dont_care_depth <= depth || (diverge_depth <= depth && second_path);
+    const bool r_key_dont_care = r_key_dont_care_depth <= depth || (diverge_depth <= depth && !second_path);
     const uint32_t suffix_rank = it.num_keys_read_;
     const uint32_t actual_suffix_len = GetActualSuffixLen(slot_size);
     uint32_t suffix_bit_pos = GetSuffixBitPos(suffix_rank, slot_size);
@@ -6435,9 +6497,14 @@ QueryTrieAfterLoop:
         return true;
     uint32_t valid_len = highbit_pos(suffix);
     uint64_t valid_mask = BITMASK(valid_len);
-    if ((suffix & valid_mask) < l_key.BitsAt(key_start_bit + depth, valid_len) 
-            || (suffix & valid_mask) > r_key.BitsAt(key_start_bit + depth, valid_len))
+    if ((l_key_dont_care || (suffix & valid_mask) < (l_key.BitsAt(key_start_bit + depth, valid_len)))
+            || (r_key_dont_care || (suffix & valid_mask) > (r_key.BitsAt(key_start_bit + depth, valid_len)))) {
+        if (diverge_depth < depth) {    // Still have to check the key on the other path
+            second_path = true;
+            goto QueryTrieDivergedPathRetry;
+        }
         return false;
+    }
     depth += valid_len;
     if (suffix >> (actual_suffix_len - 1)) {    // Have more suffixes to consider
         do {
@@ -6445,9 +6512,14 @@ QueryTrieAfterLoop:
                                            suffix_read_buf, suffix_read_buf_filled_bits,
                                            actual_suffix_len);
             valid_len = highbit_pos(suffix);
-            if ((suffix & valid_mask) < l_key.BitsAt(key_start_bit + depth, valid_len) 
-                    || (suffix & valid_mask) > r_key.BitsAt(key_start_bit + depth, valid_len))
+            if ((l_key_dont_care || (suffix & valid_mask) < l_key.BitsAt(key_start_bit + depth, valid_len))
+                    || (r_key_dont_care || (suffix & valid_mask) > r_key.BitsAt(key_start_bit + depth, valid_len))) {
+                if (diverge_depth < depth) {    // Still have to check the key on the other path
+                    second_path = true;
+                    goto QueryTrieDivergedPathRetry;
+                }
                 return false;
+            }
             depth += valid_len;
         } while (suffix >> (slot_size - 1));
     }

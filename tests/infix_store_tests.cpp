@@ -5,7 +5,9 @@
 
 #include <bitset>
 #include <cstddef>
+#include <cstring>
 #include <filesystem>
+#include <limits>
 #include <random>
 #include <sys/types.h>
 #include <utility>
@@ -1983,6 +1985,212 @@ public:
     }
 
 
+    static void BinaryTrieRangeQuery() {
+        const uint32_t N = 600;
+        const uint32_t key_start_bit = 0;
+        const uint32_t min_key_len = 6;
+        const uint32_t max_key_len = 17;
+        const uint32_t max_num_keys_in_infix = 16;
+        const uint32_t infix_size = 5;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        uint8_t keys_contents[N][max_key_len + 1] = {};
+        BinaryTrieDiva::InfiniteByteString keys[N];
+        uint64_t infixes[N];
+        for (uint32_t i = 0; i < N; i++) {
+            const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+            keys[i] = {keys_contents[i], 8 * key_len};
+            for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                keys_contents[i][j] = rng();
+            infixes[i] = (rng() & BITMASK(highbit_pos(infix_store_target_size) + infix_size)) | 1;
+        }
+        std::sort(infixes, infixes + N);
+        std::sort(keys, keys + N);
+
+        std::vector<BinaryTrieDiva::Infix> infix_vec;
+        for (uint32_t i = 0; i < N; i++) {
+            uint32_t num_keys_in_infix = 1;
+            while (i + num_keys_in_infix < N && infixes[i + num_keys_in_infix] == infixes[i])
+                num_keys_in_infix++;
+            num_keys_in_infix = std::max(num_keys_in_infix,
+                                         std::min<uint32_t>(rng() % max_num_keys_in_infix + 1, N - i));
+            infix_vec.emplace_back(infixes[i]);
+            infix_vec.back().BuildTrie(keys + i, num_keys_in_infix, key_start_bit, infix_size);
+            i += num_keys_in_infix - 1;
+        }
+
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_,
+                s.size_scalar_shrink_grow_sep);
+        s.LoadVectorToInfixStore(store, infix_vec);
+
+        SUBCASE("no false negatives") {
+            int32_t key_ind = 0;
+            for (auto& infix : infix_vec) {
+                for (int32_t i = 0; i < infix.num_suffixes_; i++) {
+                    const uint32_t current_key_len = keys[key_ind].length / 8;
+                    uint8_t key_l[current_key_len], key_r[current_key_len];
+                    memcpy(key_l, keys[key_ind].str, current_key_len);
+                    memcpy(key_r, keys[key_ind].str, current_key_len);
+                    for (int32_t j = 0; j < current_key_len; j++) {
+                        int32_t rand_pos = std::max((key_start_bit + 1) / 8, rand() % current_key_len);
+                        if (std::numeric_limits<uint8_t>::min() < keys[key_ind].str[rand_pos] 
+                                && keys[key_ind].str[rand_pos] < std::numeric_limits<uint8_t>::max()) {
+                            key_l[rand_pos]--;
+                            key_r[rand_pos]++;
+                            break;
+                        }
+                    }
+                    REQUIRE(s.RangeQueryInfixStore(store, infix.infix_, infix.infix_,
+                                infix_store_target_size, 
+                                {key_l, current_key_len},
+                                {key_r, current_key_len},
+                                key_start_bit));
+                    key_ind++;
+                }
+            }
+
+            SUBCASE("two runs true false") {
+                const uint8_t original_key_l[2] = {0b00100001, 0b00011010};
+                const uint8_t original_key_r[2] = {0b00100001, 0b00000000};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000111101010111,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("two runs false true") {
+                const uint8_t original_key_l[2] = {0b00100101, 0b00011010};
+                const uint8_t original_key_r[2] = {0b00100001, 0b10100100};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000111101010111,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("three non-empty runs") {
+                const uint8_t original_key_l[2] = {0b00100101, 0b00011010};
+                const uint8_t original_key_r[2] = {0b00111111, 0b11111111};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b0001000110001101,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("two runs with single leaf trie in the second") {
+                const uint8_t original_key_l[2] = {0b00100111, 0b11110101};
+                const uint8_t original_key_r[2] = {0b01111111, 0b11111111};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000111101010111, 0b0001000110001101,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+        }
+
+        SUBCASE("negatives") {
+            SUBCASE("diverge left") {
+                const uint8_t original_key_l[2] = {0b00100001, 0b00010000};
+                const uint8_t original_key_r[2] = {0b00100001, 0b00010110};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+            SUBCASE("diverge right") {
+                const uint8_t original_key_l[2] = {0b00100000, 0b11010101};
+                const uint8_t original_key_r[2] = {0b00100000, 0b11110000};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+            SUBCASE("diverge both ways") {
+                const uint8_t original_key_l[2] = {0b00100000, 0b11010101};
+                const uint8_t original_key_r[2] = {0b00100001, 0b00010010};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+            SUBCASE("diverge leftmost") {
+                const uint8_t original_key_l[2] = {0b00010000, 0b11010101};
+                const uint8_t original_key_r[2] = {0b00011000, 0b00010010};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+            SUBCASE("diverge rightmost") {
+                const uint8_t original_key_l[2] = {0b00100100, 0b11010101};
+                const uint8_t original_key_r[2] = {0b00110010, 0b00010010};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+            SUBCASE("two runs") {
+                const uint8_t original_key_l[2] = {0b00100110, 0b11010101};
+                const uint8_t original_key_r[2] = {0b00100000, 0b00010010};
+                REQUIRE_FALSE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000111101010111,
+                                                     infix_store_target_size,
+                                                     {original_key_l, 2},
+                                                     {original_key_r, 2},
+                                                     0));
+            }
+        }
+
+        SUBCASE("false positives") {
+            SUBCASE("one run") {
+                const uint8_t original_key_l[2] = {0b00100000, 0b10111000};
+                const uint8_t original_key_r[2] = {0b00100000, 0b10111111};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000110000101101,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("two runs false true") {
+                const uint8_t original_key_l[2] = {0b00100111, 0b11110101};
+                const uint8_t original_key_r[2] = {0b00000000, 0b00000000};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000111101010111, 0b0001000110001101,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("two runs true false") {
+                const uint8_t original_key_l[2] = {0b00100001, 0b00011111};
+                const uint8_t original_key_r[2] = {0b00100000, 0b10000000};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000110000101101, 0b000111101010111,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+            SUBCASE("two runs true true") {
+                const uint8_t original_key_l[2] = {0b00100110, 0b11111111};
+                const uint8_t original_key_r[2] = {0b00000000, 0b00000000};
+                REQUIRE(s.RangeQueryInfixStore(store, 0b000111101010111, 0b0001000110001101,
+                                               infix_store_target_size,
+                                               {original_key_l, 2},
+                                               {original_key_r, 2},
+                                               0));
+            }
+        }
+    }
+
+
 private:
     static void WriteStoreContentsToFile(std::string path,
                                          const std::vector<uint32_t> &occupieds_pos, 
@@ -2280,14 +2488,14 @@ TEST_SUITE("infix_store") {
             InfixStoreTests::BinaryTriePointQuery();
         }
         SUBCASE("range query") {
-            // InfixStoreTests::BinaryTrieRangeQuery();
-        }
-        SUBCASE("resize") {
-            // InfixStoreTests::BinaryTrieResize();
+            InfixStoreTests::BinaryTrieRangeQuery();
         }
         SUBCASE("delete raw") {
             // InfixStoreTests::BinaryTrieDeleteRaw();
             // InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
+        }
+        SUBCASE("resize") {
+            // InfixStoreTests::BinaryTrieResize();
         }
         SUBCASE("adapt") {
             // InfixStoreTests::BinaryTrieAdapt();
