@@ -3729,11 +3729,13 @@ inline int32_t Diva<diva_type, payload_type>::FindEmptySlotAfter(const InfixStor
 template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
 inline int32_t Diva<diva_type, payload_type>::FindEmptySlotBefore(const InfixStore &store, const uint32_t runend_pos) const {
+    const uint32_t size_grade = store.GetSizeGrade();
     int32_t current_pos = runend_pos, previous_pos;
     do {
         previous_pos = current_pos;
         current_pos = PreviousRunend(store, current_pos);
-    } while (current_pos >= 0 && GetSlot(store, current_pos + 1));
+    } while (current_pos >= 0 
+            && (current_pos == scaled_sizes_[size_grade] - 1 || GetSlot(store, current_pos + 1)));
 
     do {
         current_pos++;
@@ -3752,30 +3754,32 @@ inline uint32_t Diva<diva_type, payload_type>::MakeRoomFromSlot(InfixStore &stor
     const int32_t store_size = static_cast<int32_t>(scaled_sizes_[size_grade]);
     uint32_t empty_slots_to_right[num_slots], num_empty_slots_to_right = 0;
     uint32_t empty_slots_to_left[num_slots], num_empty_slots_to_left = 0;
-    in_run &= pos > runend_pos;
+    const bool in_run_dec = in_run & (pos > runend_pos);
 
     // Find the empty slots
-    int32_t current_pos = runend_pos;
-    do {
-        while ((num_empty_slots_to_right < num_slots && current_pos < store_size) 
-                    && GetSlot(store, current_pos) == 0) {
+    int32_t current_pos = FindEmptySlotAfter(store, runend_pos);
+    while (num_empty_slots_to_right < num_slots && current_pos < store_size) {
+        if (GetSlot(store, current_pos) == 0) {
             empty_slots_to_right[num_empty_slots_to_right++] = current_pos;
             current_pos++;
         }
-        current_pos = FindEmptySlotAfter(store, current_pos);
-    } while (num_empty_slots_to_right < num_slots && current_pos < store_size);
+        else {
+            current_pos = GetRunendBit(store, current_pos) ? current_pos : NextRunend(store, current_pos);
+            current_pos = FindEmptySlotAfter(store, current_pos);
+        }
+    } 
 
     // Check if we need to look to the left for empty slots
     if (num_empty_slots_to_right < num_slots) {
         current_pos = FindEmptySlotBefore(store, runend_pos);
-        do {
-            while ((num_empty_slots_to_right + num_empty_slots_to_left < num_slots && current_pos >= 0)
-                        && (GetSlot(store, current_pos) == 0 && !GetRunendBit(store, current_pos))) {
+        while (num_empty_slots_to_right + num_empty_slots_to_left < num_slots && current_pos >= 0) {
+            if (GetSlot(store, current_pos) == 0 && !GetRunendBit(store, current_pos)) {
                 empty_slots_to_left[num_empty_slots_to_left++] = current_pos;
                 current_pos--;
             }
-            current_pos = FindEmptySlotBefore(store, current_pos);
-        } while (num_empty_slots_to_right + num_empty_slots_to_left < num_slots && current_pos >= 0);
+            else 
+                current_pos = FindEmptySlotBefore(store, current_pos);
+        }
     }
 #ifdef DEBUG
     assert(num_empty_slots_to_left + num_empty_slots_to_right == num_slots);
@@ -3791,12 +3795,11 @@ inline uint32_t Diva<diva_type, payload_type>::MakeRoomFromSlot(InfixStore &stor
         if constexpr (payload_type == PayloadType::FixedLength)
             ShiftPayloadsRight(store, l, r, shamt);
     }
-    for (int32_t i = 0; i < static_cast<int32_t>(num_empty_slots_to_left); i++) {
-        const uint32_t r = (i == static_cast<int32_t>(num_empty_slots_to_left) - 1) ? pos
-                                                            : empty_slots_to_left[i + 1];
+    for (int32_t i = num_empty_slots_to_left - 1; i >= 0; i--) {
         const uint32_t l = empty_slots_to_left[i] + 1;
-        const uint32_t shamt = i + 1;
-        ShiftRunendsLeft(store, l, r - in_run, shamt);
+        const uint32_t r = i == 0 ? pos : empty_slots_to_left[i - 1];
+        const uint32_t shamt = num_empty_slots_to_left - i;
+        ShiftRunendsLeft(store, l, r - (i == 0 && in_run_dec), shamt);
         ShiftSlotsLeft(store, l, r, shamt);
         if constexpr (payload_type == PayloadType::FixedLength)
             ShiftPayloadsLeft(store, l, r, shamt);
@@ -3884,8 +3887,18 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
     if (!is_occupied) {
         const int32_t next_runend = std::min<int32_t>(SelectRunends(store, key_rank), scaled_sizes_[size_grade]);
         const int32_t previous_runend = key_rank > 0 ? static_cast<int32_t>(SelectRunends(store, key_rank - 1)) : -1;
-        const int32_t next_empty = FindEmptySlotAfter(store, next_runend < scaled_sizes_[size_grade] ? next_runend : previous_runend);
-        const int32_t previous_empty = FindEmptySlotBefore(store, std::min<int32_t>(next_runend, scaled_sizes_[size_grade] - 1));
+        const int32_t empty_before_next_runend = FindEmptySlotBefore(store, next_runend);
+        int32_t next_empty, previous_empty;
+        if (empty_before_next_runend > previous_runend) {
+            next_empty = mapped_pos <= previous_runend ? previous_runend + 1 
+                : (empty_before_next_runend < mapped_pos ? scaled_sizes_[size_grade] : mapped_pos);
+            previous_empty = mapped_pos <= previous_runend ? FindEmptySlotBefore(store, previous_runend) 
+                : std::min(empty_before_next_runend, mapped_pos);
+        }
+        else {
+            next_empty = FindEmptySlotAfter(store, next_runend < scaled_sizes_[size_grade] ? next_runend : previous_runend);
+            previous_empty = empty_before_next_runend;
+        }
         int32_t insert_pos;
         bool should_make_room = false;
         if (next_empty < scaled_sizes_[size_grade]) {
@@ -3894,7 +3907,7 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
         }
         else {
             insert_pos = previous_empty < previous_runend ? previous_runend + 1 : previous_empty;
-            should_make_room = previous_empty < mapped_pos;
+            should_make_room = previous_empty < previous_runend;
         }
         if (should_make_room)
             insert_pos = MakeRoomFromSlot(store, insert_pos, next_empty - 1, 1, false);
@@ -3916,10 +3929,23 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
         auto [found, insert_pos] = FindInfixInRun(store, runstart_pos, runend_pos, explicit_part);
         if constexpr (diva_type == DivaType::BinaryTrie) {
             if (found) {
-                Infix infix_to_update(store.ptr + num_metadata_offset_words,
-                                      infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * insert_pos,
-                                      infix_size_);
-                const uint32_t original_num_slots = infix_to_update.GetNumSlots(infix_size_);
+                Infix infix_to_update;
+                uint32_t original_num_slots = 1;
+                if (SlotHasTrie(store, insert_pos, runend_pos)) {
+                    infix_to_update = Infix(store.ptr + num_metadata_offset_words,
+                                            infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * insert_pos,
+                                            infix_size_);
+                    original_num_slots = infix_to_update.GetNumSlots(infix_size_);
+                }
+                else {
+                    infix_to_update.infix_ = explicit_part;
+                    infix_to_update.num_prefix_keys_ = 0;
+                    infix_to_update.num_trie_bits_ = 1;
+                    infix_to_update.trie_ = {0b1};
+                    infix_to_update.num_suffixes_ = 1;
+                    infix_to_update.num_suffix_bits_ = infix_size_ - 1;
+                    infix_to_update.trie_suffixes_ = {0b1};
+                }
                 infix_to_update.InsertTrie(original_key, original_key_start_bit, infix_size_);
                 const uint32_t new_num_slots = infix_to_update.GetNumSlots(infix_size_);
                 num_slots_filled = new_num_slots - original_num_slots;

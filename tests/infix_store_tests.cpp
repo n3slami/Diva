@@ -1775,9 +1775,7 @@ public:
                                                             N_bulk_keys - key_ind);
             infix_vec.emplace_back(bulk_infixes[i]);
             infix_vec.back().BuildTrie(keys + key_ind, num_keys_in_infix, key_start_bit, infix_size);
-            PrintTrieAndTrieSuffixes(infix_vec.back());
             key_ind += num_keys_in_infix;
-            std::cerr << "i=" << i << " key_ind=" << key_ind << std::endl;
         }
 
         BinaryTrieDiva s(infix_size, seed, load_factor);
@@ -1792,22 +1790,101 @@ public:
                                     nullptr,
                                     {original_key, 1}, 0);
         }
-        SUBCASE("insertion of new suffix into a single run") {
+        SUBCASE("inserting new suffix into a single run") {
             auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_suffix_into_single_run");
             AssertStoreContents(s, store, occupieds_pos, checks);
         }
 
-        PrintStore(s, store);
+        s.InsertRawIntoInfixStore(store, 0b0100000011001101);
+        SUBCASE("inserting new suffix after run") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_suffix_after_run");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
         {
             uint8_t original_key[8] = {0b00000000};
             s.InsertRawIntoInfixStore(store, 0b0011111111100011, infix_store_target_size,
                                     nullptr,
                                     {original_key, 1}, 0);
         }
-        PrintStore(s, store);
         SUBCASE("switch encoding and shift next run") {
-            //auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_suffix_into_single_run");
-            //AssertStoreContents(s, store, occupieds_pos, checks);
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/switch_encoding_shift_next_run");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0000000000000001);
+        SUBCASE("inserting new infix before trie") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_before_trie");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0000000000011111);
+        SUBCASE("inserting new infix after trie") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_after_trie");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        {
+            uint8_t original_key[8] = {0b00001000, 0b10101010};
+            s.InsertRawIntoInfixStore(store, 0b0000000000000011, infix_store_target_size,
+                                    nullptr,
+                                    {original_key, 2}, 0);
+        }
+        SUBCASE("inserting new suffix and shifting at the beginning") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_suffix_shifting_at_beginning");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0000000000101011);
+        SUBCASE("inserting new infix between touching runs") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_between_touching_runs");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        {
+            uint8_t original_key[8] = {0b10101010};
+            s.InsertRawIntoInfixStore(store, 0b0000000000101011, infix_store_target_size,
+                                    nullptr,
+                                    {original_key, 1}, 0);
+        }
+        SUBCASE("convert infix into trie") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/convert_infix_into_trie");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0111111111110101);
+        SUBCASE("inserting new infix after last run at the end") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_after_last_run_at_end");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0111110010111011);
+        SUBCASE("inserting new infix just before end cluster") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_before_end_cluster");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        {
+            uint8_t original_key[8] = {0b00001000, 0b10101010};
+            s.InsertRawIntoInfixStore(store, 0b0111111111110101, infix_store_target_size,
+                                    nullptr,
+                                    {original_key, 2}, 0);
+        }
+        SUBCASE("convert infix to trie at the end") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/convert_infix_to_trie_at_end");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0111111111111101);
+        SUBCASE("inserting new infix after trie at the end") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_after_trie_at_end");
+            AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+
+        s.InsertRawIntoInfixStore(store, 0b0111111111000101);
+        SUBCASE("inserting new infix before trie at the end") {
+            auto [occupieds_pos, checks] = ReadStoreContentsFromFile("binary_trie/insert/new_infix_before_trie_at_end");
+            AssertStoreContents(s, store, occupieds_pos, checks);
         }
     }
 
