@@ -1889,6 +1889,100 @@ public:
     }
 
 
+    static void BinaryTriePointQuery() {
+        const uint32_t N = 600;
+        const uint32_t key_start_bit = 0;
+        const uint32_t min_key_len = 6;
+        const uint32_t max_key_len = 17;
+        const uint32_t max_num_keys_in_infix = 16;
+        const uint32_t infix_size = 5;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        uint8_t keys_contents[N][max_key_len + 1] = {};
+        BinaryTrieDiva::InfiniteByteString keys[N];
+        uint64_t infixes[N];
+        for (uint32_t i = 0; i < N; i++) {
+            const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+            keys[i] = {keys_contents[i], 8 * key_len};
+            for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                keys_contents[i][j] = rng();
+            infixes[i] = (rng() & BITMASK(highbit_pos(infix_store_target_size) + infix_size)) | 1;
+        }
+        std::sort(infixes, infixes + N);
+        std::sort(keys, keys + N);
+
+        std::vector<BinaryTrieDiva::Infix> infix_vec;
+        for (uint32_t i = 0; i < N; i++) {
+            uint32_t num_keys_in_infix = 1;
+            while (i + num_keys_in_infix < N && infixes[i + num_keys_in_infix] == infixes[i])
+                num_keys_in_infix++;
+            num_keys_in_infix = std::max(num_keys_in_infix,
+                                         std::min<uint32_t>(rng() % max_num_keys_in_infix + 1, N - i));
+            infix_vec.emplace_back(infixes[i]);
+            infix_vec.back().BuildTrie(keys + i, num_keys_in_infix, key_start_bit, infix_size);
+            i += num_keys_in_infix - 1;
+        }
+
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_,
+                s.size_scalar_shrink_grow_sep);
+        s.LoadVectorToInfixStore(store, infix_vec);
+
+        SUBCASE("no false negatives") {
+            int32_t key_ind = 0;
+            for (auto& infix : infix_vec) {
+                for (int32_t i = 0; i < infix.num_suffixes_; i++) {
+                    REQUIRE(s.PointQueryInfixStore(store, infix.infix_, infix_store_target_size,
+                                {keys[key_ind].str, keys[key_ind].length / 8},
+                                key_start_bit));
+                    key_ind++;
+                }
+            }
+        }
+
+        SUBCASE("negatives") {
+            {
+                const uint8_t original_key[3] = {0b11111010, 0b11110000, 0b00110011};
+                REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b001000110001101, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+            {
+                const uint8_t original_key[3] = {0b01111111, 0b11110000, 0b00110011};
+                REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b000011000101101, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+            {
+                const uint8_t original_key[3] = {0b10010100, 0b00001011, 0b11111111};
+                REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b100000010011011, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+        }
+
+        SUBCASE("false positives") {
+            {
+                const uint8_t original_key[3] = {0b00101010, 0b11110000, 0b00110011};
+                REQUIRE(s.PointQueryInfixStore(store, 0b001000110001101, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+            {
+                const uint8_t original_key[3] = {0b01111111, 0b11110000, 0b00110011};
+                REQUIRE(s.PointQueryInfixStore(store, 0b011011000101101, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+            {
+                const uint8_t original_key[3] = {0b10010100, 0b10101011, 0b11111111};
+                REQUIRE(s.PointQueryInfixStore(store, 0b100000010011011, infix_store_target_size,
+                            {original_key, 3}, 0));
+            }
+        }
+    }
+
+
 private:
     static void WriteStoreContentsToFile(std::string path,
                                          const std::vector<uint32_t> &occupieds_pos, 
@@ -2183,7 +2277,7 @@ TEST_SUITE("infix_store") {
             InfixStoreTests::BinaryTrieInsertRaw();
         }
         SUBCASE("point query") {
-            // InfixStoreTests::BinaryTriePointQuery();
+            InfixStoreTests::BinaryTriePointQuery();
         }
         SUBCASE("range query") {
             // InfixStoreTests::BinaryTrieRangeQuery();

@@ -4883,6 +4883,7 @@ inline bool Diva<diva_type, payload_type>::PointQueryInfixStore(InfixStore &stor
                                                                 const uint32_t original_key_start_bit) const {
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
+    const uint32_t size_grade = store.GetSizeGrade();
 
     if (!GetOccupiedBit(store, implicit_part))
         return false;
@@ -4898,9 +4899,11 @@ inline bool Diva<diva_type, payload_type>::PointQueryInfixStore(InfixStore &stor
             const uint64_t mask = ((slot_value & (-slot_value)) << 1) - 1;
             if ((explicit_part | mask) == (slot_value | mask)) {
                 if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
-                    const Infix infix_to_query(store, i, infix_size_);
+                    const Infix infix_to_query(store.ptr + num_metadata_offset_words,
+                            infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * i, infix_size_);
                     if (infix_to_query.QueryTrie(original_key, original_key, original_key_start_bit, infix_size_))
                         return true;
+                    i += infix_to_query.GetNumSlots(infix_size_) - 1;
                 }
                 else 
                     return true;
@@ -6369,6 +6372,10 @@ inline bool Diva<diva_type, payload_type>::Infix::QueryTrie(const InfiniteByteSt
                                                             uint32_t slot_size) const {
     TrieIterator it(trie_.data());
     int32_t last_depth = -1;
+    if (num_trie_bits_ == 1) {  // Might have only one suffix, so there's nothing to traverse
+        it.depth_branch_.clear();
+        goto QueryTrieAfterLoop;
+    }
     while (true) {
         it.Advance(HasPrefixKeys());
         if (it.depth_branch_.empty())
@@ -6411,6 +6418,7 @@ inline bool Diva<diva_type, payload_type>::Infix::QueryTrie(const InfiniteByteSt
             break;
         last_depth = depth;
     }
+QueryTrieAfterLoop:
     assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
     uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
     const uint32_t suffix_rank = it.num_keys_read_;
