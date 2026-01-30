@@ -9,6 +9,7 @@
 #include <endian.h>
 #include <fstream>
 #include <limits>
+#include <malloc.h>
 #include <random>
 #include <string_view>
 #include <thread>
@@ -29,34 +30,87 @@
 
 namespace diva {
 
-// Function to generate random string of given size with a fixed seed
-// If use_binary_keys is true, uses all ASCII characters (0-255)
-// If use_binary_keys is false, uses only alphanumeric characters
-std::string generateRandomString(int size, unsigned int seed, bool use_binary_keys = true) {
-  std::mt19937 gen(seed);  // Use fixed seed
+typedef uint64_t SequenceNumber;
 
-  std::string str;
-  str.resize(size);
+static void decodePayload(uint64_t payload,
+                          uint8_t file_number_bits,
+                          uint8_t offset_bits,
+                          uint64_t* file_number,
+                          uint64_t* offset,
+                          bool* isTombstone) {
+    uint64_t fileNumberMask = (1UL << file_number_bits) - 1;
+    uint64_t offsetMask = (1UL << offset_bits) - 1;
+    *isTombstone = payload & 1;
+    *offset = (payload >> 1) & offsetMask;
+    *file_number = (payload >> (offset_bits + 1)) & fileNumberMask;
+}
 
-  if (use_binary_keys) {
-    // Generate all possible byte values (0-255)
-    std::uniform_int_distribution<unsigned char> dis(0, 255);
-    for (int i = 0; i < size; ++i) {
-      str[i] = static_cast<char>(dis(gen));
+static void DecodeSequenceAndAddressDiva(const uint64_t* encoded,
+                                         uint64_t num_sequence_bits,
+                                         uint8_t file_number_bits,
+                                         uint8_t offset_bits,
+                                         SequenceNumber* seq,
+                                         uint64_t* file_number,
+                                         uint64_t* offset,
+                                         bool* isTombstone) {
+    uint64_t payload_bits = file_number_bits + offset_bits + 1;
+
+    uint64_t decoded_seq = 0;
+    uint64_t decoded_payload = 0;
+
+    // Helper: extract single bit (LSB-first)
+    auto get_bit = [&](uint64_t pos) -> bool {
+        uint64_t word_pos = pos / 64;
+        uint64_t bit_in_word = pos % 64; // LSB-first
+        return (encoded[word_pos] >> bit_in_word) & 1ULL;
+    };
+
+    // Decode sequence number bits
+    for (uint64_t i = 0; i < num_sequence_bits; ++i) {
+        decoded_seq |= (static_cast<uint64_t>(get_bit(i)) << i);
     }
-  } else {
-    // Generate only alphanumeric characters
-    static const char charset[] =
-        "0123456789"
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    std::uniform_int_distribution<int> dis(0, sizeof(charset) - 2);
-    for (int i = 0; i < size; ++i) {
-      str[i] = charset[dis(gen)];
-    }
-  }
 
-  return str;
+    // Decode payload bits (file_number + offset + tombstone)
+    for (uint64_t i = 0; i < payload_bits; ++i) {
+        decoded_payload |= (static_cast<uint64_t>(get_bit(num_sequence_bits + i)) << i);
+    }
+
+    // Assign sequence number
+    if (seq) *seq = decoded_seq;
+
+    // Decode payload into file_number, offset, isTombstone
+    decodePayload(decoded_payload, file_number_bits, offset_bits,
+            file_number, offset, isTombstone);
+}
+
+std::vector<uint64_t> ReadLiveBlobFiles(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        throw std::runtime_error("Failed to open file for reading: " + path);
+    }
+
+    // 1. Read the number of elements
+    uint64_t size = 0;
+    in.read(reinterpret_cast<char*>(&size), sizeof(size));
+
+    if (!in) {
+        if (in.eof()) return {}; // Handle empty file if that's expected
+        throw std::runtime_error("Failed to read size from blob file");
+    }
+
+    // 2. Prepare the vector and read the data block
+    std::vector<uint64_t> live_blob_files;
+    if (size > 0) {
+        live_blob_files.resize(size);
+        in.read(reinterpret_cast<char*>(live_blob_files.data()),
+                size * sizeof(uint64_t));
+    }
+
+    if (!in) {
+        throw std::runtime_error("Failed to read vector data from blob file");
+    }
+
+    return live_blob_files;
 }
 
 class DivaTests {
@@ -4508,7 +4562,7 @@ public:
                 threads.emplace_back([&, i] {
                         if (i > 0) {
                             for (uint32_t ti = n_bulk + i; ti < n_keys; ti += n_threads) {
-                                if (ti % 100000 == 1)
+                                if (ti % 100000 == i)
                                     std::cerr << "filter_memory=" << s.Size() << " process_memory=" << getMemoryUsage() << std::endl;
                                 for (uint32_t j = 0; j < n_duplicates; j++) {
                                     for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); 
@@ -4585,35 +4639,52 @@ public:
 
 
         SUBCASE("memory leak") {
-            const uint32_t infix_size = 8;
-            const uint32_t seed = 2;
-            const float load_factor = 0.8;
-            const uint32_t n_keys = 10000000;
-            const uint32_t n_bulk = n_keys / 8;
+            const std::string filterPath = "blob_filter_data1769464730";
+            const std::string blobPath = "live_blob_files_1769464730";
 
-            Diva<O, PayloadType::FixedLength> s(infix_size, seed, load_factor, 88, true);
-            std::string payloadd = "abcdefghijk";
-            for (int tries = 0; tries < 20; tries++) {
-                size_t membefore = getMemoryUsage();
-                std::cerr << "=======================================" << std::endl;
-                std::cerr << "memory before insertion " << membefore << std::endl;
-                std::cerr << "num keys before insertion " << s.GetNumKeys() << std::endl;
-                for (int i = 0; i < 1000000; i++) {
-                    if (s.GetNumKeys() < 1000) {
-                        s.Insert(generateRandomString(32, 3 + i, false), payloadd.data(), 1024);
-                    } else {
-                        s.Insert(generateRandomString(32, 3 + i, false), payloadd.data());
-                    }
-                }
-                size_t memafter = getMemoryUsage();
-                std::cerr << "memory after insertion " << memafter << std::endl;
-                std::cerr << "num keys after insertion " << s.GetNumKeys() << std::endl;
-                s.DeleteRange(nullptr, 0, nullptr, 0, [](const uint64_t* payload) { return true; });
-                size_t memafterdelete = getMemoryUsage();
-                std::cout << "memory after delete " << memafterdelete << std::endl;
-                std::cout << "num keys after delete " << s.GetNumKeys() << std::endl;
-                std::cout << "---" << std::endl;
-            }
+            // 1. Setup environment exactly like the original
+            std::vector<uint64_t> all_live_files = ReadLiveBlobFiles(blobPath);
+            std::sort(all_live_files.begin(), all_live_files.end());
+
+            // 2. Load the 100% case
+            std::ifstream in(filterPath, std::ios::binary);
+            in.seekg(0, std::ios::end);
+            std::streamsize size = in.tellg();
+            in.seekg(0, std::ios::beg);
+            char* buffer = new char[size];
+            in.read(buffer, size);
+
+            auto diva_ = new diva::Diva<false, diva::PayloadType::FixedLength>(buffer);
+            delete[] buffer;
+
+            size_t memoryAfterLoad = getMemoryUsage();
+            std::cout << "num keys before: " << diva_->GetNumKeys() << std::endl;
+            std::cout << "memory before: " << memoryAfterLoad << std::endl;
+
+            // Use the 100% subset
+            std::vector<uint64_t> current_live_subset = all_live_files;
+            uint32_t offset_bits = static_cast<uint32_t>(std::log2(65 << 20)) + 1;
+
+            // 3. The Operation
+            diva_->DeleteRange(nullptr, 0, nullptr, 0,
+                    [&](const uint64_t* payload) {
+                        SequenceNumber seq; uint64_t file_num, off; bool tomb;
+                        DecodeSequenceAndAddressDiva(payload, 56, 32, offset_bits, &seq, &file_num, &off, &tomb);
+                        return !std::binary_search(current_live_subset.begin(), current_live_subset.end(), file_num);
+                    });
+
+            size_t memoryAfterDelete = getMemoryUsage();
+            std::cout << "num keys after: " << diva_->GetNumKeys() << std::endl;
+            std::cout << "memory after: " << memoryAfterDelete << std::endl;
+            malloc_trim(0);
+            size_t memoryAfterTrim = getMemoryUsage();
+            std::cout << "memory after trim: " << memoryAfterTrim << std::endl;
+            // 4. Cleanup
+            delete diva_;
+
+            // Explicitly clear the vector to ensure it's not the "leak"
+            current_live_subset.clear();
+            current_live_subset.shrink_to_fit();
         }
 
 
