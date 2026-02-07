@@ -663,11 +663,11 @@ private:
                                                                const uint32_t total_implicit=infix_store_target_size, 
                                                                std::function<bool(const uint64_t *)> should_remove=nullptr);
     // Assumes that `key` is a full length infix.
-    uint32_t GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
-                                         const uint32_t total_implicit=infix_store_target_size,
-                                         std::function<bool(const uint64_t*)> should_consider=nullptr,
-                                         const InfiniteByteString original_key={nullptr, 0},
-                                         const uint32_t original_key_start_bit=0) const;
+    int32_t GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                        const uint32_t total_implicit=infix_store_target_size,
+                                        std::function<bool(const uint64_t*)> should_consider=nullptr,
+                                        const InfiniteByteString original_key={nullptr, 0},
+                                        const uint32_t original_key_start_bit=0) const;
     // Assumes that `l_key` and `r_key` are full length infixes. Returnes true
     // if there is an infix that may lie within the range [`l_key`, `r_key`].
     bool RangeQueryInfixStore(InfixStore &store, const uint64_t l_key, const uint64_t r_key,
@@ -4062,29 +4062,33 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
     Infix infix_to_adapt;
     while (current_pos <= runend_pos) {
         const uint64_t current_slot = GetSlot(store, current_pos);
+        if ((current_slot & (current_slot - 1)) > explicit_part)
+            break;
         const uint64_t mask = ((current_slot & -current_slot) << 1) - 1;
         const bool is_full_infix = current_slot & 1;
         if ((current_slot | mask) == (explicit_part | mask)) {
-            if (is_full_infix && SlotHasTrie(store, current_pos, infix_size_)) {
+            if (is_full_infix && SlotHasTrie(store, current_pos, runend_pos)) {
                 infix_to_adapt = Infix(store.ptr + num_metadata_offset_words, 
                                        infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * current_pos,
                                        infix_size_);
                 adapt_pos = infix_to_adapt.GetLongestMatch(original_key, original_key_start_bit, infix_size_) >= 0 ? current_pos
                           : adapt_pos;
+                current_pos += infix_to_adapt.GetNumSlots(infix_size_);
                 break;
             }
-            else 
+            else {
                 adapt_pos = current_pos;
+                current_pos++;
+            }
         }
         else if (is_full_infix && SlotHasTrie(store, current_pos, runend_pos)) {
-            const Infix infix_to_skip(store, current_pos, infix_size_);
+            const Infix infix_to_skip = Infix(store.ptr + num_metadata_offset_words, 
+                                              infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * current_pos,
+                                              infix_size_);
             current_pos += infix_to_skip.GetNumSlots(infix_size_);
         }
-        else {
+        else
             current_pos++;
-            if ((current_slot & (current_slot - 1)) > explicit_part)
-                break;
-        }
     }
 #ifdef DEBUG
     assert(adapt_pos != -1);
@@ -4114,7 +4118,11 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
         adapt_pos = current_pos - 1;
         infix_to_adapt = Infix(explicit_part);
         if (adapt_length >= infix_size_) {
-            infix_to_adapt.BuildTrieAndSuffixes(&original_key, 1, original_key_start_bit, infix_size_);
+            const InfiniteByteString converted_original_key = 
+                    {original_key.str, original_key_start_bit + adapt_length - infix_size_ + 1};
+            infix_to_adapt.BuildTrieAndSuffixes(&converted_original_key , 1, 
+                    original_key_start_bit, infix_size_,
+                    false, true);
         }
         num_slots_filled = infix_to_adapt.GetNumSlots(infix_size_) - 1;
         if (num_slots_filled > 0) {
@@ -4722,11 +4730,11 @@ Diva<diva_type, payload_type>::DeleteRawRangeFromInfixStore(InfixStore &store,
 
 
 template <DivaType diva_type, PayloadType payload_type>
-inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
-                                                                           const uint32_t total_implicit,
-                                                                           std::function<bool(const uint64_t*)> should_consider,
-                                                                           const InfiniteByteString original_key,
-                                                                           const uint32_t original_key_start_bit) const {
+inline int32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const InfixStore &store, const uint64_t key,
+                                                                          const uint32_t total_implicit,
+                                                                          std::function<bool(const uint64_t*)> should_consider,
+                                                                          const InfiniteByteString original_key,
+                                                                          const uint32_t original_key_start_bit) const {
     const uint32_t store_size = scaled_sizes_[store.GetSizeGrade()];
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
@@ -4788,7 +4796,7 @@ inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const
             }
         }
     }
-    return res;
+    return res - 1;
 }
 
 
@@ -7123,7 +7131,7 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
     int32_t last_depth = -1;
-    bool prefix_match = false;
+    bool prefix_match = false, should_check_suffix = true;
     while (true) {
         it.Advance(has_prefix_keys);
         auto [depth, children] = it.depth_branch_.back();
@@ -7146,9 +7154,15 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
         if (it.AtPrefixKey(has_prefix_keys)) {
             prefix_match = true;
             it.Advance(has_prefix_keys);
+            depth = it.depth_branch_.back().first;
+            children = it.depth_branch_.back().second;
         }
         if ((children & 1) == 1 && key.GetBit(key_start_bit + depth) == 1)
             it.SkipSubtree(has_prefix_keys);
+        else if (((children >> key.GetBit(key_start_bit + depth)) & 1) == 0) {
+            should_check_suffix = false;
+            break;
+        }
         if (it.AtLeaf())
             break;
         last_depth = depth;
@@ -7156,22 +7170,27 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
     assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
     uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
 
-    // Check if suffixes match
-    uint32_t suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_, slot_size, actual_suffix_len_backup);
-    auto [suffix_len, suffix_len_with_meta] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len_backup);
-    uint8_t suffix_contents[suffix_len / 8 + 8];
-    memset(suffix_contents, 0, suffix_len / 8 + 8);
-    const InfiniteByteString suffix = {suffix_contents, (suffix_len + 7) / 8};
-    bool suffix_match = true;
-    GetSuffixString(suffix_bit_pos, slot_size, suffix_contents, 0, actual_suffix_len_backup);
-    for (uint32_t i = 0; i < suffix_len; i += 64) {
-        const uint32_t bits_to_compare = std::min(64U, suffix_len - i);
-        const uint64_t read_key = key.BitsAt(key_start_bit + depth + i, bits_to_compare);
-        const uint64_t read_suffix = suffix.BitsAt(i, bits_to_compare);
-        const uint64_t diff = read_key ^ read_suffix;
-        if (diff) {
-            suffix_match = false;
-            break;
+    bool suffix_match = false;
+    uint32_t suffix_bit_pos = 0, suffix_len = 0, suffix_len_with_meta = 0;
+    if (should_check_suffix) {  // Check if suffixes match
+        suffix_bit_pos = GetSuffixBitPos(it.num_keys_read_, slot_size, actual_suffix_len_backup);
+        auto [suffix_len_, suffix_len_with_meta_] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len_backup);
+        suffix_len = suffix_len_;
+        suffix_len_with_meta = suffix_len_with_meta_;
+        uint8_t suffix_contents[suffix_len / 8 + 8];
+        memset(suffix_contents, 0, suffix_len / 8 + 8);
+        const InfiniteByteString suffix = {suffix_contents, (suffix_len + 7) / 8};
+        GetSuffixString(suffix_bit_pos, slot_size, suffix_contents, 0, actual_suffix_len_backup);
+        suffix_match = true;
+        for (uint32_t i = 0; i < suffix_len; i += 64) {
+            const uint32_t bits_to_compare = std::min(64U, suffix_len - i);
+            const uint64_t read_key = key.BitsAt(key_start_bit + depth + i, bits_to_compare);
+            const uint64_t read_suffix = suffix.BitsAt(i, bits_to_compare);
+            const uint64_t diff = read_key ^ read_suffix;
+            if (diff) {
+                suffix_match = false;
+                break;
+            }
         }
     }
 
