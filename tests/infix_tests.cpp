@@ -48,7 +48,7 @@ public:
             const std::vector<uint64_t> expected_trie = {0b1010'00000000000000000000000000110000,
                                                          0b111110000100011001000101110100110011100110001000};
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -62,7 +62,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -94,7 +94,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -108,7 +108,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -141,7 +141,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -156,7 +156,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -197,7 +197,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
                 const uint8_t l_key[20] = {0b00000000, 0b00000000};
@@ -256,7 +256,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
                 const uint8_t l_key[20] = {0b00000000, 0b11110010};
@@ -308,7 +308,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
                 const uint8_t l_key[20] = {0b00000000, 0b01111110, 0b11101101, 0b11101101};
@@ -376,7 +376,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             Diva<>::Infix::TrieIterator it(infix.trie_.data());
 
@@ -443,7 +443,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             Diva<>::Infix::TrieIterator it(infix.trie_.data());
 
@@ -512,7 +512,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             Diva<>::Infix::TrieIterator it(infix.trie_.data());
             SUBCASE("iterate all") {
@@ -593,15 +593,15 @@ public:
         std::sort(keys, keys + N);
 
         Diva<>::Infix expected_no_prefix(infix_value);
-        expected_no_prefix.BuildTrie(keys, N, key_start_bit, slot_size);
+        expected_no_prefix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
         Diva<>::Infix expected_prefix(infix_value);
-        expected_prefix.BuildTrie(keys, N, key_start_bit, slot_size, true);
+        expected_prefix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size, true);
 
         Diva<>::Infix infix(infix_value);
 
         SUBCASE("no prefix keys to prefix keys") {
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
             infix.SwitchTrieEncoding(true, slot_size);
 
             Diva<>::Infix check_infix(expected_prefix);
@@ -614,7 +614,7 @@ public:
         }
 
         SUBCASE("prefix keys to no prefix keys") {
-            infix.BuildTrie(keys, N, key_start_bit, slot_size, true);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size, true);
             infix.SwitchTrieEncoding(false, slot_size);
 
             Diva<>::Infix check_infix(expected_no_prefix);
@@ -649,7 +649,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             SUBCASE("path diverging to the right") {
                 SUBCASE("first part zero") {
@@ -757,7 +757,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             SUBCASE("path diverging") {
                 uint8_t insertee_contents[8] = {0b00000000, 0b10111111, 0b11111111};
@@ -852,7 +852,7 @@ public:
 
             const uint64_t infix_value = 1;
             Diva<>::Infix infix(infix_value);
-            infix.BuildTrie(keys, N, key_start_bit, slot_size);
+            infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b00000000};
             infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
@@ -896,7 +896,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
 
                 std::vector<uint32_t> expected_key_bit_lens = {4,
@@ -924,7 +924,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
                 std::vector<uint32_t> expected_key_bit_lens = {7,
                                                                9,
@@ -969,7 +969,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
                 std::vector<uint32_t> expected_key_bit_lens = {2,
                                                                4,
@@ -996,7 +996,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
                 std::vector<uint32_t> expected_key_bit_lens = {2,
                                                                6,
@@ -1042,7 +1042,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
                 std::vector<uint32_t> expected_key_bit_lens = {5,
                                                                5,
@@ -1089,7 +1089,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 const auto [recovered_keys, recovered_key_contents] = infix.GetStrings(slot_size);
                 std::vector<uint32_t> expected_key_bit_lens = {8,
                                                                8,
@@ -1171,22 +1171,22 @@ public:
             }
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                 check_infix.num_suffix_bits_ = 14;
                 check_infix.trie_suffixes_[0] = 0b100100;
                 AssertInfix(infix, check_infix);
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                 check_infix.num_suffix_bits_ = 55;
                 check_infix.trie_suffixes_[0] = 0b100001000011100111101011010000000000011100000111001000;
                 AssertInfix(infix, check_infix);
@@ -1221,11 +1221,11 @@ public:
                 uint8_t victim_key[1] = {0b00001111};
 
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 infix.DeleteTrie({victim_key, 1}, 0, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                 check_infix.trie_suffixes_[0] = 0b110000110000101000110000110000111000111000101000100;
                 AssertInfix(infix, check_infix);
             }
@@ -1240,22 +1240,22 @@ public:
                 }
 
                 SUBCASE("small slots") {
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
-                    check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                    check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                     check_infix.num_suffix_bits_ = 13;
                     check_infix.trie_suffixes_[0] = 0b111000;
                     AssertInfix(infix, check_infix);
                 }
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
-                    check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                    check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                     check_infix.num_suffix_bits_ = 42;
                     check_infix.trie_suffixes_[0] = 0b11001100101011000000000011110011101010100;
                     AssertInfix(infix, check_infix);
@@ -1290,20 +1290,20 @@ public:
             }
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                 AssertInfix(infix, check_infix);
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(baseline_keys, N - 1, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
                 AssertInfix(infix, check_infix);
             }
         }
@@ -1335,7 +1335,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 2;
@@ -1355,7 +1355,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 2;
@@ -1393,7 +1393,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 2;
@@ -1418,7 +1418,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 2;
@@ -1457,7 +1457,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 3;
@@ -1477,7 +1477,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     const uint32_t query_key_len = 3;
@@ -1524,10 +1524,10 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1561,10 +1561,10 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1618,10 +1618,10 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1643,16 +1643,16 @@ public:
                     check_infix.trie_[0] = 0b11111010101111010111010110001000;
                     check_infix.num_suffixes_ = 10;
                     check_infix.num_suffix_bits_ = 45;
-                    check_infix.trie_suffixes_[0] = 0b111110111010110000000000001111111111100001;
+                    check_infix.trie_suffixes_[0] = 0b111110111010110000000000011111111111100001;
                     AssertInfix(infix, check_infix);
                 }
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1700,10 +1700,10 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1727,10 +1727,10 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
-                check_infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                check_infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
@@ -1784,7 +1784,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(3, slot_size);
@@ -1881,7 +1881,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(3, slot_size);
@@ -2008,7 +2008,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(1, slot_size);
@@ -2139,7 +2139,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(1, slot_size);
@@ -2312,7 +2312,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(3, slot_size);
@@ -2399,7 +2399,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
                     auto split_infixes = infix.SplitPrefixBits(3, slot_size);
@@ -2545,8 +2545,8 @@ public:
             Diva<>::Infix infix_b(infix_value);
 
             SUBCASE("small slots") {
-                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
-                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.BuildTrieAndSuffixes(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrieAndSuffixes(keys + N / 2, N / 2, key_start_bit, slot_size);
                 infix_a.Merge(infix_b, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
@@ -2560,8 +2560,8 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
-                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.BuildTrieAndSuffixes(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrieAndSuffixes(keys + N / 2, N / 2, key_start_bit, slot_size);
                 infix_a.Merge(infix_b, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
@@ -2594,8 +2594,8 @@ public:
             Diva<>::Infix infix_b(infix_value);
 
             SUBCASE("small slots") {
-                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
-                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.BuildTrieAndSuffixes(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrieAndSuffixes(keys + N / 2, N / 2, key_start_bit, slot_size);
                 infix_a.Merge(infix_b, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
@@ -2609,8 +2609,8 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix_a.BuildTrie(keys, N / 2, key_start_bit, slot_size);
-                infix_b.BuildTrie(keys + N / 2, N / 2, key_start_bit, slot_size);
+                infix_a.BuildTrieAndSuffixes(keys, N / 2, key_start_bit, slot_size);
+                infix_b.BuildTrieAndSuffixes(keys + N / 2, N / 2, key_start_bit, slot_size);
                 infix_a.Merge(infix_b, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
@@ -2656,7 +2656,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2692,7 +2692,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2746,7 +2746,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2782,7 +2782,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2837,7 +2837,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2877,7 +2877,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2936,7 +2936,7 @@ public:
             Diva<>::Infix infix(infix_value);
 
             SUBCASE("small slots") {
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -2970,7 +2970,7 @@ public:
             }
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
-                infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
@@ -3072,7 +3072,7 @@ public:
                 Diva<>::Infix infix(infix_value);
 
                 SUBCASE("small slots") {
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 14);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000010,
@@ -3087,7 +3087,7 @@ public:
                 }
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
@@ -3109,7 +3109,7 @@ public:
                 Diva<>::Infix infix(infix_value);
 
                 SUBCASE("small slots") {
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 14);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00001010,
@@ -3124,7 +3124,7 @@ public:
                 }
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
@@ -3162,7 +3162,7 @@ public:
                 Diva<>::Infix infix(infix_value);
 
                 SUBCASE("small slots") {
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 16);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000010,
@@ -3177,7 +3177,7 @@ public:
                 }
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,
@@ -3199,7 +3199,7 @@ public:
                 Diva<>::Infix infix(infix_value);
 
                 SUBCASE("small slots") {
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 16);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b01001010,
@@ -3214,7 +3214,7 @@ public:
                 }
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
-                    infix.BuildTrie(keys, N, key_start_bit, slot_size);
+                    infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
                     REQUIRE_EQ(infix.GetNumSlots(slot_size), 12);
                     infix.SerializeToPtr(infix_store_buf, slot_pos * slot_size, slot_size);
                     const uint8_t infix_store_expected_buf[1024] = {0b00000000, 0b00000000, 0b00000000, 0b00000000,

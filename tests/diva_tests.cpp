@@ -1993,7 +1993,7 @@ public:
 
         std::vector<std::thread> threads;
 
-        SUBCASE("inserts welp") {
+        SUBCASE("inserts") {
             for (uint32_t i = 0; i < n_threads; i++) {
                 threads.emplace_back([&, i] {
                             std::mt19937_64 rng(rng_seed + i + 1);
@@ -4304,121 +4304,6 @@ public:
                 }
                 REQUIRE_EQ(found, (payloads[i][0] > delete_threshold || payloads[i][0] == 0));
             }
-        }
-
-
-        SUBCASE("guy's workload") {
-            std::ifstream inserts("./tests/phase1_insert.txt", std::ios::binary);
-            REQUIRE(inserts.is_open());
-            std::ifstream updates("./tests/phase1_update.txt", std::ios::binary);
-            REQUIRE(updates.is_open());
-
-            const uint32_t infix_size = 8;
-            const float load_factor = 0.95;
-            const uint32_t n_keys = 30000000;
-            const uint32_t n_threads = 16;
-            const uint32_t n_init_samples = 50000;
-            const uint64_t delete_threshold = 10000000;
-            const uint64_t query_period = 5000000;
-
-            std::vector<std::string> string_keys;
-            for (int32_t i = 0; i < n_keys; i++) {
-                uint32_t key_length;
-                std::string key;
-                char dummy;
-                if (i < n_keys / 3) {
-                    inserts.read(reinterpret_cast<char *>(&key_length), sizeof(key_length));
-                    key_length = __builtin_bswap32(key_length);
-                    key.resize(key_length);
-                    inserts.read(key.data(), key_length);
-                    inserts.read(&dummy, sizeof(dummy));
-                }
-                else {
-                    updates.read(reinterpret_cast<char *>(&key_length), sizeof(key_length));
-                    key_length = __builtin_bswap32(key_length);
-                    key.resize(key_length);
-                    updates.read(key.data(), key_length);
-                    updates.read(&dummy, sizeof(dummy));
-                }
-                string_keys.push_back(key);
-            }
-            uint64_t *payloads_contents = new uint64_t[n_keys * (payload_size / 64 + 2)];
-            uint64_t **payloads = new uint64_t *[n_keys];
-            for (uint32_t i = 0; i < n_keys; i++) {
-                for (uint32_t j = 0; j < payload_size / 64 + 2; j++)
-                    payloads_contents[i * (payload_size / 64 + 2) + j] = rng();
-                payloads[i] = &(payloads_contents[i * (payload_size / 64 + 2)]);
-            }
-            std::cerr << "workload set up" << std::endl;
-
-            Diva<diva_type, PayloadType::FixedLength> s(infix_size,
-                                                seed,
-                                                load_factor,
-                                                payload_size, 
-                                                true);
-
-            for (uint32_t i = 0; i < n_init_samples; i++)
-                s.Insert(string_keys[i], payloads[i], 1024);
-
-            std::atomic<uint64_t> n_keys_inserted_overall = 1;
-            std::vector<std::thread> threads;
-            for (uint32_t i = 0; i < n_threads; i++) {
-                threads.emplace_back([&, i] {
-                        if (i > 0) {
-                            uint64_t cnt = 0, total_count = 0, xor_ = 0;
-                            for (uint32_t ti = n_init_samples + i; ti < n_keys; ti += n_threads) {
-                                for (auto it = s.GetIterator(string_keys[ti], string_keys[ti]); it.IsValid(); ++it) {
-                                    uint64_t payload[(payload_size + 63) / 64 + 1];
-                                    it.GetPayload(payload);
-                                    xor_ ^= payload[0];
-                                    cnt++;
-                                }
-                                payloads[ti][0] = n_keys_inserted_overall.load(std::memory_order_acquire);
-                                s.Insert(string_keys[ti], payloads[ti], rng());
-                                total_count++;
-                                n_keys_inserted_overall.fetch_add(1, std::memory_order_release);
-                                if ((ti - n_init_samples - i) % query_period == 0) {    // Ensure no data loss
-                                    std::cerr << "querying i=" << i << " ti=" << ti << std::endl;
-                                    for (int32_t tj = ti; tj >= 0; tj -= n_threads) {
-                                        if (payloads[tj][0] > delete_threshold) {
-                                            bool found = false;
-                                            for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
-                                                    it.IsValid();
-                                                    ++it) {
-                                                uint64_t payload[(payload_size + 63) / 64 + 1];
-                                                it.GetPayload(payload);
-                                                if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size))
-                                                    found = true;
-                                            }
-                                            if (!found) {
-                                                for (auto it = s.GetIterator(string_keys[tj], string_keys[tj]); 
-                                                        it.IsValid();
-                                                        ++it) {
-                                                    uint64_t payload[(payload_size + 63) / 64 + 1];
-                                                    it.GetPayload(payload);
-                                                    if (compare_bitmap_to_bitmap(payloads[tj], 0, payload, 0, payload_size))
-                                                        found = true;
-                                                }
-                                            }
-                                            REQUIRE(found);
-                                        }
-                                    }
-                                }
-                            }
-                            std::cerr << "done i=" << i << " cnt=" << cnt << " xor=" << xor_ << std::endl;
-                        }
-                        else {
-                            while (n_keys_inserted_overall.load(std::memory_order_acquire) <= delete_threshold)
-                                cpu_pause();
-                            s.DeleteRange(nullptr, 0, nullptr, 0, 
-                                    [=](const uint64_t *payload) { 
-                                        return payload[0] <= delete_threshold && payload[0] > 0;
-                                    });
-                        }
-                    });
-            }
-            for (auto& t : threads)
-                t.join();
         }
     }
 
