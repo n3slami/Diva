@@ -4727,6 +4727,7 @@ inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const
                                                                            std::function<bool(const uint64_t*)> should_consider,
                                                                            const InfiniteByteString original_key,
                                                                            const uint32_t original_key_start_bit) const {
+    const uint32_t store_size = scaled_sizes_[store.GetSizeGrade()];
     const uint64_t implicit_part = key >> infix_size_;
     const uint64_t explicit_part = key & BITMASK(infix_size_);
 
@@ -4745,7 +4746,9 @@ inline uint32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const
             const bool is_full_infix = current_slot & 1;
             if ((current_slot | mask) == (explicit_part | mask)) {
                 if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
-                    const Infix infix_to_query(store, i, infix_size_);
+                    const Infix infix_to_query(store.ptr + num_metadata_offset_words,
+                            infix_store_target_size + store_size + infix_size_ * i,
+                            infix_size_);
                     const int32_t trie_match_size = infix_to_query.GetLongestMatch(original_key,
                                                                                    original_key_start_bit,
                                                                                    infix_size_);
@@ -6594,7 +6597,6 @@ template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::Infix::AdjustActualSuffixLen(uint32_t old_actual_suffix_len,
                                                                         uint32_t new_actual_suffix_len,
                                                                         uint32_t slot_size) {
-    const uint32_t new_actual_valid_bits = new_actual_suffix_len - 1 - (new_actual_suffix_len > 1);
     uint8_t suffix_str[sizeof(trie_suffixes_[0]) * trie_suffixes_.size()];
     uint32_t old_suffixes_bit_pos = 0;
     Infix res;
@@ -7019,8 +7021,10 @@ Diva<diva_type, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
             res_contents.resize(old_res_contents_size + current_string.size());
             memcpy(res_contents.data() + old_res_contents_size, current_string.data(), current_string.size());
             res.emplace_back(reinterpret_cast<const uint8_t *>(old_res_contents_size), depth);
+            it.Advance(has_prefix_keys);
             last_depth = depth;
-            continue;
+            depth = it.depth_branch_.back().first;
+            children = it.depth_branch_.back().second;
         }
         if (it.AtLeaf()) {
             const auto [suffix_len, suffix_len_with_meta] = GetSuffixLength(suffix_bit_pos, slot_size, actual_suffix_len);
@@ -7074,9 +7078,13 @@ int32_t Diva<diva_type, payload_type>::Infix::GetLongestMatch(const InfiniteByte
         if (it.AtPrefixKey(has_prefix_keys)) {
             res = depth;
             it.Advance(has_prefix_keys);
+            depth = it.depth_branch_.back().first;
+            children = it.depth_branch_.back().second;
         }
         if ((children & 1) == 1 && key.GetBit(key_start_bit + depth) == 1)
             it.SkipSubtree(has_prefix_keys);
+        else if (((children >> key.GetBit(key_start_bit + depth)) & 1) == 0)
+            return res;
         if (it.AtLeaf())
             break;
         last_depth = depth;

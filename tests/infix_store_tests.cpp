@@ -2249,7 +2249,7 @@ public:
                 uint8_t original_key[2] = {0b00001000, 0b01000000};
                 s.DeleteRawFromInfixStore(store, 0b0000000000000011, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_left/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2258,7 +2258,7 @@ public:
                 uint8_t original_key[2] = {0b00001000, 0b00000000};
                 s.DeleteRawFromInfixStore(store, 0b0000000000000011, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_left/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2270,7 +2270,7 @@ public:
                 uint8_t original_key[1] = {0b00000000};
                 s.DeleteRawFromInfixStore(store, 0b0011111111100111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2279,7 +2279,7 @@ public:
                 uint8_t original_key[1] = {0b11110000};
                 s.DeleteRawFromInfixStore(store, 0b0011111111100111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2288,7 +2288,7 @@ public:
                 uint8_t original_key[3] = {0b01000100, 0b00110101, 0b01001100};
                 s.DeleteRawFromInfixStore(store, 0b0100000000101101, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/3");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2299,7 +2299,7 @@ public:
             uint8_t original_key[3] = {0b01000100, 0b00110101, 0b01001100};
             s.DeleteRawFromInfixStore(store, 0b0100000000111111, infix_store_target_size,
                     nullptr, 
-                    {original_key, sizeof(original_key)}, key_start_bit);
+                    {original_key, sizeof(original_key)}, 0);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_left");
             AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2309,7 +2309,7 @@ public:
             for (int32_t i = 0; i < infix_vec[0].num_suffixes_; i++) {
                 s.DeleteRawFromInfixStore(store, infix_vec[0].infix_, infix_store_target_size,
                         nullptr, 
-                        {keys[i].str, keys[i].length / 8}, key_start_bit);
+                        {keys[i].str, keys[i].length / 8}, 0);
             }
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/destroy_run/shift_left");
@@ -2321,7 +2321,7 @@ public:
                 uint8_t original_key[2] = {0b01001010, 0b01000000};
                 s.DeleteRawFromInfixStore(store, 0b0111111110011111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_right/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2330,7 +2330,7 @@ public:
                 uint8_t original_key[2] = {0b01001000, 0b00000000};
                 s.DeleteRawFromInfixStore(store, 0b0111111110011111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_right/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2344,7 +2344,7 @@ public:
             for (int32_t i = 0; i < infix_vec.back().num_suffixes_ + infix_vec.back().GetNumPrefixKeys(); i++) {
                 s.DeleteRawFromInfixStore(store, infix_vec.back().infix_, infix_store_target_size,
                         nullptr,
-                        {keys[key_offset + i].str, keys[key_offset + i].length / 8}, key_start_bit);
+                        {keys[key_offset + i].str, keys[key_offset + i].length / 8}, 0);
             }
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/destroy_run/shift_right");
@@ -2356,7 +2356,7 @@ public:
                 uint8_t original_key[3] = {0b01010110, 0b00000000, 0b00000000};
                 s.DeleteRawFromInfixStore(store, 0b0111111110011111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2365,7 +2365,7 @@ public:
                 uint8_t original_key[2] = {0b01010101, 0b00000000};
                 s.DeleteRawFromInfixStore(store, 0b0111111110011111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2374,7 +2374,7 @@ public:
                 uint8_t original_key[1] = {0b01010100};
                 s.DeleteRawFromInfixStore(store, 0b0111111110011111, infix_store_target_size,
                         nullptr, 
-                        {original_key, sizeof(original_key)}, key_start_bit);
+                        {original_key, sizeof(original_key)}, 0);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/3");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2410,6 +2410,108 @@ public:
             const std::vector<uint32_t> occupieds_pos;
             const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks;
             AssertStoreContents(s, store, occupieds_pos, checks);
+        }
+    }
+
+
+    static void BinaryTrieGetLongestMatchingInfixSize() {
+        const uint32_t N_bulk = 6;
+        const uint32_t N_bulk_keys = 61;
+        const uint32_t key_start_bit = 0;
+        const uint32_t min_key_len = 6;
+        const uint32_t max_key_len = 17;
+        const uint32_t max_num_keys_in_infix = 10;
+        const uint32_t infix_size = 5;
+        const uint32_t infix_store_target_size = BinaryTrieDiva::infix_store_target_size;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+
+        uint64_t bulk_infixes[N_bulk] = {0b0000000000000011,
+            0b0000000001000011, 0b0011111111100111,
+            0b0100000000101101, 0b0111111110011111,
+            0b0111111111011111};
+        uint8_t keys_contents[N_bulk_keys][max_key_len + 1] = {};
+        BinaryTrieDiva::InfiniteByteString keys[N_bulk_keys];
+        for (int32_t i = 0; i < N_bulk_keys - 1; i++) {
+            const uint32_t key_len = min_key_len + rng() % (max_key_len - min_key_len + 1);
+            keys[i] = {keys_contents[i], 8 * key_len};
+            for (uint32_t j = (key_start_bit + 7) / 8; j < key_len; j++)
+                keys_contents[i][j] = rng();
+        }
+        keys_contents[N_bulk_keys - 1][0] = 0b01000100;
+        keys_contents[N_bulk_keys - 1][1] = 0b00110101;
+        keys_contents[N_bulk_keys - 1][2] = 0b01001100;
+        keys[N_bulk_keys - 1] = {keys_contents[N_bulk_keys - 1], 24};
+        std::sort(keys, keys + N_bulk_keys);
+
+        std::vector<BinaryTrieDiva::Infix> infix_vec;
+        int32_t key_ind = 0;
+        for (int32_t i = 0; i < N_bulk; i++) {
+            uint32_t num_keys_in_infix = std::min<uint32_t>(rng() % max_num_keys_in_infix + 1,
+                                                            N_bulk_keys - key_ind);
+            num_keys_in_infix += (i == 3);      // Manually add the prefix key
+            infix_vec.emplace_back(bulk_infixes[i]);
+            infix_vec.back().BuildTrieAndSuffixes(keys + key_ind, num_keys_in_infix, key_start_bit, infix_size);
+            key_ind += num_keys_in_infix;
+        }
+        infix_vec.insert(infix_vec.begin() + 2,  {0b0011111111100110});
+        infix_vec.insert(infix_vec.begin() + 4,  {0b0100000000100101});
+        infix_vec.insert(infix_vec.begin() + 6,  {0b0100000000111111});
+
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
+        BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_,
+                s.size_scalar_shrink_grow_sep);
+        s.LoadVectorToInfixStore(store, infix_vec);
+
+        SUBCASE("single infix, exact trie match") {
+            uint8_t original_key[2] = {0b00101011, 0b10100110};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0000000001000011, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    infix_size + 8);
+        }
+
+        SUBCASE("multiple infixes, exact trie match") {
+            uint8_t original_key[4] = {0b01000100, 0b00110101, 0b01001100, 0b10100111};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0100000000101101, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    infix_size + 25);
+        }
+
+        SUBCASE("multiple infixes, partial trie match") {
+            uint8_t original_key[4] = {0b01000100, 0b00110101, 0b01001100, 0b00111110};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0100000000101101, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    infix_size + 24);
+        }
+
+        SUBCASE("multiple infixes, exact infix match") {
+            uint8_t original_key[2] = {0b01100100, 0b00110101};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0100000000111111, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    infix_size);
+        }
+
+        SUBCASE("multiple infixes, partial infix match") {
+            uint8_t original_key[2] = {0b01100100, 0b00110101};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0011111111100101, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    infix_size - 1);
+        }
+
+        SUBCASE("no match") {
+            uint8_t original_key[4] = {0b01000100, 0b00110101, 0b01001100, 0b10100111};
+            REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0000000001000011, infix_store_target_size,
+                        nullptr,
+                        {original_key, sizeof(original_key)}, 0), 
+                    0);
         }
     }
 
@@ -2716,7 +2818,7 @@ TEST_SUITE("infix_store") {
         }
         SUBCASE("delete raw") {
             InfixStoreTests::BinaryTrieDeleteRaw();
-            //InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
+            InfixStoreTests::BinaryTrieGetLongestMatchingInfixSize();
         }
         SUBCASE("resize") {
             // InfixStoreTests::BinaryTrieResize();
