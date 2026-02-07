@@ -6690,7 +6690,7 @@ inline void Diva<diva_type, payload_type>::Infix::InsertTrie(const InfiniteByteS
     const bool has_prefix_keys = HasPrefixKeys();
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
     bool found_exact_match = true;
-    int32_t last_depth = -1, last_bit_pos = -1;
+    int32_t last_depth = -1, last_bit_pos = 0;
     if (num_trie_bits_ == 1) {  // Might have only one suffix, so there's nothing to traverse
         it.depth_branch_.clear();
         goto InsertTrieAfterLoop;
