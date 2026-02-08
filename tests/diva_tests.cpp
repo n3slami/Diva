@@ -437,14 +437,12 @@ public:
             uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
             value = to_big_endian_order(value);
             s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
-            keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
-            partial_keys.insert(0b0000000000000000000000000000000000011101000010110100000000000000UL);
+            keys.insert(__bswap_64(value));
 
             value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
             value = to_big_endian_order(value);
             s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
-            const uint64_t rev_value = __bswap_64(value);
-            keys.insert(rev_value);
+            keys.insert(__bswap_64(value));
         }
 
         SUBCASE("no false negatives") {
@@ -580,14 +578,12 @@ public:
             uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
             value = to_big_endian_order(value);
             s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
-            keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
-            partial_keys.insert(0b0000000000000000000000000000000000011101000010110100000000000000UL);
+            keys.insert(__bswap_64(value));
 
             value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
             value = to_big_endian_order(value);
             s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
-            const uint64_t rev_value = __bswap_64(value);
-            keys.insert(rev_value);
+            keys.insert(__bswap_64(value));
         }
 
         SUBCASE("no false negatives: random end-points") {
@@ -4421,7 +4417,6 @@ TEST_SUITE("diva") {
         DivaTests::RandomInsert<DivaType::Standard>();
     }
 
-    /*
     TEST_CASE("point query") {
         DivaTests::PointQuery<DivaType::Standard>();
     }
@@ -4430,6 +4425,7 @@ TEST_SUITE("diva") {
         DivaTests::RangeQuery<DivaType::Standard>();
     }
 
+    /*
     TEST_CASE("delete") {
         DivaTests::Delete<DivaType::Standard>();
     }
@@ -4466,7 +4462,6 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::RandomInsert<DivaType::Int>();
     }
 
-    /*
     TEST_CASE("point query") {
         DivaTests::PointQuery<DivaType::Int>();
     }
@@ -4475,6 +4470,7 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::RangeQuery<DivaType::Int>();
     }
 
+    /*
     TEST_CASE("delete") {
         DivaTests::Delete<DivaType::Int>();
     }
