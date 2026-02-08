@@ -741,11 +741,11 @@ public:
                     s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
                 }
 
-                const uint8_t *key_ptr;
+                const uint8_t *key_ptr, *res_key;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
                 typename Diva<diva_type>::InfixStore *store;
-                uint32_t dummy;
+                uint32_t res_size, dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
                 std::vector<uint64_t> left_store_infixes {0b0'001010101'01011,
@@ -755,6 +755,8 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b1'001010101'10000,
                     0b1'001010101'01011, 0b1'001111111'11001,
                     0b1'011111100'01000, 0b1'011111100'00111};
+                const auto [occupieds_pos, checks] = 
+                    ReadStoreContentsFromFile("delete/merge/1");
                 if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -775,12 +777,6 @@ public:
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                          reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 1, 299, 320, 383};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11001},   {  1,0,0b11011},   {  2,1,0b11011},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,1,0b00011},   { 37,0,0b11000},   { 38,1,0b10101},   { 40,1,0b11101},   { 47,0,0b00100},   { 48,1,0b00011}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -817,12 +813,6 @@ public:
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                      reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 1, 299, 320, 383};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b11001},   {  1,0,0b11011},   {  2,1,0b11011},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,1,0b00011},   { 37,0,0b11000},   { 38,1,0b10101},   { 40,1,0b11101},   { 47,0,0b00100},   { 48,1,0b00011}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -852,11 +842,11 @@ public:
                     s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
                 }
 
-                const uint8_t *key_ptr;
+                const uint8_t *key_ptr, *res_key;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
                 typename Diva<diva_type>::InfixStore *store;
-                uint32_t dummy;
+                uint32_t res_size, dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
                 std::vector<uint64_t> left_store_infixes {0b0'000000000'10100,
@@ -866,6 +856,8 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b0'010100000'11111,
                     0b0'011110101'01000, 0b0'011110101'00001,
                     0b1'001001011'01011};
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("delete/merge/2");
                 if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -886,12 +878,6 @@ public:
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                          reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 512, 513, 514, 516};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10100},   {  1,1,0b10101},   {  2,1,0b10111},   {  3,0,0b10000},   {  4,1,0b00001},   {  5,1,0b10111},   { 59,1,0b00001},   { 60,1,0b01101},   { 61,0,0b00011},   { 62,1,0b00011},   { 63,1,0b10111}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -928,12 +914,6 @@ public:
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                      reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 512, 513, 514, 516};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10100},   {  1,1,0b10101},   {  2,1,0b10111},   {  3,0,0b10000},   {  4,1,0b00001},   {  5,1,0b10111},   { 59,1,0b00001},   { 60,1,0b01101},   { 61,0,0b00011},   { 62,1,0b00011},   { 63,1,0b10111}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -962,11 +942,11 @@ public:
                     s.AddTreeKey(reinterpret_cast<const uint8_t *>(&conv_key), sizeof(conv_key));
                 }
 
-                const uint8_t *key_ptr;
+                const uint8_t *key_ptr, *res_key;
                 uint32_t key_len;
                 uint64_t value = to_big_endian_order(boundary_keys[0]);
                 typename Diva<diva_type>::InfixStore *store;
-                uint32_t dummy;
+                uint32_t res_size, dummy;
 
                 const uint64_t total_implicit = 0b1'111111111 - 0b0'000000000 + 1;
                 std::vector<uint64_t> left_store_infixes {0b0'000000000'10100,
@@ -976,6 +956,8 @@ public:
                 std::vector<uint64_t> right_store_infixes {0b0'010100000'11111,
                     0b0'011110101'01000, 0b0'011110101'00001,
                     0b1'001001011'01011};
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("delete/merge/3");
                 if constexpr (diva_type == DivaType::Int) {
                     wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                     wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
@@ -996,12 +978,6 @@ public:
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                          reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 160, 245, 587};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b00001},   {  1,0,0b00001},   {  2,0,0b00001},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,0,0b00001},   {  6,1,0b00001},   { 10,1,0b11111},   { 15,0,0b01000},   { 16,1,0b00001},   { 36,1,0b01011}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -1038,12 +1014,6 @@ public:
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&key_ptr), &key_len,
                                      reinterpret_cast<void **>(&store), &dummy);
                     {
-                        const std::vector<uint32_t> occupieds_pos = {0, 160, 245, 587};
-                        const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b00001},   {  1,0,0b00001},   {  2,0,0b00001},   {  3,0,0b00001},   {  4,0,0b00001},   {  5,0,0b00001},   {  6,1,0b00001},   { 10,1,0b11111},   { 15,0,0b01000},   { 16,1,0b00001},   { 36,1,0b01011}};
-                        const uint8_t *res_key;
-                        uint32_t res_size, dummy;
-                        typename Diva<diva_type>::InfixStore *store;
-
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
@@ -1121,20 +1091,9 @@ public:
 
             {
                 uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
-                auto it = boundary_keys.upper_bound(value);
-                const uint64_t next_key = to_big_endian_order(*it);
-                --it;
-                const uint64_t prev_key = to_big_endian_order(*it);
-                auto [shared, ignore, implicit_size] = s.GetSharedIgnoreImplicitLengths(
-                        {reinterpret_cast<const uint8_t *>(&prev_key), sizeof(prev_key)},
-                        {reinterpret_cast<const uint8_t *>(&next_key), sizeof(next_key)});
-                const uint32_t bits_to_zero_out = sizeof(uint64_t) * 8 - shared - ignore - implicit_size - s.infix_size_;
-
                 value = to_big_endian_order(value);
                 s.InsertSplit({reinterpret_cast<const uint8_t *>(&value), sizeof(value)});
-                const uint64_t rev_value = __bswap_64(value);
-                keys.emplace_back(rev_value, bits_to_zero_out);
-                boundary_keys.insert(0b0000000000000000000000000000000000011101000010110000000000000000UL);
+                boundary_keys.insert(__bswap_64(value));
             }
 
             for (int32_t i = 0; i < keys.size(); i++) {
@@ -1145,19 +1104,13 @@ public:
             const uint32_t shuffle_seed = 10;
             std::mt19937 shuffle_gen(shuffle_seed);
             std::shuffle(keys.begin(), keys.end(), shuffle_gen);
+            // Since we duplicate this infix, we're going to return true anyways, so account for this
+            keys.emplace_back(0b00011101000010110000000000000000UL, 16);
 
-            for (int32_t i = 0; i < keys.size(); i++) {
+            for (int32_t i = 0; i < keys.size() - 1; i++) {
                 if (boundary_keys.find(keys[i].first) != boundary_keys.end())
                     boundary_keys.erase(keys[i].first);
-                else if (0b00011101000010110000000000000000UL == (keys[i].first & (~BITMASK(keys[i].second + 1)))) {
-                    const uint64_t l = 0b00011101000010110000000000000000UL;
-                    const uint64_t r = 0b00011101000010110111111111111111UL;
-                    const bool found = std::find_if(keys.begin() + i + 1, keys.end(),
-                                                    [&](std::pair<uint64_t, uint64_t> key) { return l <= key.first && key.first <= r; })
-                                            != keys.end();
-                    if (!found)
-                        boundary_keys.erase(keys[i].first & (~BITMASK(keys[i].second + 1)));
-                }
+
                 const uint64_t del_value = to_big_endian_order(keys[i].first);
                 s.Delete(reinterpret_cast<const uint8_t *>(&del_value), sizeof(del_value));
 
@@ -4425,11 +4378,11 @@ TEST_SUITE("diva") {
         DivaTests::RangeQuery<DivaType::Standard>();
     }
 
-    /*
     TEST_CASE("delete") {
         DivaTests::Delete<DivaType::Standard>();
     }
 
+    /*
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<DivaType::Standard>();
         DivaTests::BulkLoadStreaming<DivaType::Standard>();
@@ -4470,11 +4423,11 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::RangeQuery<DivaType::Int>();
     }
 
-    /*
     TEST_CASE("delete") {
         DivaTests::Delete<DivaType::Int>();
     }
 
+    /*
     TEST_CASE("bulk load") {
         DivaTests::BulkLoad<DivaType::Int>();
         DivaTests::BulkLoadStreaming<DivaType::Int>();

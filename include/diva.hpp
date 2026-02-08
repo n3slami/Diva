@@ -2545,7 +2545,10 @@ inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
     store_l->ptr = store.ptr;
     store_l->rwlock.store(store.rwlock.load(std::memory_order_acquire), std::memory_order_release);
     delete[] old_store_l_ptr;
-    free(reinterpret_cast<void *>(store_r->ptr[1]));
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        // Free the sample payload list for the deleted key
+        free(reinterpret_cast<void *>(store_r->ptr[1]));
+    }
     delete[] store_r->ptr;
     if (should_allocate_on_heap) {
         delete[] infix_list;
