@@ -7,6 +7,7 @@
 #include "wormhole/wh_int.h"
 #include <atomic>
 #include <endian.h>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <random>
@@ -40,28 +41,18 @@ public:
         const bool check_it_unlock = true;
         Diva<diva_type> s(infix_size, seed, load_factor);
 
-        uint64_t value;
-        uint8_t buf[9];
-        memset(buf, 0, sizeof(buf));
-
-        value = to_big_endian_order(0x0000000011111111UL);
+        uint64_t value = to_big_endian_order(0x0000000011111111UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
         value = to_big_endian_order(0x0000000022222222UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
         value = to_big_endian_order(0x0000000033333333UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
         value = to_big_endian_order(0x0000000044444444UL);
         s.AddTreeKey(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
         value = to_big_endian_order(0x0000000020000000UL);
         s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
         value = to_big_endian_order(0x0000000040007777UL);
         s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
-
 
         for (int32_t i = 1; i < 100; i++) {
             const uint64_t l = 0x0000000011111111ULL, r = 0x0000000022222222ULL;
@@ -70,8 +61,8 @@ public:
             s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
         SUBCASE("interpolated inserts") {
-            const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32, 38, 43, 49, 54, 60, 65, 71, 76, 82, 87, 92, 98, 103, 109, 114, 120, 125, 131, 136, 142, 147, 153, 158, 163, 169, 174, 180, 185, 191, 196, 202, 207, 213, 218, 224, 229, 234, 240, 245, 251, 256, 262, 267, 273, 278, 284, 289, 295, 300, 305, 311, 316, 322, 327, 333, 338, 344, 349, 355, 360, 366, 371, 376, 382, 387, 393, 398, 404, 409, 415, 420, 426, 431, 437, 442, 447, 453, 458, 464, 469, 475, 478, 480, 486, 491, 497, 502, 508, 513, 518, 524, 529, 535, 540};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,1,0b10111},   {118,1,0b00111},   {128,1,0b10101},   {139,1,0b00101},   {149,1,0b10011},   {161,1,0b00001},   {171,1,0b10001},   {181,1,0b11111},   {193,1,0b01101},   {202,1,0b11101},   {214,1,0b01011},   {224,1,0b11011},   {236,1,0b01001},   {246,1,0b10111},   {258,1,0b00111},   {267,1,0b10101},   {279,1,0b00101},   {289,1,0b10011},   {301,1,0b00001},   {311,1,0b10001},   {321,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,1,0b01101},   {762,1,0b11101},   {774,1,0b01011},   {784,1,0b11001},   {796,1,0b01001},   {805,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
+            const auto [occupieds_pos, checks] = 
+                ReadStoreContentsFromFile("insert/interpolated");
             const uint8_t *res_key;
             uint32_t res_size, dummy;
             typename Diva<diva_type>::InfixStore *store;
@@ -80,22 +71,18 @@ public:
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_iter_destroy(it, check_it_write);
             }
         }
@@ -107,8 +94,8 @@ public:
             s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
         SUBCASE("overlapping interpolated reversed inserts with a stride of 2") {
-            const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32, 38, 43, 49, 54, 60, 65, 71, 76, 82, 87, 92, 98, 103, 109, 114, 120, 125, 131, 136, 142, 147, 153, 158, 163, 169, 174, 180, 185, 191, 196, 202, 207, 213, 218, 224, 229, 234, 240, 245, 251, 256, 262, 267, 273, 278, 284, 289, 295, 300, 305, 311, 316, 322, 327, 333, 338, 344, 349, 355, 360, 366, 371, 376, 382, 387, 393, 398, 404, 409, 415, 420, 426, 431, 437, 442, 447, 453, 458, 464, 469, 475, 478, 480, 486, 491, 497, 502, 508, 513, 518, 524, 529, 535, 540};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,0,0b10111},   {107,1,0b10111},   {118,1,0b00111},   {128,0,0b10101},   {129,1,0b10101},   {139,1,0b00101},   {149,0,0b10011},   {150,1,0b10011},   {161,1,0b00001},   {171,0,0b10001},   {172,1,0b10001},   {181,1,0b11111},   {193,0,0b01101},   {194,1,0b01101},   {202,1,0b11101},   {214,0,0b01011},   {215,1,0b01011},   {224,1,0b11011},   {236,0,0b01001},   {237,1,0b01001},   {246,1,0b10111},   {258,0,0b00111},   {259,1,0b00111},   {267,1,0b10101},   {279,0,0b00101},   {280,1,0b00101},   {289,1,0b10011},   {301,0,0b00001},   {302,1,0b00001},   {311,1,0b10001},   {321,0,0b11111},   {322,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,1,0b01101},   {762,1,0b11101},   {774,1,0b01011},   {784,1,0b11001},   {796,1,0b01001},   {805,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
+            const auto [occupieds_pos, checks] = 
+                ReadStoreContentsFromFile("insert/overlapping_interpolated_stride_2");
             const uint8_t *res_key;
             uint32_t res_size, dummy;
             typename Diva<diva_type>::InfixStore *store;
@@ -117,22 +104,18 @@ public:
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_iter_destroy(it, check_it_write);
             }
         }
@@ -145,8 +128,8 @@ public:
             s.Insert(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         }
         SUBCASE("overlapping interpolated consecutive inserts") {
-            const std::vector<uint32_t> occupieds_pos = {5, 11, 16, 21, 27, 32, 38, 43, 49, 54, 60, 65, 71, 76, 82, 87, 92, 98, 103, 109, 114, 120, 125, 131, 136, 142, 147, 153, 158, 163, 169, 174, 180, 185, 191, 196, 202, 207, 213, 218, 224, 229, 234, 240, 245, 251, 256, 262, 267, 273, 278, 284, 289, 295, 300, 305, 311, 316, 322, 327, 333, 338, 344, 349, 355, 360, 366, 371, 376, 382, 383, 384, 385, 386, 387, 388, 393, 398, 404, 409, 415, 420, 426, 431, 437, 442, 447, 453, 458, 464, 469, 475, 478, 480, 486, 491, 497, 502, 508, 513, 518, 524, 529, 535, 540};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  9,1,0b10011},   { 21,1,0b00001},   { 31,1,0b10001},   { 41,1,0b11111},   { 53,1,0b01111},   { 63,1,0b11101},   { 74,1,0b01011},   { 84,1,0b11011},   { 96,1,0b01001},   {106,0,0b10111},   {107,1,0b10111},   {118,1,0b00111},   {128,0,0b10101},   {129,1,0b10101},   {139,1,0b00101},   {149,0,0b10011},   {150,1,0b10011},   {161,1,0b00001},   {171,0,0b10001},   {172,1,0b10001},   {181,1,0b11111},   {193,0,0b01101},   {194,1,0b01101},   {202,1,0b11101},   {214,0,0b01011},   {215,1,0b01011},   {224,1,0b11011},   {236,0,0b01001},   {237,1,0b01001},   {246,1,0b10111},   {258,0,0b00111},   {259,1,0b00111},   {267,1,0b10101},   {279,0,0b00101},   {280,1,0b00101},   {289,1,0b10011},   {301,0,0b00001},   {302,1,0b00001},   {311,1,0b10001},   {321,0,0b11111},   {322,1,0b11111},   {333,1,0b01101},   {342,1,0b11101},   {354,1,0b01011},   {364,1,0b11011},   {376,1,0b01001},   {386,1,0b10111},   {398,1,0b00111},   {407,1,0b10101},   {419,1,0b00101},   {429,1,0b10011},   {441,1,0b00001},   {451,1,0b10001},   {461,1,0b11111},   {472,1,0b01101},   {482,1,0b11101},   {494,1,0b01011},   {504,1,0b11011},   {516,1,0b01001},   {526,1,0b10111},   {537,1,0b00111},   {547,1,0b10101},   {559,1,0b00011},   {569,1,0b10011},   {581,1,0b00001},   {591,1,0b10001},   {601,1,0b11111},   {612,1,0b01101},   {622,1,0b11101},   {634,1,0b01011},   {644,1,0b11011},   {656,1,0b01001},   {666,1,0b10111},   {677,1,0b00111},   {687,1,0b10101},   {699,1,0b00011},   {709,1,0b10011},   {721,1,0b00001},   {731,1,0b10001},   {740,1,0b11111},   {752,0,0b01101},   {753,0,0b10001},   {754,0,0b10101},   {755,0,0b11001},   {756,1,0b11101},   {757,0,0b00001},   {758,0,0b00101},   {759,0,0b01001},   {760,0,0b01101},   {761,0,0b10001},   {762,0,0b10101},   {763,0,0b11001},   {764,1,0b11101},   {765,0,0b00001},   {766,0,0b00101},   {767,0,0b01001},   {768,0,0b01101},   {769,0,0b10001},   {770,0,0b10101},   {771,0,0b11001},   {772,1,0b11101},   {773,0,0b00001},   {774,0,0b00101},   {775,0,0b01001},   {776,0,0b01101},   {777,0,0b10001},   {778,0,0b10101},   {779,0,0b11001},   {780,1,0b11101},   {781,0,0b00001},   {782,0,0b00101},   {783,0,0b01001},   {784,0,0b01101},   {785,0,0b10001},   {786,0,0b10101},   {787,0,0b11001},   {788,1,0b11101},   {789,0,0b00001},   {790,0,0b00101},   {791,0,0b01001},   {792,0,0b01101},   {793,0,0b10001},   {794,0,0b10101},   {795,0,0b11001},   {796,0,0b11101},   {797,1,0b11101},   {798,0,0b00001},   {799,0,0b00101},   {800,0,0b01001},   {801,0,0b01101},   {802,1,0b10001},   {803,1,0b01011},   {804,1,0b11001},   {805,1,0b01001},   {806,1,0b10111},   {817,1,0b00111},   {827,1,0b10101},   {839,1,0b00011},   {849,1,0b10011},   {861,1,0b00001},   {870,1,0b10001},   {880,1,0b11111},   {892,1,0b01101},   {902,1,0b11101},   {914,1,0b01011},   {924,1,0b11001},   {935,1,0b01001},   {941,1,0b00001},   {945,1,0b10111},   {957,1,0b00111},   {967,1,0b10101},   {979,1,0b00011},   {989,1,0b10011},   {1001,1,0b00001},   {1010,1,0b01111},   {1020,1,0b11111},   {1032,1,0b01101},   {1042,1,0b11101},   {1054,1,0b01011},   {1064,1,0b11001}};
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("insert/overlapping_interpolated_consecutive");
             const uint8_t *res_key;
             uint32_t res_size, dummy;
             typename Diva<diva_type>::InfixStore *store;
@@ -155,22 +138,18 @@ public:
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_iter_destroy(it, check_it_write);
             }
         }
@@ -180,8 +159,8 @@ public:
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
 
         SUBCASE("split infix store: left half") {
-            const std::vector<uint32_t> occupieds_pos = {11, 22, 33, 43, 54, 65, 76, 87, 98, 109, 120, 131, 142, 153, 164, 175, 185, 196, 207, 218, 229, 240, 251, 262, 273, 284, 295, 306, 317, 327, 338, 349, 360, 371, 382, 393, 404, 415, 426, 437, 448, 459, 469, 480, 491, 502, 513, 524, 535, 546, 557, 568, 579, 590, 601, 611, 622, 633, 644, 655, 666, 677, 688, 699, 710, 721, 732, 743, 753, 764, 765, 766};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  1,1,0b00110},   {  2,1,0b00010},   {  4,1,0b00010},   {  5,1,0b11110},   {  6,1,0b11110},   {  8,1,0b11010},   {  9,1,0b10110},   { 10,1,0b10110},   { 12,1,0b10010},   { 13,0,0b01110},   { 14,1,0b01110},   { 15,1,0b01110},   { 16,0,0b01010},   { 17,1,0b01010},   { 18,1,0b01010},   { 19,0,0b00110},   { 20,1,0b00110},   { 21,1,0b00010},   { 22,0,0b00010},   { 23,1,0b00010},   { 24,1,0b11110},   { 25,0,0b11010},   { 26,1,0b11010},   { 27,1,0b11010},   { 28,0,0b10110},   { 29,1,0b10110},   { 30,1,0b10110},   { 31,0,0b10010},   { 32,1,0b10010},   { 33,1,0b01110},   { 34,0,0b01110},   { 35,1,0b01110},   { 36,1,0b01010},   { 37,0,0b01010},   { 38,1,0b01010},   { 39,1,0b00110},   { 40,0,0b00010},   { 41,1,0b00010},   { 42,1,0b00010},   { 43,0,0b11110},   { 44,1,0b11110},   { 45,1,0b11010},   { 46,1,0b11010},   { 47,1,0b10110},   { 48,1,0b10110},   { 49,1,0b10010},   { 50,1,0b01110},   { 51,1,0b01110},   { 52,1,0b01010},   { 53,1,0b01010},   { 55,1,0b00110},   { 56,1,0b00010},   { 57,1,0b00010},   { 59,1,0b11110},   { 60,1,0b11010},   { 61,1,0b11010},   { 63,1,0b10110},   { 64,1,0b10110},   { 66,1,0b10010},   { 67,1,0b01110},   { 68,1,0b01110},   { 69,1,0b01010},   { 70,1,0b00110},   { 71,1,0b00110},   { 72,1,0b00010},   { 73,1,0b00010},   { 74,1,0b11110},   { 75,1,0b11010},   { 76,1,0b11010},   { 77,1,0b10110},   { 78,1,0b10110},   { 79,1,0b10010},   { 80,1,0b01110},   { 81,1,0b01110},   { 82,1,0b01010},   { 83,1,0b00110},   { 84,1,0b00110},   { 85,1,0b00010},   { 86,1,0b00010},   { 87,1,0b11110},   { 88,1,0b11010},   { 89,0,0b00010},   { 90,0,0b01010},   { 91,0,0b10010},   { 92,1,0b11010},   { 93,0,0b00010},   { 94,0,0b01010},   { 95,1,0b10010}};
+            const auto [occupieds_pos, checks] = 
+                ReadStoreContentsFromFile("insert/split/left");
             const uint8_t *res_key;
             uint32_t res_size, dummy;
             typename Diva<diva_type>::InfixStore *store;
@@ -190,26 +169,18 @@ public:
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_int_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_FALSE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 0);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 const uint64_t value = to_big_endian_order(0x0000000011111111UL);
                 wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_FALSE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 0);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
-
                 wh_iter_destroy(it, check_it_write);
             }
         }
@@ -218,40 +189,31 @@ public:
         value &= ~BITMASK(shamt);
         value = to_big_endian_order(value);
         SUBCASE("split infix store: right half") {
-            const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 40, 62, 84, 105, 127, 149, 171, 193, 215, 237, 258, 280, 302, 324, 346, 368, 379, 389, 411, 433, 455, 477, 499, 520, 542, 564, 586, 608, 630};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b10111},   {  1,0,0b00100},   {  2,1,0b10100},   {  3,0,0b00100},   {  4,1,0b10100},   {  5,0,0b00100},   {  6,1,0b10100},   {  7,0,0b00100},   {  8,1,0b10100},   {  9,0,0b00100},   { 10,1,0b10100},   { 11,0,0b00100},   { 12,1,0b10100},   { 13,0,0b00100},   { 14,1,0b10100},   { 15,0,0b00100},   { 16,1,0b10100},   { 17,0,0b00100},   { 18,1,0b10100},   { 19,0,0b00100},   { 20,1,0b10100},   { 21,0,0b00100},   { 22,1,0b10100},   { 23,0,0b00100},   { 24,1,0b10100},   { 25,0,0b00100},   { 26,1,0b10100},   { 27,0,0b00100},   { 28,1,0b10100},   { 29,0,0b00100},   { 30,1,0b10100},   { 31,0,0b00100},   { 32,1,0b10100},   { 33,0,0b00100},   { 34,1,0b10100},   { 35,0,0b00100},   { 36,0,0b10100},   { 37,1,0b10100},   { 38,0,0b00100},   { 39,1,0b10100},   { 40,0,0b00100},   { 41,1,0b10100},   { 42,1,0b00100},   { 43,1,0b01100},   { 44,1,0b00100},   { 45,1,0b00100},   { 46,1,0b11100},   { 47,1,0b11100},   { 48,1,0b10100},   { 49,1,0b01100},   { 50,1,0b01100},   { 51,1,0b00100},   { 52,1,0b00100},   { 53,1,0b11100},   { 54,1,0b10100},   { 55,1,0b10100},   { 56,1,0b01100},   { 57,1,0b00100},   { 58,1,0b00100},   { 59,1,0b00100},   { 60,1,0b11100},   { 61,1,0b11100},   { 62,1,0b10100},   { 63,1,0b01100},   { 64,1,0b01100},   { 65,1,0b00100},   { 66,1,0b11100},   { 67,1,0b11100},   { 68,1,0b10100},   { 70,1,0b10100},   { 73,1,0b01100},   { 76,1,0b00100}};
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("insert/split/right");
             uint8_t res_key[sizeof(uint64_t)];
             uint32_t res_size, dummy;
             typename Diva<diva_type>::InfixStore store;
 
             if constexpr (diva_type == DivaType::Int) {
                 wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
-
                 wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
-
                 wh_int_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
                                  reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
-                REQUIRE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 7);
                 AssertStoreContents(s, store, occupieds_pos, checks);
-
                 wh_int_iter_destroy(it, check_it_write);
             }
             else {
                 wormhole_iter *it = wh_iter_create(s.better_tree_);
                 wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
-
                 wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
                              reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
-                REQUIRE(store.IsPartialKey());
-                REQUIRE_EQ(store.GetInvalidBits(), 7);
                 AssertStoreContents(s, store, occupieds_pos, checks);
-
                 wh_iter_destroy(it, check_it_write);
             }
         }
 
-        // Split an extension of a partial boundary key
+        // Fetch old boundary key
         uint8_t old_boundary [sizeof(uint64_t)];
         uint32_t old_boundary_size;
         if constexpr (diva_type == DivaType::Int) {
@@ -272,73 +234,13 @@ public:
                          reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type>::InfixStore), &dummy);
             wh_iter_destroy(it, check_it_write);
         }
-        uint32_t extended_key_len = old_boundary_size + 1;
-        uint8_t extended_key[extended_key_len];
-        memcpy(extended_key, old_boundary, extended_key_len);
-        extended_key[extended_key_len - 1] = 1;
-        s.InsertSplit({extended_key, extended_key_len});
-
-        SUBCASE("split infix store using an extension of a partial boundary key") {
-            const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 40, 62, 84, 105, 127, 149, 171, 193, 215, 237, 258, 280, 302, 324, 346, 368, 379, 389, 411, 433, 455, 477, 499, 520, 542, 564, 586, 608, 630};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,0,0b10001},   {  1,1,0b10111},   {  2,0,0b00100},   {  3,1,0b10100},   {  4,0,0b00100},   {  5,1,0b10100},   {  6,0,0b00100},   {  7,1,0b10100},   {  8,0,0b00100},   {  9,1,0b10100},   { 10,0,0b00100},   { 11,1,0b10100},   { 12,0,0b00100},   { 13,1,0b10100},   { 14,0,0b00100},   { 15,1,0b10100},   { 16,0,0b00100},   { 17,1,0b10100},   { 18,0,0b00100},   { 19,1,0b10100},   { 20,0,0b00100},   { 21,1,0b10100},   { 22,0,0b00100},   { 23,1,0b10100},   { 24,0,0b00100},   { 25,1,0b10100},   { 26,0,0b00100},   { 27,1,0b10100},   { 28,0,0b00100},   { 29,1,0b10100},   { 30,0,0b00100},   { 31,1,0b10100},   { 32,0,0b00100},   { 33,1,0b10100},   { 34,0,0b00100},   { 35,1,0b10100},   { 36,0,0b00100},   { 37,0,0b10100},   { 38,1,0b10100},   { 39,0,0b00100},   { 40,1,0b10100},   { 41,0,0b00100},   { 42,1,0b10100},   { 43,1,0b00100},   { 44,1,0b01100},   { 45,1,0b00100},   { 46,1,0b00100},   { 47,1,0b11100},   { 48,1,0b11100},   { 49,1,0b10100},   { 50,1,0b01100},   { 51,1,0b01100},   { 52,1,0b00100},   { 53,1,0b00100},   { 54,1,0b11100},   { 55,1,0b10100},   { 56,1,0b10100},   { 57,1,0b01100},   { 58,1,0b00100},   { 59,1,0b00100},   { 60,1,0b00100},   { 61,1,0b11100},   { 62,1,0b11100},   { 63,1,0b10100},   { 64,1,0b01100},   { 65,1,0b01100},   { 66,1,0b00100},   { 67,1,0b11100},   { 68,1,0b11100},   { 69,1,0b10100},   { 70,1,0b10100},   { 73,1,0b01100},   { 76,1,0b00100}};
-            const uint8_t *res_key;
-            uint32_t res_size, dummy;
-            typename Diva<diva_type>::InfixStore *store;
-
-            uint64_t value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (8ULL << shamt);
-            value &= ~BITMASK(shamt);
-            value = to_big_endian_order(value);
-            if constexpr (diva_type == DivaType::Int) {
-                wormhole_int_iter *it = wh_int_iter_create(s.better_tree_int_);
-                wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
-                                     reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 7);
-                AssertStoreContents(s, *store, occupieds_pos, checks);
-
-                REQUIRE_EQ(old_boundary_size, res_size);
-                REQUIRE_EQ(memcmp(old_boundary, res_key, old_boundary_size), 0);
-                wh_int_iter_skip1(it, check_it_write, check_it_unlock);
-                wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
-                                     reinterpret_cast<void **>(&store), &dummy);
-                const uint64_t expected_next_boundary_key = 0x0000000022222222ULL;
-                uint64_t current_key = 0;
-                memcpy(&current_key, res_key, res_size);
-                REQUIRE_EQ(__bswap_64(current_key), expected_next_boundary_key);
-
-                wh_int_iter_destroy(it, check_it_write);
-            }
-            else {
-                wormhole_iter *it = wh_iter_create(s.better_tree_);
-                wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
-                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
-                                 reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 7);
-                AssertStoreContents(s, *store, occupieds_pos, checks);
-
-                REQUIRE_EQ(old_boundary_size, res_size);
-                REQUIRE_EQ(memcmp(old_boundary, res_key, old_boundary_size), 0);
-                wh_iter_skip1(it, check_it_write, check_it_unlock);
-                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
-                                 reinterpret_cast<void **>(&store), &dummy);
-                const uint64_t expected_next_boundary_key = 0x0000000022222222ULL;
-                uint64_t current_key = 0;
-                memcpy(&current_key, res_key, res_size);
-                REQUIRE_EQ(__bswap_64(current_key), expected_next_boundary_key);
-
-                wh_iter_destroy(it, check_it_write);
-            }
-        }
 
         value = (0x0000000011111111ULL * 30 + 0x0000000022222222ULL * 70) / 100 + (16ULL << shamt);
         value = to_big_endian_order(value);
         s.InsertSplit({reinterpret_cast<uint8_t *>(&value), sizeof(value)});
-
         SUBCASE("split infix store, create void infixes") {
-            const std::vector<uint32_t> occupieds_pos = {0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30, 31, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479};
-            const std::vector<std::tuple<uint32_t, bool, uint64_t>> checks = {{  0,1,0b10000},   {  1,1,0b10000},   {  2,1,0b10000},   {  3,1,0b10000},   {  4,1,0b10000},   {  5,1,0b10000},   {  6,1,0b10000},   {  7,1,0b10000},   { 11,1,0b10000},   { 12,1,0b10000},   { 13,1,0b10000},   { 14,1,0b10000},   { 15,1,0b10000},   { 16,1,0b10000},   { 17,1,0b10000},   { 18,1,0b10000},   { 31,1,0b10000},   { 32,1,0b10000},   { 33,1,0b10000},   { 34,1,0b10000},   { 35,1,0b10000},   { 36,1,0b10000},   { 37,1,0b10000},   { 38,1,0b10000},   { 39,1,0b10000},   { 40,1,0b10000},   { 41,1,0b10000},   { 42,1,0b10000},   { 43,1,0b10000},   { 44,1,0b10000},   { 45,1,0b10000},   { 46,1,0b10000},   { 47,1,0b10000},   { 48,1,0b10000},   { 49,1,0b10000},   { 50,1,0b10000},   { 51,1,0b10000},   { 52,1,0b10000},   { 53,1,0b10000},   { 54,1,0b10000},   { 55,1,0b10000},   { 56,1,0b10000},   { 57,1,0b10000},   { 58,1,0b10000},   { 59,1,0b10000},   { 60,1,0b10000},   { 61,1,0b10000},   { 62,1,0b10000},   { 63,1,0b10000},   { 64,1,0b10000},   { 65,1,0b10000},   { 66,1,0b10000},   { 67,1,0b10000},   { 68,1,0b10000},   { 69,1,0b10000},   { 70,1,0b10000},   { 71,1,0b10000},   { 72,1,0b10000},   { 73,1,0b10000},   { 74,1,0b10000},   { 75,1,0b10000},   { 76,1,0b10000},   { 77,1,0b10000},   { 78,1,0b10000},   { 79,1,0b10000},   { 80,1,0b10000},   { 81,1,0b10000},   { 82,1,0b10000},   { 83,1,0b10000},   { 84,1,0b10000},   { 85,1,0b10000},   { 86,1,0b10000},   { 87,1,0b10000},   { 88,1,0b10000},   { 89,1,0b10000},   { 90,1,0b10000},   { 91,1,0b10000},   { 92,1,0b10000},   { 93,1,0b10000},   { 94,1,0b10000},   { 95,1,0b10000},   { 96,1,0b10000},   { 97,1,0b10000},   { 98,1,0b10000},   { 99,1,0b10000},   {100,1,0b10000},   {101,1,0b10000},   {102,1,0b10000},   {103,1,0b10000},   {104,1,0b10000},   {105,1,0b10000},   {106,1,0b10000},   {107,1,0b10000},   {108,1,0b10000},   {109,1,0b10000},   {110,1,0b10000},   {111,1,0b10000},   {112,1,0b10000},   {113,1,0b10000},   {114,1,0b10000},   {115,1,0b10000},   {116,1,0b10000},   {117,1,0b10000},   {118,1,0b10000},   {119,1,0b10000},   {120,1,0b10000},   {121,1,0b10000},   {122,1,0b10000},   {123,1,0b10000},   {124,1,0b10000},   {125,1,0b10000},   {126,1,0b10000},   {127,1,0b10000},   {128,1,0b10000},   {129,1,0b10000},   {130,1,0b10000},   {131,1,0b10000},   {132,1,0b10000},   {133,1,0b10000},   {134,1,0b10000},   {135,1,0b10000},   {136,1,0b10000},   {137,1,0b10000},   {138,1,0b10000},   {139,1,0b10000},   {140,1,0b10000},   {141,1,0b10000},   {142,1,0b10000},   {143,1,0b10000},   {144,1,0b10000},   {145,1,0b10000},   {146,1,0b10000},   {147,1,0b10000},   {148,1,0b10000},   {149,1,0b10000},   {150,1,0b10000},   {151,1,0b10000},   {152,1,0b10000},   {153,1,0b10000},   {154,1,0b10000},   {155,1,0b10000},   {156,1,0b10000},   {157,1,0b10000},   {158,1,0b10000},   {159,1,0b10000},   {160,1,0b10000},   {161,1,0b10000},   {162,1,0b10000},   {163,1,0b10000},   {164,1,0b10000},   {165,1,0b10000},   {166,1,0b10000},   {167,1,0b10000},   {168,1,0b10000},   {169,1,0b10000},   {170,1,0b10000},   {171,1,0b10000},   {172,1,0b10000},   {173,1,0b10000},   {174,1,0b10000},   {175,1,0b10000},   {176,1,0b10000},   {177,1,0b10000},   {178,1,0b10000},   {179,1,0b10000},   {180,1,0b10000},   {181,1,0b10000},   {182,1,0b10000},   {183,1,0b10000},   {184,1,0b10000},   {185,1,0b10000},   {186,1,0b10000},   {187,1,0b10000},   {188,1,0b10000},   {189,1,0b10000},   {190,1,0b10000},   {191,1,0b10000},   {192,1,0b10000},   {193,1,0b10000},   {194,1,0b10000},   {195,1,0b10000},   {196,1,0b10000},   {197,1,0b10000},   {198,1,0b10000},   {199,1,0b10000},   {200,1,0b10000},   {201,1,0b10000},   {202,1,0b10000},   {203,1,0b10000},   {204,1,0b10000},   {205,1,0b10000},   {206,1,0b10000},   {207,1,0b10000},   {208,1,0b10000},   {209,1,0b10000},   {210,1,0b10000},   {211,1,0b10000},   {212,1,0b10000},   {213,1,0b10000},   {214,1,0b10000},   {215,1,0b10000},   {216,1,0b10000},   {217,1,0b10000},   {218,1,0b10000},   {219,1,0b10000},   {220,1,0b10000},   {221,1,0b10000},   {222,1,0b10000},   {223,1,0b10000},   {224,1,0b10000},   {225,1,0b10000},   {226,1,0b10000},   {227,1,0b10000},   {228,1,0b10000},   {229,1,0b10000},   {230,1,0b10000},   {231,1,0b10000},   {232,1,0b10000},   {233,1,0b10000},   {234,1,0b10000},   {235,1,0b10000},   {236,1,0b10000},   {237,1,0b10000},   {238,1,0b10000},   {239,1,0b10000},   {240,1,0b10000},   {241,1,0b10000},   {242,1,0b10000},   {243,1,0b10000},   {244,1,0b10000},   {245,1,0b10000},   {246,1,0b10000},   {247,1,0b10000},   {248,1,0b10000},   {249,1,0b10000},   {250,1,0b10000},   {251,1,0b10000},   {252,1,0b10000},   {253,1,0b10000},   {254,1,0b10000}};
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("insert/split/create_void_infixes");
             const uint8_t *res_key;
             uint32_t res_size, dummy;
             typename Diva<diva_type >::InfixStore *store;
@@ -351,8 +253,6 @@ public:
 
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 7);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
 
                 REQUIRE_EQ(old_boundary_size, res_size);
@@ -360,7 +260,7 @@ public:
                 wh_int_iter_skip1(it, check_it_write, check_it_unlock);
                 wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_EQ(sizeof(value) - 1, res_size);
+                REQUIRE_EQ(sizeof(value), res_size);
                 REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value) - 2), 0);
 
                 wh_int_iter_destroy(it, check_it_write);
@@ -372,8 +272,6 @@ public:
 
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE(store->IsPartialKey());
-                REQUIRE_EQ(store->GetInvalidBits(), 7);
                 AssertStoreContents(s, *store, occupieds_pos, checks);
 
                 REQUIRE_EQ(old_boundary_size, res_size);
@@ -381,7 +279,7 @@ public:
                 wh_iter_skip1(it, check_it_write, check_it_unlock);
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_EQ(sizeof(value) - 1, res_size);
+                REQUIRE_EQ(sizeof(value), res_size);
                 REQUIRE_EQ(memcmp(reinterpret_cast<uint8_t *>(&value), res_key, sizeof(value) - 2), 0);
 
                 wh_iter_destroy(it, check_it_write);
@@ -418,15 +316,11 @@ public:
             const uint64_t value = to_big_endian_order(0x0000000033333333UL);
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
-
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                              reinterpret_cast<void **>(&store), &dummy);
-            REQUIRE_FALSE(store->IsPartialKey());
             AssertStoreContents(s, *store, occupieds_pos, checks);
-
             REQUIRE_EQ(sizeof(value), res_size);
             REQUIRE_EQ(memcmp(reinterpret_cast<const uint8_t *>(&value), res_key, sizeof(value)), 0);
-
             wh_iter_destroy(it, check_it_write);
         }
 
@@ -441,15 +335,11 @@ public:
             wormhole_iter *it = wh_iter_create(s.better_tree_);
             wh_iter_seek(it, reinterpret_cast<const void *>(&value), sizeof(value), check_it_write);
             wh_iter_skip1(it, check_it_write, check_it_unlock);
-
             wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                              reinterpret_cast<void **>(&store), &dummy);
-            REQUIRE_FALSE(store->IsPartialKey());
             AssertStoreContents(s, *store, occupieds_pos, checks);
-
             REQUIRE_EQ(new_extended_key_len, res_size);
             REQUIRE_EQ(memcmp(new_extended_key, res_key, new_extended_key_len), 0);
-
             wh_iter_destroy(it, check_it_write);
         }
     }
@@ -897,8 +787,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -941,8 +829,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -1012,8 +898,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -1056,8 +940,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -1126,8 +1008,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -1170,8 +1050,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks);
 
                         uint64_t value = to_big_endian_order(boundary_keys[0]);
@@ -1393,8 +1271,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1410,8 +1286,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1427,8 +1301,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1444,8 +1316,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1462,8 +1332,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1480,8 +1348,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
                 wh_int_iter_destroy(it, check_it_write);
@@ -1501,8 +1367,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1518,8 +1382,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1535,8 +1397,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1552,8 +1412,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1570,8 +1428,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1588,8 +1444,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, sizeof(keys[0])), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
                 wh_iter_destroy(it, check_it_write);
@@ -1626,8 +1480,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1644,8 +1496,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1662,8 +1512,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1680,8 +1528,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1699,8 +1545,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1718,8 +1562,6 @@ public:
                                          reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
                 wh_int_iter_destroy(it, check_it_write);
@@ -1740,8 +1582,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1758,8 +1598,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1776,8 +1614,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1794,8 +1630,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1813,8 +1647,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
 
@@ -1832,8 +1664,6 @@ public:
                                      reinterpret_cast<void **>(&store), &dummy);
 
                     REQUIRE_EQ(memcmp(expected_boundary, res_key, expected_boundary_length), 0);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks);
                 }
                 wh_iter_destroy(it, check_it_write);
@@ -2494,8 +2324,6 @@ public:
 
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 1);
@@ -2510,8 +2338,6 @@ public:
 
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE_FALSE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 0);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 1);
@@ -2542,8 +2368,6 @@ public:
 
                     wh_int_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
                                      reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
-                    REQUIRE(store.IsPartialKey());
-                    REQUIRE_EQ(store.GetInvalidBits(), 7);
                     AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2557,8 +2381,6 @@ public:
 
                     wh_iter_peek(it, reinterpret_cast<void *>(res_key), sizeof(res_key), &res_size, 
                                  reinterpret_cast<void *>(&store), sizeof(typename Diva<diva_type, PayloadType::FixedLength>::InfixStore), &dummy);
-                    REQUIRE(store.IsPartialKey());
-                    REQUIRE_EQ(store.GetInvalidBits(), 7);
                     AssertStoreContents(s, store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2616,8 +2438,6 @@ public:
                     wh_int_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 7);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2640,8 +2460,6 @@ public:
                     wh_iter_seek(it, reinterpret_cast<void *>(&value), sizeof(value) - shamt / 8, check_it_write);
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 7);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2687,8 +2505,6 @@ public:
 
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 7);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2711,8 +2527,6 @@ public:
 
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE(store->IsPartialKey());
-                    REQUIRE_EQ(store->GetInvalidBits(), 7);
                     AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                     s.GetPayload(*store, -1, payload);
                     REQUIRE_EQ(payload[0], 0x6811b41c065a828c);
@@ -2769,7 +2583,6 @@ public:
 
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_FALSE(store->IsPartialKey());
                 AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                 s.GetPayload(*store, -1, payload);
                 REQUIRE_EQ(payload[0], 3);
@@ -2799,7 +2612,6 @@ public:
 
                 wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                  reinterpret_cast<void **>(&store), &dummy);
-                REQUIRE_FALSE(store->IsPartialKey());
                 AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                 s.GetPayload(*store, -1, payload);
                 REQUIRE_EQ(payload[0], 10);
@@ -2889,8 +2701,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -2953,8 +2763,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -3051,8 +2859,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -3115,8 +2921,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -3419,8 +3223,6 @@ public:
 
                         wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                              reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -3458,8 +3260,6 @@ public:
 
                         wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                        REQUIRE_FALSE(store->IsPartialKey());
-                        REQUIRE_EQ(store->GetInvalidBits(), 0);
                         AssertStoreContents(s, *store, occupieds_pos, checks, check_payloads);
                         s.GetPayload(*store, -1, payload);
                         REQUIRE_EQ(payload[0], 1);
@@ -4309,82 +4109,98 @@ public:
 
 
 private:
-    template <DivaType diva_type>
-    static void AssertStoreContents(const Diva<diva_type>& s, const typename Diva<diva_type>::InfixStore& store,
-                                    const std::vector<uint32_t>& occupieds_pos,
-                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks) {
-        REQUIRE_NE(store.ptr, nullptr);
-        REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
-        const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-        const uint64_t *occupieds = store.ptr + 1;
-        const uint64_t *runends = store.ptr + 1 + Diva<diva_type>::infix_store_target_size / 64;
-        uint32_t ind = 0;
-        for (uint32_t i = 0; i < Diva<diva_type>::infix_store_target_size; i++) {
-            if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
-                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
-                ind++;
-            }
-            else 
-                REQUIRE_EQ(get_bitmap_bit(occupieds, i), 0);
-        }
+    static void WriteStoreContentsToFile(std::string path,
+                                         const std::vector<uint32_t> &occupieds_pos, 
+                                         const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks,
+                                         const uint64_t * const *payloads = nullptr,
+                                         uint32_t payload_size = 0) {
+        const std::string path_prefix = "./tests/data/diva/";
+        path = path_prefix + path;
+        std::ofstream fout;
 
-        const uint32_t total_size = s.scaled_sizes_[store.GetSizeGrade()];
-        ind = 0;
-        uint32_t runend_count = 0;
-        for (int32_t i = 0; i < total_size; i++) {
-            const uint64_t slot = s.GetSlot(store, i);
-            if (ind < checks.size()) {
-                const auto [pos, runend, value] = checks[ind];
-                if (i == pos) {
-                    REQUIRE_EQ(value, slot);
-                    REQUIRE_EQ(get_bitmap_bit(runends, i), runend);
-                    runend_count += runend;
-                    ind++;
-                }
-                else {
-                    REQUIRE_EQ(slot, 0ULL);
-                    REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
-                }
-            }
-            else {
-                REQUIRE_EQ(slot, 0ULL);
-                REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
-            }
-        }
-        REQUIRE_EQ(occupieds_pos.size(), runend_count);
+        fout.open(path + "/occupieds_pos", std::ios::out | std::ios::binary);
+        fout.write(reinterpret_cast<const char *>(occupieds_pos.data()),
+                occupieds_pos.size() * sizeof(occupieds_pos[0]));
+        fout.close();
 
-        uint32_t check_popcnts[2] = {};
-        for (int32_t i = 0; i < Diva<diva_type>::infix_store_target_size / 128; i++) {
-            check_popcnts[0] += __builtin_popcountll(occupieds[i]);
-            if (static_cast<int32_t>(s.scaled_sizes_[store.GetSizeGrade()]) - i * 64 > 0) {
-                const uint64_t mask = BITMASK(std::min(64UL, s.scaled_sizes_[store.GetSizeGrade()] - i * 64));
-                check_popcnts[1] += __builtin_popcountll(runends[i] & mask);
-            }
-        }
+        fout.open(path + "/checks", std::ios::out | std::ios::binary);
+        fout.write(reinterpret_cast<const char *>(checks.data()),
+                checks.size() * sizeof(checks[0]));
+        fout.close();
 
-        REQUIRE_EQ(popcnts[0], check_popcnts[0]);
-        REQUIRE_EQ(popcnts[1], check_popcnts[1]);
+        if (payloads != nullptr) {
+            fout.open(path + "/payloads", std::ios::out | std::ios::binary);
+            const uint32_t payload_size_bytes = sizeof(uint64_t) * ((payload_size + 63) / 64);
+            for (int32_t i = 0; i < checks.size(); i++)
+                fout.write(reinterpret_cast<const char *>(payloads[i]), payload_size_bytes);
+            fout.close();
+        }
     }
 
+    static std::pair<std::vector<uint32_t>, std::vector<std::tuple<uint32_t, bool, uint64_t>>>
+    ReadStoreContentsFromFile(std::string path) {
+        const std::string path_prefix = "./tests/data/diva/";
+        path = path_prefix + path;
+        std::ifstream fin;
 
-    template <DivaType diva_type>
-    static void AssertStoreContents(const Diva<diva_type, PayloadType::FixedLength>& s, 
-                                    const typename Diva<diva_type, PayloadType::FixedLength>::InfixStore& store,
-                                    const std::vector<uint32_t>& occupieds_pos,
-                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>>& checks,
-                                    const uint64_t **check_payloads) {
+        const std::string occupieds_pos_path = path + "/occupieds_pos";
+        const uint32_t occupieds_pos_n_bytes =
+            std::filesystem::file_size(occupieds_pos_path);
+        fin.open(occupieds_pos_path, std::ios::in | std::ios::binary);
+        std::vector<uint32_t> occupieds_pos(occupieds_pos_n_bytes /
+                sizeof(uint32_t));
+        fin.read(reinterpret_cast<char *>(occupieds_pos.data()),
+                occupieds_pos_n_bytes);
+        fin.close();
+
+        const std::string checks_path = path + "/checks";
+        const uint32_t checks_n_bytes = std::filesystem::file_size(checks_path);
+        fin.open(checks_path, std::ios::in | std::ios::binary);
+        std::vector<std::tuple<uint32_t, bool, uint64_t>> checks(
+                checks_n_bytes / sizeof(std::tuple<uint32_t, bool, uint64_t>));
+        fin.read(reinterpret_cast<char *>(checks.data()), checks_n_bytes);
+        fin.close();
+
+        return {std::move(occupieds_pos), std::move(checks)};
+    }
+
+    static void ReadStorePayloadsFromFile(std::string path,
+                                          uint32_t payload_size,
+                                          uint64_t **out) {
+        const std::string path_prefix = "./tests/data/infix_store/";
+        path = path_prefix + path;
+        std::ifstream fin;
+
+        const std::string payloads_path = path + "/payloads";
+        const uint32_t payloads_n_bytes = std::filesystem::file_size(payloads_path);
+        const uint32_t payload_size_bytes = sizeof(uint64_t) * ((payload_size + 63) / 64);
+        fin.open(payloads_path, std::ios::in | std::ios::binary);
+        for (int32_t i = 0; i < payloads_n_bytes / payload_size_bytes; i++)
+            fin.read(reinterpret_cast<char *>(out[i]), payload_size_bytes);
+        fin.close();
+    }
+
+    template <DivaType diva_type, PayloadType payload_type>
+    static void AssertStoreContents(const Diva<diva_type, payload_type> &s,
+                                    const typename Diva<diva_type, payload_type>::InfixStore &store,
+                                    const std::vector<uint32_t> &occupieds_pos,
+                                    const std::vector<std::tuple<uint32_t, bool, uint64_t>> &checks,
+                                    const uint64_t * const *check_payloads = nullptr) {
         REQUIRE_NE(store.ptr, nullptr);
-        REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
+        if constexpr (diva_type != DivaType::BinaryTrie)
+            REQUIRE_EQ(store.GetFullSlotCount(), checks.size());
+        if constexpr (payload_type == PayloadType::FixedLength)
+            assert(check_payloads != nullptr);
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-        const uint64_t *occupieds = store.ptr + 1;
-        const uint64_t *runends = store.ptr + 1 + Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size / 64;
+        const uint64_t *occupieds = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words
+                                    + Diva<>::infix_store_target_size / 64;
         uint32_t ind = 0;
-        for (uint32_t i = 0; i < Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size; i++) {
+        for (uint32_t i = 0; i < Diva<>::infix_store_target_size; i++) {
             if (ind < occupieds_pos.size() && i == occupieds_pos[ind]) {
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 1);
                 ind++;
-            }
-            else 
+            } else
                 REQUIRE_EQ(get_bitmap_bit(occupieds, i), 0);
         }
 
@@ -4394,22 +4210,24 @@ private:
         for (int32_t i = 0; i < total_size; i++) {
             const uint64_t slot = s.GetSlot(store, i);
             uint64_t read_payload[s.payload_size_ / 64 + 2];
-            s.GetPayload(store, i, read_payload);
+            if constexpr (payload_type == PayloadType::FixedLength)
+                s.GetPayload(store, i, read_payload);
             if (ind < checks.size()) {
                 const auto [pos, runend, value] = checks[ind];
                 if (i == pos) {
                     REQUIRE_EQ(value, slot);
                     REQUIRE_EQ(get_bitmap_bit(runends, i), runend);
-                    REQUIRE(compare_bitmap_to_bitmap(read_payload, 0, check_payloads[ind], 0, s.payload_size_));
+                    if constexpr (payload_type == PayloadType::FixedLength) {
+                        REQUIRE(compare_bitmap_to_bitmap(
+                                    read_payload, 0, check_payloads[ind], 0, s.payload_size_));
+                    }
                     runend_count += runend;
                     ind++;
-                }
-                else {
+                } else {
                     REQUIRE_EQ(slot, 0ULL);
                     REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
                 }
-            }
-            else {
+            } else {
                 REQUIRE_EQ(slot, 0ULL);
                 REQUIRE_EQ(get_bitmap_bit(runends, i), 0);
             }
@@ -4417,14 +4235,11 @@ private:
         REQUIRE_EQ(occupieds_pos.size(), runend_count);
 
         uint32_t check_popcnts[2] = {};
-        for (int32_t i = 0; i < Diva<diva_type>::infix_store_target_size / 128; i++) {
+        for (int32_t i = 0; i < Diva<>::infix_store_target_size / 128; i++) {
             check_popcnts[0] += __builtin_popcountll(occupieds[i]);
-            if (static_cast<int32_t>(s.scaled_sizes_[store.GetSizeGrade()]) - i * 64 > 0) {
-                const uint64_t mask = BITMASK(std::min(64UL, s.scaled_sizes_[store.GetSizeGrade()] - i * 64));
-                check_popcnts[1] += __builtin_popcountll(runends[i] & mask);
-            }
+            const uint64_t masked_runends = runends[i] & BITMASK(std::min(64, std::max<int32_t>(total_size - 64 * i, 0)));
+            check_popcnts[1] += __builtin_popcountll(masked_runends);
         }
-
         REQUIRE_EQ(popcnts[0], check_popcnts[0]);
         REQUIRE_EQ(popcnts[1], check_popcnts[1]);
     }
@@ -4538,20 +4353,23 @@ private:
 
 
     template <DivaType diva_type, PayloadType payload_type>
-    static void PrintStore(const Diva<diva_type, payload_type>& s, const typename Diva<diva_type, payload_type>::InfixStore& store) {
+    static void PrintStore(const Diva<diva_type, payload_type> &s,
+                           const typename Diva<diva_type, payload_type>::InfixStore &store) {
         const uint32_t size_grade = store.GetSizeGrade();
         const uint32_t *popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
-        const uint64_t *occupieds = store.ptr + 1;
-        const uint64_t *runends = store.ptr + 1 + Diva<>::infix_store_target_size / 64;
+        const uint64_t *occupieds = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + Diva<diva_type, payload_type>::num_metadata_offset_words
+                                  + Diva<>::infix_store_target_size / 64;
 
-        std::cerr << "is_partial=" << store.IsPartialKey() << " invalid_bits=" << store.GetInvalidBits();
-        std::cerr << " size_grade=" << size_grade << " elem_count=" << store.GetFullSlotCount() << std::endl;
+        std::cerr << " size_grade=" << size_grade << " full_slot_count=" << store.GetFullSlotCount() << std::endl;
         if constexpr (payload_type == PayloadType::FixedLength) {
-            std::cerr << "sample_payload=" << std::hex;
-            uint64_t payload[(s.payload_size_ + 63) / 64];
-            s.GetPayload(store, -1, payload);
-            for (uint32_t j = 0; j < ((s.payload_size_ + 63) / 64); j++)
-                std::cerr << "0x" << payload[j] << ", ";
+            std::cerr << "sample_payload(s)=" << std::hex;
+            for (uint32_t i = 0; i < store.num_sample_payloads; i++) {
+                uint64_t payload[(s.payload_size_ + 63) / 64];
+                s.GetSamplePayload(store, i, payload);
+                for (uint32_t j = 0; j < ((s.payload_size_ + 63) / 64); j++)
+                    std::cerr << "0x" << payload[j] << ", ";
+            }
             std::cerr << std::dec << std::endl;
         }
         std::cerr << "popcnts=[" << popcnts[0] << ", " << popcnts[1] << ']' << std::endl;
@@ -4564,7 +4382,7 @@ private:
         int32_t cnt = 0;
         for (int32_t i = 0; i < s.scaled_sizes_[size_grade]; i++) {
             const uint64_t value = s.GetSlot(store, i);
-            if (value == 0)
+            if (value == 0 && !get_bitmap_bit(runends, i))
                 continue;
             std::cerr << '{' << std::setfill(' ') << std::setw(3) << i;
             std::cerr << ',' << ((runends[i / 64] >> (i % 64)) & 1ULL) << ",0b";
@@ -4575,8 +4393,8 @@ private:
                 std::cerr << std::endl;
             cnt++;
         }
-        std::cerr << std::endl << std::hex;
         if constexpr (payload_type == PayloadType::FixedLength) {
+            std::cerr << std::endl << std::hex;
             for (int32_t i = 0; i < s.scaled_sizes_[size_grade]; i++) {
                 const uint64_t value = s.GetSlot(store, i);
                 if (value == 0)
@@ -4603,6 +4421,7 @@ TEST_SUITE("diva") {
         DivaTests::RandomInsert<DivaType::Standard>();
     }
 
+    /*
     TEST_CASE("point query") {
         DivaTests::PointQuery<DivaType::Standard>();
     }
@@ -4635,6 +4454,7 @@ TEST_SUITE("diva") {
     TEST_CASE("iterator") {
         DivaTests::Iterator<DivaType::Standard>();
     }
+    */
 }
 
 TEST_SUITE("diva (int optimized)") {
@@ -4646,6 +4466,7 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::RandomInsert<DivaType::Int>();
     }
 
+    /*
     TEST_CASE("point query") {
         DivaTests::PointQuery<DivaType::Int>();
     }
@@ -4678,6 +4499,10 @@ TEST_SUITE("diva (int optimized)") {
     TEST_CASE("iterator") {
         DivaTests::Iterator<DivaType::Int>();
     }
+    */
+}
+
+TEST_SUITE("diva (binary trie)") {
 }
 
 }

@@ -2948,7 +2948,7 @@ wormhole_int_iter_prev(struct wormhole_int_iter * const iter, struct kv * const 
 wormhole_int_iter_inp(struct wormhole_int_iter * const iter, kv_inp_func uf, void * const priv)
 {
   struct int_store_pair * const kv = wormhole_int_iter_current(iter);
-  uint8_t buf[sizeof(struct kv) + kv->key_size + sizeof(kv->payload_ptr)];
+  uint8_t buf[sizeof(struct kv) + kv->key_size + sizeof(struct store_sim_hack) + sizeof(kv->payload_ptr)];
   struct kv * res = (struct kv *) buf;
   res->klen = kv->key_size;
   memcpy(res->kv, &kv->key, res->klen);
