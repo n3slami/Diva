@@ -4111,11 +4111,11 @@ TEST_SUITE("diva") {
         DivaTests::SerializeDeserialize<DivaType::Standard>();
     }
 
-    /*
     TEST_CASE("concurrency") {
         DivaTests::Concurrency<DivaType::Standard>();
     }
 
+    /*
     TEST_CASE("payloads") {
         DivaTests::Payloads<DivaType::Standard>();
     }
@@ -4156,11 +4156,11 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::SerializeDeserialize<DivaType::Int>();
     }
 
-    /*
     TEST_CASE("concurrency") {
         DivaTests::Concurrency<DivaType::Int>();
     }
 
+    /*
     TEST_CASE("payloads") {
         DivaTests::Payloads<DivaType::Int>();
     }

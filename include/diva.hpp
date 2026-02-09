@@ -1235,15 +1235,17 @@ inline void Diva<diva_type, payload_type>::InsertSimple(const InfiniteByteString
         next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
     }
 
-    rwlock_lock_write(infix_store_ptr->rwlock);
     InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_write(infix_store.rwlock);
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
-    if (prev_key == key) {
-        // Add new sample payload
-        AddSamplePayload(infix_store, payload);
-        rwlock_unlock_write(infix_store.rwlock);
-        return;
+    if constexpr (payload_type == PayloadType::FixedLength) {
+        if (prev_key == key) {
+            // Add new sample payload
+            AddSamplePayload(infix_store, payload);
+            rwlock_unlock_write(infix_store.rwlock);
+            return;
+        }
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
@@ -1404,7 +1406,7 @@ inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, 
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
     if (prev_key == key) {
-        // Previous key was a partial key and a prefix of the query key
+        // Previous key matches the query key
         rwlock_unlock_read(infix_store.rwlock);
         return true;
     }
@@ -1441,6 +1443,7 @@ inline void Diva<diva_type, payload_type>::AddTreeKey(const uint8_t *key, const 
         wh_put(better_tree_, key, key_len, &infix_store, sizeof(infix_store), dummy_locked_leaf_addrs);
 }
 
+
 template <DivaType diva_type, PayloadType payload_type>
 inline uint32_t Diva<diva_type, payload_type>::InsertSplit(const InfiniteByteString key,
                                                            const void *payload) {
@@ -1472,14 +1475,14 @@ inline uint32_t Diva<diva_type, payload_type>::InsertSplit(const InfiniteByteStr
             AddSamplePayload(infix_store, payload);
             rwlock_unlock_write(infix_store.rwlock);
             UnlockLeaves(leaves_to_unlock, it_write_lock);
+            return 0;
         }
         else {
-            // Add duplicate infix
             rwlock_unlock_write(infix_store.rwlock);
             UnlockLeaves(leaves_to_unlock, it_write_lock);
             InsertSimple(key);
+            return 0;
         }
-        return 0;
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
@@ -3904,7 +3907,7 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
         int32_t next_empty, previous_empty;
         if (empty_before_next_runend > previous_runend) {
             next_empty = mapped_pos <= previous_runend ? previous_runend + 1 
-                : (empty_before_next_runend < mapped_pos ? scaled_sizes_[size_grade] : mapped_pos);
+                : (empty_before_next_runend < mapped_pos ? FindEmptySlotAfter(store, next_runend) : mapped_pos);
             previous_empty = mapped_pos <= previous_runend ? FindEmptySlotBefore(store, previous_runend) 
                 : std::min(empty_before_next_runend, mapped_pos);
         }
@@ -3912,6 +3915,9 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
             next_empty = FindEmptySlotAfter(store, next_runend < scaled_sizes_[size_grade] ? next_runend : previous_runend);
             previous_empty = empty_before_next_runend;
         }
+#ifdef DEBUG
+        assert(next_empty >= scaled_sizes_[size_grade] || mapped_pos <= next_runend);
+#endif // DEBUG
         int32_t insert_pos;
         bool should_make_room = false;
         if (next_empty < scaled_sizes_[size_grade]) {
@@ -5010,8 +5016,7 @@ inline void Diva<diva_type, payload_type>::ResizeInfixStore(InfixStore &store, c
 
     // Backup the pointer to the sample payload list, if necessary
     const uint64_t *sample_payload_list = reinterpret_cast<const uint64_t *>(store.ptr[1]);
-    if constexpr (payload_type == PayloadType::FixedLength)
-        delete[] store.ptr;
+    delete[] store.ptr;
 
     // Update `size_grade`
     if (full_slot_count >= (size_grade ? scaled_sizes_[size_grade - 1] : exception_scaled_size_)) {
@@ -5027,9 +5032,9 @@ inline void Diva<diva_type, payload_type>::ResizeInfixStore(InfixStore &store, c
 
     store.SetSizeGrade(size_grade);
     const uint32_t next_size = scaled_sizes_[size_grade];
-    const uint64_t word_count = InfixStore::GetPtrWordCount(next_size, infix_size_, payload_size_);
-    uint64_t *new_ptr = new uint64_t[word_count];
-    store.ptr = new_ptr;
+    const uint64_t word_count = InfixStore::GetPtrWordCount(next_size,
+            infix_size_, payload_size_);
+    store.ptr = new uint64_t[word_count];
     if constexpr (diva_type == DivaType::BinaryTrie)
         LoadVectorToInfixStore(store, infix_vec, total_implicit, true, payload_list);
     else 
@@ -5043,6 +5048,28 @@ inline void Diva<diva_type, payload_type>::ResizeInfixStore(InfixStore &store, c
         if constexpr (payload_type == PayloadType::FixedLength)
             delete[] payload_list;
     }
+
+#ifdef DEBUG
+    {
+        const uint32_t *store_popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
+        const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
+        uint32_t occupied_count = 0, runend_count = 0, popcnts[2] = {};
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++) {
+            if (i < infix_store_target_size / 128)
+                popcnts[0] += __builtin_popcountll(occupieds[i]);
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        }
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++) {
+            if (i < 512)
+                popcnts[1] += get_bitmap_bit(runends, i);
+            runend_count += get_bitmap_bit(runends, i);
+        }
+        assert(occupied_count == runend_count);
+        assert(store_popcnts[0] == popcnts[0]);
+        assert(store_popcnts[1] == popcnts[1]);
+    }
+#endif // DEBUG
 }
 
 
@@ -5128,7 +5155,6 @@ inline void Diva<diva_type, payload_type>::LoadListToInfixStore(InfixStore &stor
         }
     }
 
-    /*
 #ifdef DEBUG
     {
         uint32_t occupied_count = 0, runend_count = 0;
@@ -5144,7 +5170,6 @@ inline void Diva<diva_type, payload_type>::LoadListToInfixStore(InfixStore &stor
             assert(retrieved_infix_list[i] == list[i]);
     }
 #endif // DEBUG
-    */
 }
 
 
