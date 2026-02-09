@@ -200,43 +200,43 @@ public:
             infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b00000000};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b00000001};
-                const uint32_t r_key_len = 2;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b00000000};
+                const uint8_t r_key[2] = {0b00000000, 0b00000001};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000010, 0b00000000};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000010, 0b00000000};
-                const uint32_t r_key_len = 2;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000010, 0b00000000};
+                const uint8_t r_key[2] = {0b00000010, 0b00000000};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10001010};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b10001111};
-                const uint32_t r_key_len = 2;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b10001010};
+                const uint8_t r_key[2] = {0b00000000, 0b10001111};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10101010};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b10101110};
-                const uint32_t r_key_len = 2;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b10101010};
+                const uint8_t r_key[2] = {0b00000000, 0b10101110};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b01110010};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b01110011};
-                const uint32_t r_key_len = 2;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b01110010};
+                const uint8_t r_key[2] = {0b00000000, 0b01110011};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
         }
 
@@ -259,35 +259,35 @@ public:
             infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b11110010};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b11110011};
-                const uint32_t r_key_len = 2;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b11110010};
+                const uint8_t r_key[2] = {0b00000000, 0b11110011};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10111011};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000000, 0b10111111};
-                const uint32_t r_key_len = 2;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000000, 0b10111011};
+                const uint8_t r_key[2] = {0b00000000, 0b10111111};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000001, 0b10111011};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000001, 0b10111111};
-                const uint32_t r_key_len = 2;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000001, 0b10111011};
+                const uint8_t r_key[2] = {0b00000001, 0b10111111};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000001, 0b00000000};
-                const uint32_t l_key_len = 2;
-                const uint8_t r_key[20] = {0b00000001, 0b00000000};
-                const uint32_t r_key_len = 2;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[2] = {0b00000001, 0b00000000};
+                const uint8_t r_key[2] = {0b00000001, 0b00000000};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
         }
 
@@ -311,43 +311,43 @@ public:
             infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b01111110, 0b11101101, 0b11101101};
-                const uint32_t l_key_len = 4;
-                const uint8_t r_key[20] = {0b00000000, 0b01111110, 0b11101111};
-                const uint32_t r_key_len = 3;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[4] = {0b00000000, 0b01111110, 0b11101101, 0b11101101};
+                const uint8_t r_key[3] = {0b00000000, 0b01111110, 0b11101111};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10000010, 0b01101010};
-                const uint32_t l_key_len = 3;
-                const uint8_t r_key[20] = {0b00000000, 0b10000010, 0b11101111, 0b01010101};
-                const uint32_t r_key_len = 4;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[3] = {0b00000000, 0b10000010, 0b01101010};
+                const uint8_t r_key[4] = {0b00000000, 0b10000010, 0b11101111, 0b01010101};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10000110, 0b01101010};
-                const uint32_t l_key_len = 3;
-                const uint8_t r_key[20] = {0b00000000, 0b10000110, 0b11101111, 0b01010101};
-                const uint32_t r_key_len = 4;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[3] = {0b00000000, 0b10000110, 0b01101010};
+                const uint8_t r_key[4] = {0b00000000, 0b10000110, 0b11101111, 0b01010101};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10000011, 0b11101010};
-                const uint32_t l_key_len = 3;
-                const uint8_t r_key[20] = {0b00000000, 0b10000011, 0b11101111};
-                const uint32_t r_key_len = 3;
-                REQUIRE(!infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[3] = {0b00000000, 0b10000011, 0b11101010};
+                const uint8_t r_key[3] = {0b00000000, 0b10000011, 0b11101111};
+                REQUIRE_FALSE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                              {r_key, 8 * sizeof(r_key)},
+                                              key_start_bit, slot_size));
             }
 
             {
-                const uint8_t l_key[20] = {0b00000000, 0b10000010, 0b11101010};
-                const uint32_t l_key_len = 3;
-                const uint8_t r_key[20] = {0b00000000, 0b10000011, 0b11101111};
-                const uint32_t r_key_len = 3;
-                REQUIRE(infix.QueryTrie({l_key, l_key_len}, {r_key, r_key_len}, key_start_bit, slot_size));
+                const uint8_t l_key[3] = {0b00000000, 0b10000010, 0b11101010};
+                const uint8_t r_key[3] = {0b00000000, 0b10000011, 0b11101111};
+                REQUIRE(infix.QueryTrie({l_key, 8 * sizeof(l_key)},
+                                        {r_key, 8 * sizeof(r_key)},
+                                        key_start_bit, slot_size));
             }
         }
     }
@@ -393,7 +393,7 @@ public:
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
                     REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
                     REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
@@ -402,7 +402,7 @@ public:
                     REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -412,7 +412,7 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 5, 7};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
                     REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
@@ -423,7 +423,7 @@ public:
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
         }
 
@@ -460,7 +460,7 @@ public:
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0,
                     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
                     REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
                     REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
@@ -469,7 +469,7 @@ public:
                     REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -479,7 +479,7 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 6};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {1, 1};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 it.Advance(infix.HasPrefixKeys());
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
@@ -491,7 +491,7 @@ public:
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
         }
 
@@ -536,7 +536,7 @@ public:
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
                     REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
                     REQUIRE_EQ(it.depth_branch_.back().first, depth_checks[i]);
@@ -545,7 +545,7 @@ public:
                     REQUIRE_EQ(it.num_prefix_keys_read_, num_prefix_keys_read_checks[i]);
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
 
             SUBCASE("skip subtrees") {
@@ -555,7 +555,7 @@ public:
                 const std::vector<int32_t> num_keys_read_checks = {0, 11, 15, 18};
                 const std::vector<int32_t> num_prefix_keys_read_checks = {0, 0, 0, 0};
 
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
                 it.Advance(infix.HasPrefixKeys());
                 for (uint32_t i = 0; i < bit_pos_checks.size(); i++) {
                     REQUIRE_EQ(it.bit_pos_, bit_pos_checks[i]);
@@ -566,7 +566,7 @@ public:
                     it.SkipSubtree(infix.HasPrefixKeys());
                     it.Advance(infix.HasPrefixKeys());
                 }
-                REQUIRE(it.depth_branch_.back().first == -1);
+                REQUIRE_EQ(it.depth_branch_.back().first, -1);
             }
         }
     }
@@ -653,8 +653,9 @@ public:
 
             SUBCASE("path diverging to the right") {
                 SUBCASE("first part zero") {
-                    uint8_t insertee_contents[8] = {0b00000000, 0b10100110, 0b00000000};
-                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const uint8_t insertee_contents[3] = {0b00000000, 0b10100110, 0b00000000};
+                    infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                     key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
                     check_infix.num_prefix_keys_ = 0;
@@ -667,8 +668,9 @@ public:
                 }
 
                 SUBCASE("second part zero") {
-                    uint8_t insertee_contents[8] = {0b00000000, 0b10010110, 0b00000000};
-                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const uint8_t insertee_contents[3] = {0b00000000, 0b10010110, 0b00000000};
+                    infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                     key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
                     check_infix.num_prefix_keys_ = 0;
@@ -682,8 +684,9 @@ public:
             }
 
             SUBCASE("path diverging to the left") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b01110010, 0b10000000};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b01110010, 0b10000000};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -696,8 +699,9 @@ public:
             }
 
             SUBCASE("path diverging from suffix from left") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b10101010};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b10000010, 0b10101010};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -710,8 +714,9 @@ public:
             }
 
             SUBCASE("path diverging from suffix from right") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b11000101, 0b11010101};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b11000101, 0b11010101};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 0;
@@ -724,8 +729,9 @@ public:
             }
 
             SUBCASE("create prefix key") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b10000011, 0b10101010};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b10000011, 0b10101010};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -760,8 +766,9 @@ public:
             infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
             SUBCASE("path diverging") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b10111111, 0b11111111};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b10111111, 0b11111111};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -775,8 +782,9 @@ public:
             }
 
             SUBCASE("path diverging from suffix from left") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b01100101, 0b00000000};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b01100101, 0b00000000};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -790,8 +798,9 @@ public:
             }
 
             SUBCASE("path diverging from suffix from right") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b10001101, 0b00000000};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b10001101, 0b00000000};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 2;
@@ -805,8 +814,9 @@ public:
             }
 
             SUBCASE("create new prefix key") {
-                uint8_t insertee_contents[8] = {0b00000000, 0b10011001, 0b10110110};
-                infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                const uint8_t insertee_contents[3] = {0b00000000, 0b10011001, 0b10110110};
+                infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                 key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.num_prefix_keys_ = 3;
@@ -819,8 +829,9 @@ public:
                 AssertInfix(infix, check_infix);
 
                 SUBCASE("create new prefix key child") {
-                    uint8_t insertee_contents[8] = {0b00000000, 0b10011011, 0b11111111};
-                    infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+                    const uint8_t insertee_contents[3] = {0b00000000, 0b10011011, 0b11111111};
+                    infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                                     key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
                     check_infix.num_prefix_keys_ = 3;
@@ -854,8 +865,9 @@ public:
             Diva<>::Infix infix(infix_value);
             infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-            uint8_t insertee_contents[8] = {0b00000000, 0b10000010, 0b00000000};
-            infix.InsertTrie({insertee_contents, 3}, key_start_bit, slot_size);
+            const uint8_t insertee_contents[3] = {0b00000000, 0b10000010, 0b00000000};
+            infix.InsertTrie({insertee_contents, 8 * sizeof(insertee_contents)},
+                             key_start_bit, slot_size);
 
             Diva<>::Infix check_infix(infix_value);
             check_infix.num_prefix_keys_ = 0;
@@ -1172,7 +1184,7 @@ public:
 
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1183,7 +1195,7 @@ public:
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1222,7 +1234,8 @@ public:
 
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                infix.DeleteTrie({victim_key, 1}, 0, slot_size);
+                infix.DeleteTrie({victim_key, 8 * sizeof(victim_key)},
+                                 0, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1241,7 +1254,7 @@ public:
 
                 SUBCASE("small slots") {
                     infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                    infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                    infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
                     check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1252,7 +1265,7 @@ public:
                 SUBCASE("wide slots") {
                     const uint32_t slot_size = 10;
                     infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                    infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                    infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                     Diva<>::Infix check_infix(infix_value);
                     check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1291,7 +1304,7 @@ public:
 
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1300,7 +1313,7 @@ public:
             SUBCASE("wide slots") {
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
-                infix.DeleteTrie({keys[victim].str, keys[victim].length / 8}, key_start_bit, slot_size);
+                infix.DeleteTrie(keys[victim], key_start_bit, slot_size);
 
                 Diva<>::Infix check_infix(infix_value);
                 check_infix.BuildTrieAndSuffixes(baseline_keys, N - 1, key_start_bit, slot_size);
@@ -1338,19 +1351,22 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 4);
+                    const uint8_t query_key[2] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               4);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00011110, 0b00110001, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                    const uint8_t query_key[3] = {0b00011110, 0b00110001, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               10);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00011110, 0b10110001, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                    const uint8_t query_key[3] = {0b00011110, 0b10110001, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               -1);
                 }
             }
             SUBCASE("wide slots") {
@@ -1358,19 +1374,22 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 7);
+                    const uint8_t query_key[2] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)}, 
+                                                          0, slot_size),
+                               7);
                 }
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00000111, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                    const uint8_t query_key[2] = {0b00000111, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               -1);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100011, 0b11010010, 0b10101101};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                    const uint8_t query_key[3] = {0b00100011, 0b11010010, 0b10101101};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               10);
                 }
             }
         }
@@ -1396,24 +1415,28 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 4);
+                    const uint8_t query_key[2] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               4);
                 }
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00101110, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 2);
+                    const uint8_t query_key[2] = {0b00101110, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               2);
                 }
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b11111110, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                    const uint8_t query_key[2] = {0b11111110, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               -1);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100101, 0b10101011, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 6);
+                    const uint8_t query_key_contents[3] = {0b00100101, 0b10101011, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, 8 * sizeof(query_key_contents)},
+                                                          0, slot_size),
+                               6);
                 }
             }
             SUBCASE("wide slots") {
@@ -1421,19 +1444,22 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00000000, 0b00000000};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 6);
+                    const uint8_t query_key[2] = {0b00000000, 0b00000000};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               6);
                 }
                 {
-                    const uint32_t query_key_len = 2;
-                    uint8_t query_key_contents[query_key_len] = {0b00011111, 0b11111110};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 2);
+                    const uint8_t query_key[2] = {0b00011111, 0b11111110};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               2);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100001, 0b00101001, 0b11011011};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 8);
+                    const uint8_t query_key[3] = {0b00100001, 0b00101001, 0b11011011};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               8);
                 }
             }
         }
@@ -1460,19 +1486,22 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b11011001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 13);
+                    const uint8_t query_key[3] = {0b00100000, 0b11011001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               13);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b10101001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                    const uint8_t query_key[3] = {0b00100000, 0b10101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               -1);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00111111, 0b01101001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 7);
+                    const uint8_t query_key[3] = {0b00111111, 0b01101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               7);
                 }
             }
             SUBCASE("wide slots") {
@@ -1480,19 +1509,22 @@ public:
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b11011001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 16);
+                    const uint8_t query_key[3] = {0b00100000, 0b11011001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               16);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00100000, 0b10101001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), -1);
+                    const uint8_t query_key[3] = {0b00100000, 0b10101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               -1);
                 }
                 {
-                    const uint32_t query_key_len = 3;
-                    uint8_t query_key_contents[query_key_len] = {0b00111111, 0b01101001, 0b11101010};
-                    REQUIRE_EQ(infix.GetLongestMatch({query_key_contents, query_key_len}, 0, slot_size), 10);
+                    const uint8_t query_key[3] = {0b00111111, 0b01101001, 0b11101010};
+                    REQUIRE_EQ(infix.GetLongestMatch({query_key, 8 * sizeof(query_key)},
+                                                          0, slot_size),
+                               10);
                 }
             }
         }
@@ -1531,8 +1563,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 30;
                     check_infix.trie_suffixes_[0] = 0b11101011010100001;
@@ -1541,8 +1574,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00100000, 0b11011110};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00100000, 0b11011110};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 45;
                     check_infix.trie_suffixes_[0] = 0b1111111011010000000011101011010100001;
@@ -1551,8 +1585,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 17;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010, 0b10000000};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010, 0b10000000};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 45;
                     check_infix.trie_suffixes_[0] = 0b1111111011010000000111101011010100001;
@@ -1568,8 +1603,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 60;
                     check_infix.trie_suffixes_[0] = 0b10000100001110011110101101000011000100101110011010101010000;
@@ -1578,8 +1614,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00100000, 0b11011110};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00100000, 0b11011110};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 70;
                     check_infix.trie_suffixes_[0] = 0b1000011100111100000111111011001000011000100101110011010101010000;
@@ -1589,8 +1626,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 17;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010, 0b10000000};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b10101010, 0b10000000};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 80;
                     check_infix.trie_suffixes_[0] = 0b1111000001111110110010000110001001011100000000001110101010110000;
@@ -1625,8 +1663,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b11111111};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b11111111};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 29;
                     check_infix.trie_suffixes_[0] = 0b11111111111100001;
@@ -1635,8 +1674,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00101010, 0b11011110};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00101010, 0b11011110};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_prefix_keys_ = 0;
                     check_infix.num_trie_bits_ = 32;
@@ -1656,8 +1696,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 16;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b11111111};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00000000, 0b11111111};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 56;
                     check_infix.trie_suffixes_[0] = 0b1100110010101100110011101110101000000000110111111111000;
@@ -1666,8 +1707,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00101010, 0b11011110};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00101010, 0b11011110};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_prefix_keys_ = 0;
                     check_infix.num_trie_bits_ = 32;
@@ -1707,8 +1749,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00010001, 0b01101010};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00010001, 0b01101010};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 35;
                     check_infix.trie_suffixes_[0] = 0b111101010101100;
@@ -1717,8 +1760,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 24;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00001101, 0b10101010, 0b11111111};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00001101, 0b10101010, 0b11111111};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 60;
                     check_infix.trie_suffixes_[0] = 0b1111010101011011111111110101101011101110;
@@ -1734,8 +1778,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 15;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00010001, 0b01101010};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00010001, 0b01101010};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 110;
                     check_infix.trie_suffixes_[0] = 0b1011010000110001001011000111001010010000000110101101010110101000;
@@ -1745,8 +1790,9 @@ public:
                 {
                     const uint32_t adapt_key_len_bits = 24;
                     const uint32_t adapt_key_len = (adapt_key_len_bits + 7) / 8;
-                    uint8_t adapt_key_contents[adapt_key_len] = {0b00001101, 0b10101010, 0b11111111};
-                    infix.AdaptTrie({adapt_key_contents, adapt_key_len}, 0, adapt_key_len_bits, slot_size);
+                    const uint8_t adapt_key_contents[adapt_key_len] = {0b00001101, 0b10101010, 0b11111111};
+                    infix.AdaptTrie({adapt_key_contents, 8 * adapt_key_len},
+                                    0, adapt_key_len_bits, slot_size);
 
                     check_infix.num_suffix_bits_ = 130;
                     check_infix.trie_suffixes_[0] = 0b1100011100101001000000011010110101000111111110101010111101101000;
@@ -2634,9 +2680,8 @@ public:
         const uint32_t rng_seed = 1380;
         std::mt19937_64 rng(rng_seed);
 
-        const uint32_t prefix_length_bytes = 3;
-        uint8_t prefix_contents[prefix_length_bytes] = {0b01010101, 0b11111111, 0b00110011};
-        const Diva<>::InfiniteByteString prefix = {prefix_contents, prefix_length_bytes};
+        const uint8_t prefix_contents[3] = {0b01010101, 0b11111111, 0b00110011};
+        const Diva<>::InfiniteByteString prefix = {prefix_contents, 8 * sizeof(prefix_contents)};
 
         SUBCASE("no prefix keys") {
             const uint32_t min_key_len = 6;
@@ -3044,10 +3089,6 @@ public:
         const uint32_t key_start_bit = 6;
         const uint32_t rng_seed = 1380;
         std::mt19937_64 rng(rng_seed);
-
-        const uint32_t prefix_length_bytes = 3;
-        uint8_t prefix_contents[prefix_length_bytes] = {0b01010101, 0b11111111, 0b00110011};
-        const Diva<>::InfiniteByteString prefix = {prefix_contents, prefix_length_bytes};
 
         uint8_t infix_store_buf[1024];
         memset(infix_store_buf, 0, sizeof(infix_store_buf));

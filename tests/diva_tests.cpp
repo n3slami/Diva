@@ -30,6 +30,8 @@
 
 namespace diva {
 
+typedef Diva<DivaType::BinaryTrie, PayloadType::None> BinaryTrieDiva;
+
 class DivaTests {
 public:
     template <DivaType diva_type>
@@ -1244,7 +1246,7 @@ public:
                 for (int32_t i = 0; i < num_boundaries; i++) {
                     wh_int_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                          reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, sizeof(keys[0])), 0);
+                    REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, sizeof(expected_boundaries[i])), 0);
                     AssertStoreContents(s, *store, occupieds_pos_vec[i], checks_vec[i]);
                     wh_int_iter_skip1(it, check_it_write, check_it_unlock);
                 }
@@ -1256,7 +1258,7 @@ public:
                 for (int32_t i = 0; i < num_boundaries; i++) {
                     wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
                                      reinterpret_cast<void **>(&store), &dummy);
-                    REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, sizeof(keys[0])), 0);
+                    REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, sizeof(expected_boundaries[i])), 0);
                     AssertStoreContents(s, *store, occupieds_pos_vec[i], checks_vec[i]);
                     wh_iter_skip1(it, check_it_write, check_it_unlock);
                 }
@@ -1545,7 +1547,6 @@ public:
         const uint32_t payload_size = 100;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
-        const uint32_t n_threads = 32;
         const uint32_t n_keys = 10 * 1024;
         const uint32_t infix_store_target_size = Diva<diva_type, PayloadType::FixedLength>::infix_store_target_size;
         const bool check_it_write = false;
@@ -3575,6 +3576,143 @@ public:
     }
 
 
+    static void BulkLoadBinaryTrie() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 2600;
+        const bool check_it_write = false;
+        const bool check_it_unlock = true;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+        SUBCASE("fixed length") {
+            std::vector<std::string> string_keys;
+            const size_t key_length = 10;
+            for (int32_t i = 0; i < n_keys; i++) {
+                string_keys.push_back("");
+                for (int32_t j = 0; j < key_length; j++)
+                    string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+            }
+            std::sort(string_keys.begin(), string_keys.end());
+
+            BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                    key_length, seed, load_factor);
+
+            // Setup the expected boundary keys and the Infix Stores we should check
+            const uint32_t num_boundaries = 6;
+            const uint8_t expected_boundaries[num_boundaries][10] = {{0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
+                                                                     {0b00110000, 0b00110010, 0b00110000, 0b01000111, 0b01101010, 0b01000111, 0b01001001, 0b00110100, 0b01101111, 0b01101011},
+                                                                     {0b01001111, 0b01001001, 0b01101100, 0b01000110, 0b01101101, 0b01000100, 0b01101011, 0b00111001, 0b01110011, 0b00110111},
+                                                                     {0b01101101, 0b01001000, 0b00110011, 0b01101111, 0b01001010, 0b01101101, 0b01110101, 0b01010110, 0b00110111, 0b01110010},
+                                                                     {0b01111010, 0b01110111, 0b00110111, 0b01110110, 0b01101101, 0b01111010, 0b01001000, 0b01010001, 0b01101010, 0b00110001},
+                                                                     {0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111}};
+            std::vector<uint32_t> occupieds_pos_vec[6];
+            std::vector<std::tuple<uint32_t, bool, uint64_t>> checks_vec[6];
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/fixed_length/2");
+                occupieds_pos_vec[1] = occupieds_pos;
+                checks_vec[1] = checks;
+            }
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/fixed_length/3");
+                occupieds_pos_vec[2] = occupieds_pos;
+                checks_vec[2] = checks;
+            }
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/fixed_length/4");
+                occupieds_pos_vec[3] = occupieds_pos;
+                checks_vec[3] = checks;
+            }
+
+            // Check the boundary keys and the Infix Stores
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            typename BinaryTrieDiva::InfixStore *store;
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0, check_it_write);
+            for (int32_t i = 0; i < num_boundaries; i++) {
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                    reinterpret_cast<void **>(&store), &dummy);
+                REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, sizeof(expected_boundaries[i])), 0);
+                AssertStoreContents(s, *store, occupieds_pos_vec[i], checks_vec[i]);
+                wh_iter_skip1(it, check_it_write, check_it_unlock);
+            }
+            wh_iter_destroy(it, check_it_write);
+        }
+
+        SUBCASE("variable length") {
+            std::vector<std::string> string_keys;
+            const size_t key_length = 16;
+            for (int32_t i = 0; i < n_keys; i++) {
+                string_keys.push_back("");
+                const uint32_t current_key_length = 1 + rng() % key_length;
+                for (int32_t j = 0; j < current_key_length; j++)
+                    string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+            }
+            std::sort(string_keys.begin(), string_keys.end());
+
+            BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                    seed, load_factor);
+
+            // Setup the expected boundary keys and the Infix Stores we should check
+            const uint32_t num_boundaries = 6;
+            const uint32_t expected_boundary_lengths[num_boundaries] = {8, 1, 13, 15, 4, 16};
+            const uint8_t expected_boundaries[num_boundaries][20] = {{0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000},
+                                                                     {0b00110000},
+                                                                     {0b01010000, 0b01000100, 0b01100111, 0b01010010, 0b01001001, 0b01101111, 0b00110001, 0b01010110, 0b01001110, 0b01101111, 0b01100100, 0b01010000, 0b01000101},
+                                                                     {0b01101110, 0b01001010, 0b00110011, 0b01110100, 0b00110110, 0b01010100, 0b01100110, 0b01000101, 0b00110000, 0b01110001, 0b01010110, 0b01111010, 0b01010011, 0b01100100, 0b00110101},
+                                                                     {0b01111010, 0b01111010, 0b00110011, 0b01000101},
+                                                                     {0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111}};
+            std::vector<uint32_t> occupieds_pos_vec[6];
+            std::vector<std::tuple<uint32_t, bool, uint64_t>> checks_vec[6];
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/variable_length/2");
+                occupieds_pos_vec[1] = occupieds_pos;
+                checks_vec[1] = checks;
+            }
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/variable_length/3");
+                occupieds_pos_vec[2] = occupieds_pos;
+                checks_vec[2] = checks;
+            }
+            {
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/bulk_load/variable_length/4");
+                occupieds_pos_vec[3] = occupieds_pos;
+                checks_vec[3] = checks;
+            }
+
+            // Check the boundary keys and the Infix Stores
+            const uint8_t *res_key;
+            uint32_t res_size, dummy;
+            typename BinaryTrieDiva::InfixStore *store;
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0, check_it_write);
+            for (int32_t i = 0; i < num_boundaries; i++) {
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                    reinterpret_cast<void **>(&store), &dummy);
+                REQUIRE_EQ(memcmp(expected_boundaries[i], res_key, expected_boundary_lengths[i]), 0);
+                AssertStoreContents(s, *store, occupieds_pos_vec[i], checks_vec[i]);
+                wh_iter_skip1(it, check_it_write, check_it_unlock);
+            }
+            wh_iter_destroy(it, check_it_write);
+        }
+    }
+
+
 private:
     static void WriteStoreContentsToFile(std::string path,
                                          const std::vector<uint32_t> &occupieds_pos, 
@@ -3958,7 +4096,7 @@ private:
 };
 
 
-TEST_SUITE("diva") {
+TEST_SUITE("standard") {
     TEST_CASE("insert") {
         DivaTests::Insert<DivaType::Standard>();
     }
@@ -4001,7 +4139,7 @@ TEST_SUITE("diva") {
     }
 }
 
-TEST_SUITE("diva (int optimized)") {
+TEST_SUITE("int") {
     TEST_CASE("insert") {
         DivaTests::Insert<DivaType::Int>();
     }
@@ -4044,7 +4182,12 @@ TEST_SUITE("diva (int optimized)") {
     }
 }
 
-TEST_SUITE("diva (binary trie)") {
+TEST_SUITE("binary trie") {
+    TEST_CASE("bulk load") {
+        DivaTests::BulkLoadBinaryTrie();
+        //DivaTests::BulkLoadStreaming<DivaType::BinaryTrie>();
+    }
 }
+
 
 }
