@@ -3089,7 +3089,8 @@ inline void Diva<diva_type, payload_type>::BulkLoad(const t_itr begin, const t_i
             infix_vec.emplace_back(infix_list[last_infix_pos]);
             if (i - last_infix_pos > 1) {
                 infix_vec.back().BuildTrieAndSuffixes(keys + last_infix_pos,
-                        i - last_infix_pos, key_start_bit, infix_size_, true);
+                        i - last_infix_pos, key_start_bit, infix_size_,
+                        false, false, true);
             }
             last_infix_pos = i;
         }
@@ -3192,7 +3193,7 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
     }
     if constexpr (diva_type == DivaType::BinaryTrie) {
         infix_vec.emplace_back(infix_list[last_infix_pos]);
-        if (bulk_load_streaming_ind_ - 1 - last_infix_pos > 1) {
+        if (bulk_load_streaming_ind_ - last_infix_pos > 1) {
             infix_vec.back().BuildTrieAndSuffixes(bulk_load_key_list_ + last_infix_pos,
                     bulk_load_streaming_ind_ - last_infix_pos, key_start_bit, infix_size_,
                     false, false, true);
@@ -3218,10 +3219,18 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
         store.ptr[1] = reinterpret_cast<uint64_t>(sample_payloads);
         AddSamplePayload(store, bulk_load_left_payload_);
     }
-    if constexpr (diva_type == DivaType::Int)
-        wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
-    else
-        wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
+    if constexpr (diva_type == DivaType::Int) {
+        wh_int_put(better_tree_int_, bulk_load_left_key_.str,
+                bulk_load_left_key_.length, &store,
+                sizeof(store),
+                dummy_locked_leaf_addrs);
+    }
+    else {
+        wh_put(better_tree_, bulk_load_left_key_.str,
+                bulk_load_left_key_.length, &store,
+                sizeof(store),
+                dummy_locked_leaf_addrs);
+    }
 
     delete[] bulk_load_left_key_.str;
     bulk_load_left_key_ = bulk_load_right_key;
@@ -3242,15 +3251,15 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
     AddTreeKey(key_copy, bulk_load_streaming_max_len_);
 
     if (bulk_load_streaming_ind_ > 0) {
-        InfiniteByteString bulk_load_right_key {bulk_load_key_list_[bulk_load_streaming_ind_ - 1].str,
-                                                bulk_load_key_list_[bulk_load_streaming_ind_ - 1].length};
+        const InfiniteByteString bulk_load_right_key = bulk_load_key_list_[bulk_load_streaming_ind_ - 1];
         bulk_load_key_list_[bulk_load_streaming_ind_ - 1] = {};
         bulk_load_streaming_ind_--;
 
         uint64_t infix_list[infix_store_target_size];
         std::vector<Infix> infix_vec;
         uint32_t last_infix_pos = 0;
-        const auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(bulk_load_left_key_, bulk_load_right_key);
+        const auto [shared, ignore, implicit_size] = 
+            GetSharedIgnoreImplicitLengths(bulk_load_left_key_, bulk_load_right_key);
         const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
         const uint64_t prev_implicit = ExtractPartialKey(bulk_load_left_key_, shared, ignore, implicit_size, 0) >> infix_size_;
         const uint64_t next_implicit = ExtractPartialKey(bulk_load_right_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -3289,23 +3298,27 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
             allocation_size_grade = std::lower_bound(scaled_sizes_, scaled_sizes_ + size_scalar_count, num_slots_filled) - scaled_sizes_;
         }
         InfixStore store(scaled_sizes_[allocation_size_grade], infix_size_, allocation_size_grade, payload_size_);
-        if constexpr (payload_type == PayloadType::FixedLength) {
-            if constexpr (diva_type == DivaType::BinaryTrie)
-                LoadVectorToInfixStore(store, infix_vec, total_implicit, true, bulk_load_payload_list_);
-            else 
-                LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit, true, bulk_load_payload_list_);
-            if constexpr (payload_type == PayloadType::FixedLength) {
-                uint64_t *sample_payloads = reinterpret_cast<uint64_t *>(malloc(((payload_size_ + 63) / 64) * sizeof(uint64_t)));
-                store.ptr[1] = reinterpret_cast<uint64_t>(sample_payloads);
-                AddSamplePayload(store, bulk_load_left_payload_);
-            }
-        }
+        if constexpr (diva_type == DivaType::BinaryTrie)
+            LoadVectorToInfixStore(store, infix_vec, total_implicit, true, bulk_load_payload_list_);
         else 
-            LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit);
-        if constexpr (diva_type == DivaType::Int)
-            wh_int_put(better_tree_int_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
-        else
-            wh_put(better_tree_, bulk_load_left_key_.str, bulk_load_left_key_.length, &store, sizeof(store), dummy_locked_leaf_addrs);
+            LoadListToInfixStore(store, infix_list, bulk_load_streaming_ind_, total_implicit, true, bulk_load_payload_list_);
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            uint64_t *sample_payloads = reinterpret_cast<uint64_t *>(malloc(((payload_size_ + 63) / 64) * sizeof(uint64_t)));
+            store.ptr[1] = reinterpret_cast<uint64_t>(sample_payloads);
+            AddSamplePayload(store, bulk_load_left_payload_);
+        }
+        if constexpr (diva_type == DivaType::Int) {
+            wh_int_put(better_tree_int_, bulk_load_left_key_.str,
+                    bulk_load_left_key_.length, &store,
+                    sizeof(store),
+                    dummy_locked_leaf_addrs);
+        }
+        else {
+            wh_put(better_tree_, bulk_load_left_key_.str,
+                    bulk_load_left_key_.length, &store,
+                    sizeof(store),
+                    dummy_locked_leaf_addrs);
+        }
         uint64_t bulk_load_right_payload_[(payload_size_ + 63) / 64 + 1];
         copy_bitmap_to_bitmap(bulk_load_payload_list_, bulk_load_streaming_ind_ * payload_size_,
                               bulk_load_right_payload_, 0, payload_size_);
@@ -6449,7 +6462,6 @@ inline void Diva<diva_type, payload_type>::Infix::BuildTrieRecurse(const Infinit
             : (keys[i].GetBitBitLength(key_start_bit + shared_prefix_bits) ? i : split_pos);
     }
     assert(prefix_key_count == 0 || HasPrefixKeys());
-    //std::cerr << "key_count=" << key_count << " prefix_key_count=" << prefix_key_count << " split_pos=" << split_pos << std::endl;
 
     const uint32_t new_start_bit = key_start_bit + shared_prefix_bits + 1 - (prefix_key_count > 1);
     if (HasPrefixKeys()) {

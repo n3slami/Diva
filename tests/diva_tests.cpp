@@ -3576,7 +3576,7 @@ public:
     }
 
 
-    static void BulkLoadBinaryTrie() {
+    static void BinaryTrieBulkLoad() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
         const float load_factor = 0.95;
@@ -3709,6 +3709,43 @@ public:
                 wh_iter_skip1(it, check_it_write, check_it_unlock);
             }
             wh_iter_destroy(it, check_it_write);
+        }
+    }
+
+
+    static void BinaryTrieBulkLoadStreaming() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 40000;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+
+        std::vector<std::string> string_keys;
+        for (int32_t i = 0; i < n_keys; i++) {
+            string_keys.push_back("");
+            const uint32_t current_key_length = 6 + rng() % 3;
+            for (int32_t j = 0; j < current_key_length; j++)
+                string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+        }
+        std::sort(string_keys.begin(), string_keys.end());
+
+        SUBCASE("streaming") {
+            BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                             seed, load_factor);
+            BinaryTrieDiva streamed_s(infix_size, seed, load_factor);
+            for (int32_t i = 0; i < n_keys; i++)
+                streamed_s.BulkLoadStreaming(string_keys[i]);
+            streamed_s.BulkLoadStreamingFinish();
+            AssertDivas(s, streamed_s);
         }
     }
 
@@ -3897,7 +3934,11 @@ private:
                 REQUIRE_EQ(store_a->status, store_b->status);
                 const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
                 const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
-                REQUIRE_EQ(memcmp(store_a->ptr, store_b->ptr, word_count * sizeof(uint64_t)), 0);
+                REQUIRE_EQ(store_a->ptr[0], store_b->ptr[0]);
+                REQUIRE_EQ(memcmp(store_a->ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
+                                       store_b->ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
+                                       (word_count - Diva<diva_type, payload_type>::num_metadata_offset_words) * sizeof(uint64_t)),
+                           0);
                 if constexpr (payload_type == PayloadType::FixedLength) {
                     REQUIRE_EQ(store_a->num_sample_payloads, store_b->num_sample_payloads);
                     const uint64_t *store_a_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_a->ptr[1]);
@@ -3937,7 +3978,10 @@ private:
                 const uint32_t slot_count = a.scaled_sizes_[store_a->GetSizeGrade()];
                 const uint32_t word_count = store_a->GetPtrWordCount(slot_count, a.infix_size_);
                 REQUIRE_EQ(store_a->ptr[0], store_b->ptr[0]);
-                REQUIRE_EQ(memcmp(store_a->ptr + 2, store_b->ptr + 2, (word_count - 2) * sizeof(uint64_t)), 0);
+                REQUIRE_EQ(memcmp(store_a->ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
+                                       store_b->ptr + Diva<diva_type, payload_type>::num_metadata_offset_words,
+                                       (word_count - Diva<diva_type, payload_type>::num_metadata_offset_words) * sizeof(uint64_t)),
+                           0);
                 if constexpr (payload_type == PayloadType::FixedLength) {
                     REQUIRE_EQ(store_a->num_sample_payloads, store_b->num_sample_payloads);
                     const uint64_t *store_a_sample_payloads_ptr = reinterpret_cast<const uint64_t *>(store_a->ptr[1]);
@@ -4184,8 +4228,8 @@ TEST_SUITE("int") {
 
 TEST_SUITE("binary trie") {
     TEST_CASE("bulk load") {
-        DivaTests::BulkLoadBinaryTrie();
-        //DivaTests::BulkLoadStreaming<DivaType::BinaryTrie>();
+        DivaTests::BinaryTrieBulkLoad();
+        DivaTests::BinaryTrieBulkLoadStreaming();
     }
 }
 
