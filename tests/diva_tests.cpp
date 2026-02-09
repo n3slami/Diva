@@ -3429,7 +3429,6 @@ public:
                 t.join();
         }
 
-
         SUBCASE("concurrently iterating and deleting with payloads") {
             const uint32_t infix_size = 10;
             const uint32_t seed = 2;
@@ -3997,11 +3996,9 @@ TEST_SUITE("diva") {
         DivaTests::Payloads<DivaType::Standard>();
     }
 
-    /*
     TEST_CASE("iterator") {
         DivaTests::Iterator<DivaType::Standard>();
     }
-    */
 }
 
 TEST_SUITE("diva (int optimized)") {
@@ -4042,11 +4039,9 @@ TEST_SUITE("diva (int optimized)") {
         DivaTests::Payloads<DivaType::Int>();
     }
 
-    /*
     TEST_CASE("iterator") {
         DivaTests::Iterator<DivaType::Int>();
     }
-    */
 }
 
 TEST_SUITE("diva (binary trie)") {
