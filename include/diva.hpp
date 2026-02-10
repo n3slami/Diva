@@ -1451,7 +1451,9 @@ inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, 
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t query_key = extraction - (prev_implicit << infix_size_);
-    const bool res = PointQueryInfixStore(infix_store, query_key, total_implicit);
+    const bool res = PointQueryInfixStore(infix_store, query_key, total_implicit,
+                                          {key.str, 8 * key.length},
+                                          shared + ignore + implicit_size + infix_size_ - 1);
 
     rwlock_unlock_read(infix_store.rwlock);
     return res;
@@ -7809,7 +7811,7 @@ Diva<diva_type, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uint32_
                 new_infix.AddBitsToTrie(1, 1);
                 new_infix.AddSuffixToTrie(suffix,
                         suffix_len, suffix_len - suffix_bit_count,
-                        slot_size, slot_size);
+                        slot_size, slot_size - 1);
             }
             res.push_back(new_infix);
             it.Advance(has_prefix_keys);
@@ -7817,7 +7819,7 @@ Diva<diva_type, payload_type>::Infix::SplitPrefixBits(uint32_t num_bits, uint32_
         }
         else if (it.AtPrefixKey(has_prefix_keys)) {
             Infix new_infix(infix_without_age_shifted | current_prefix 
-                            | (1UL << std::min(63, num_split_bits - depth - 1)));
+                            | (1UL << std::min(63, num_split_bits - depth)));
             res.push_back(new_infix);
             it.Advance(has_prefix_keys);
         }

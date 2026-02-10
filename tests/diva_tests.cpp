@@ -3851,6 +3851,52 @@ public:
     }
 
 
+    static void BinaryTriePointQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 2600;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+        std::vector<std::string> string_keys;
+        const size_t key_length = 10;
+        for (int32_t i = 0; i < n_keys; i++) {
+            string_keys.push_back("");
+            for (int32_t j = 0; j < key_length; j++)
+                string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+        }
+        std::sort(string_keys.begin(), string_keys.end());
+
+        BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                key_length, seed, load_factor);
+
+        {
+            const uint8_t query_key[4] = {0b00110001, 0b01011010, 0b01011001, 0b10011001};
+            REQUIRE(s.PointQuery(query_key, sizeof(query_key)));
+        }
+        {
+            const uint8_t query_key[4] = {0b00110001, 0b01011010, 0b01101101, 0b10011001};
+            REQUIRE(s.PointQuery(query_key, sizeof(query_key)));
+        }
+        {
+            const uint8_t query_key[4] = {0b00110001, 0b01011010, 0b01101111, 0b10011001};
+            REQUIRE(s.PointQuery(query_key, sizeof(query_key)));
+        }
+        {
+            const uint8_t query_key[4] = {0b00110001, 0b01011010, 0b01100011, 0b10011001};
+            REQUIRE_FALSE(s.PointQuery(query_key, sizeof(query_key)));
+        }
+    }
+
+
     static void BinaryTrieAdapt() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4385,6 +4431,7 @@ TEST_SUITE("binary trie") {
     }
 
     TEST_CASE("point query") {
+        DivaTests::BinaryTriePointQuery();
     }
 
     TEST_CASE("range query") {
