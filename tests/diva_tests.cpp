@@ -3897,6 +3897,66 @@ public:
     }
 
 
+    static void BinaryTrieRangeQuery() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 2600;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+        std::vector<std::string> string_keys;
+        const size_t key_length = 10;
+        for (int32_t i = 0; i < n_keys; i++) {
+            string_keys.push_back("");
+            for (int32_t j = 0; j < key_length; j++)
+                string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+        }
+        std::sort(string_keys.begin(), string_keys.end());
+
+        BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                key_length, seed, load_factor);
+
+        {
+            const uint8_t query_l_key[3] = {0b00110001, 0b01011010, 0b00000001};
+            const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01011001, 0b10011001};
+            REQUIRE(s.RangeQuery(query_l_key, sizeof(query_l_key),
+                                 query_r_key, sizeof(query_r_key)));
+        }
+        {
+            const uint8_t query_l_key[3] = {0b00110001, 0b01011010, 0b01100001};
+            const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01101101, 0b11111111};
+            REQUIRE(s.RangeQuery(query_l_key, sizeof(query_l_key),
+                                 query_r_key, sizeof(query_r_key)));
+        }
+        {
+            const uint8_t query_l_key[3] = {0b00110001, 0b01011010, 0b01101111};
+            const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01111111, 0b11111111};
+            REQUIRE(s.RangeQuery(query_l_key, sizeof(query_l_key),
+                                 query_r_key, sizeof(query_r_key)));
+        }
+        {
+            const uint8_t query_l_key[3] = {0b00110001, 0b01011010, 0b00000001};
+            const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01111111, 0b11111111};
+            REQUIRE(s.RangeQuery(query_l_key, sizeof(query_l_key),
+                                 query_r_key, sizeof(query_r_key)));
+        }
+        {
+            const uint8_t query_l_key[3] = {0b00110001, 0b01011010, 0b01111111};
+            const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01111111, 0b11111111};
+            REQUIRE_FALSE(s.RangeQuery(query_l_key, sizeof(query_l_key),
+                                       query_r_key, sizeof(query_r_key)));
+        }
+    }
+
+
     static void BinaryTrieAdapt() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4435,6 +4495,7 @@ TEST_SUITE("binary trie") {
     }
 
     TEST_CASE("range query") {
+        DivaTests::BinaryTrieRangeQuery();
     }
 
     TEST_CASE("delete") {

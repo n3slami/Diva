@@ -1276,6 +1276,9 @@ inline void Diva<diva_type, payload_type>::InsertSimple(const InfiniteByteString
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    // To insert into the binary tries
+    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
     const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -1284,7 +1287,7 @@ inline void Diva<diva_type, payload_type>::InsertSimple(const InfiniteByteString
     InsertRawIntoInfixStore(infix_store, insertee, total_implicit, 
                             reinterpret_cast<const uint64_t *>(payload),
                             {key.str, 8 * key.length},
-                            shared + ignore + implicit_size + infix_size_ - 1);
+                            key_start_bit);
     rwlock_unlock_write(infix_store.rwlock);
 }
 
@@ -1371,7 +1374,9 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
         const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
         const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit,
-                                              l_key, r_key, key_start_bit);
+                                              {l_key.str, 8 * l_key.length},
+                                              {r_key.str, 8 * r_key.length},
+                                              key_start_bit);
 
         rwlock_unlock_read(infix_store.rwlock);
         return res;
@@ -1385,7 +1390,9 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         const uint64_t l_val = (l_extraction | 1ULL) - (prev_implicit << infix_size_);
         const uint64_t r_val = (r_extraction | 1ULL) - (prev_implicit << infix_size_);
         const bool res = RangeQueryInfixStore(infix_store, l_val, r_val, total_implicit,
-                                              l_key, r_key, key_start_bit);
+                                              {l_key.str, 8 * l_key.length},
+                                              {r_key.str, 8 * r_key.length},
+                                              key_start_bit);
 
         rwlock_unlock_read(infix_store.rwlock);
         return res;
@@ -1446,6 +1453,9 @@ inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, 
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    // To query the binary tries
+    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -1453,7 +1463,7 @@ inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, 
     const uint64_t query_key = extraction - (prev_implicit << infix_size_);
     const bool res = PointQueryInfixStore(infix_store, query_key, total_implicit,
                                           {key.str, 8 * key.length},
-                                          shared + ignore + implicit_size + infix_size_ - 1);
+                                          key_start_bit);
 
     rwlock_unlock_read(infix_store.rwlock);
     return res;
@@ -2881,15 +2891,19 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint3
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    // To adapt the binary tries
+    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+    const uint32_t adapt_length = new_prefix_len - key_start_bit + infix_size_ - 1;
+
     const uint64_t extraction = ExtractPartialKey(key_conv, shared, ignore, implicit_size, key_conv.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
     const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t adaptee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
-    const uint32_t original_key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
     AdaptRawInInfixStore(infix_store, adaptee, 
-                         {key_conv.str, 8 * key_conv.length}, original_key_start_bit,
-                         new_prefix_len - original_key_start_bit + infix_size_ - 1,
+                         {key_conv.str, 8 * key_conv.length}, 
+                         key_start_bit,
+                         adapt_length,
                          total_implicit);
     rwlock_unlock_write(infix_store.rwlock);
 }
