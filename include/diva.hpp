@@ -120,6 +120,9 @@ public:
     bool PointQuery(uint64_t key) const;
     bool PointQuery(std::string_view key) const;
     bool PointQuery(const uint8_t *key, const uint32_t key_len) const;
+    void Adapt(uint64_t key, const uint32_t new_prefix_len);
+    void Adapt(std::string_view key, const uint32_t new_prefix_len);
+    void Adapt(const uint8_t *key, const uint32_t key_len, const uint32_t new_prefix_len);
     void ShrinkInfixSize(const uint32_t new_infix_size);
     uint64_t Size() const;
     uint32_t Serialize(char *out) const;
@@ -2827,6 +2830,66 @@ inline void Diva<diva_type, payload_type>::UpdateInfixListDelete(const uint32_t 
             infix_list[i] = recovered_infix;
         }
     }
+}
+
+
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Adapt(uint64_t key, const uint32_t new_prefix_len) {
+    key = __builtin_bswap64(key);
+    Adapt(reinterpret_cast<const uint8_t *>(&key), sizeof(key), new_prefix_len);
+}
+
+
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Adapt(std::string_view key, const uint32_t new_prefix_len) {
+    Adapt(reinterpret_cast<const uint8_t *>(key.data()), key.size(), new_prefix_len);
+}
+
+
+template <DivaType diva_type, PayloadType payload_type>
+inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint32_t key_len,
+                                                 const uint32_t new_prefix_len) {
+    const bool it_write_lock = false;
+    InfixStore *infix_store_ptr;
+    void *leaves_to_unlock[3] = {};
+
+    InfiniteByteString next_key {};
+    InfiniteByteString prev_key {};
+    InfiniteByteString key_conv = {key, key_len};
+
+    wormhole_int_iter it_int;
+    wormhole_iter it;
+    GetLowerUpperBounds(key_conv, it_write_lock, leaves_to_unlock, it, it_int,
+                        prev_key, next_key, infix_store_ptr);
+    uint64_t prev_key_word, next_key_word;
+    if constexpr (diva_type == DivaType::Int) {
+        prev_key_word = *reinterpret_cast<const uint64_t *>(prev_key.str);
+        prev_key.str = reinterpret_cast<const uint8_t *>(&prev_key_word);
+        next_key_word = *reinterpret_cast<const uint64_t *>(next_key.str);
+        next_key.str = reinterpret_cast<const uint8_t *>(&next_key_word);
+    }
+
+    InfixStore& infix_store = *infix_store_ptr;
+    rwlock_lock_write(infix_store.rwlock);
+    UnlockLeaves(leaves_to_unlock, it_write_lock);
+
+    if (prev_key == key_conv) { // Nothing to adapt
+        rwlock_unlock_write(infix_store.rwlock);
+        return;
+    }
+
+    auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    const uint64_t extraction = ExtractPartialKey(key_conv, shared, ignore, implicit_size, key_conv.GetBit(shared));
+    const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
+    const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
+    const uint32_t total_implicit = next_implicit - prev_implicit + 1;
+    const uint64_t adaptee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
+    const uint32_t original_key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+    AdaptRawInInfixStore(infix_store, adaptee, 
+                         {key_conv.str, 8 * key_conv.length}, original_key_start_bit,
+                         new_prefix_len - original_key_start_bit + infix_size_ - 1,
+                         total_implicit);
+    rwlock_unlock_write(infix_store.rwlock);
 }
 
 
@@ -7579,7 +7642,7 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
             memset(encoded_suffix, 0, ((adapt_length - depth) / 32 + 1) * sizeof(encoded_suffix[0]));
             uint32_t encoding_bit_pos = 0;
             while (depth <= adapt_length) {
-                uint64_t data = key.BitsAtBitLength(depth, write_len) | (1ULL << write_len);
+                uint64_t data = key.BitsAtBitLength(key_start_bit + depth, write_len) | (1ULL << write_len);
                 data >>= write_len - std::min(write_len, adapt_length - depth);
                 write_bits_to_bitmap(encoded_suffix, encoding_bit_pos,
                         data, write_len + 1);

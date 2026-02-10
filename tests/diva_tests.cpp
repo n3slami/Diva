@@ -3851,6 +3851,53 @@ public:
     }
 
 
+    static void BinaryTrieAdapt() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 2600;
+        const bool check_it_write = false;
+        const bool check_it_unlock = true;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+        std::vector<std::string> string_keys;
+        const size_t key_length = 10;
+        for (int32_t i = 0; i < n_keys; i++) {
+            string_keys.push_back("");
+            for (int32_t j = 0; j < key_length; j++)
+                string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+        }
+        std::sort(string_keys.begin(), string_keys.end());
+
+        BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                key_length, seed, load_factor);
+
+        const uint8_t adaptee[4] = {0b00110001, 0b01011010, 0b01011001, 0b10011001};
+        s.Adapt(adaptee, sizeof(adaptee), 24);
+
+        const uint8_t *res_key;
+        uint32_t res_size, dummy;
+        typename BinaryTrieDiva::InfixStore *store;
+        wormhole_iter *it = wh_iter_create(s.better_tree_);
+        wh_iter_seek(it, nullptr, 0, check_it_write);
+        wh_iter_skip1(it, check_it_write, check_it_unlock);
+        wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                            reinterpret_cast<void **>(&store), &dummy);
+        const auto [occupieds_pos, checks] =
+            ReadStoreContentsFromFile("binary_trie/adapt");
+        AssertStoreContents(s, *store, occupieds_pos, checks);
+        wh_iter_destroy(it, check_it_write);
+    }
+
+
 private:
     static void WriteStoreContentsToFile(std::string path,
                                          const std::vector<uint32_t> &occupieds_pos, 
@@ -4347,6 +4394,7 @@ TEST_SUITE("binary trie") {
     }
 
     TEST_CASE("adapt") {
+        DivaTests::BinaryTrieAdapt();
     }
 }
 
