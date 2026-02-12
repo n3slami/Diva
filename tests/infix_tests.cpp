@@ -2675,6 +2675,7 @@ public:
 
     static void PrependPrefix() {
         const uint32_t N = 10;
+        const uint32_t infix_len = 6;
         const uint32_t slot_size = 5;
         const uint32_t key_start_bit = 6;
         const uint32_t rng_seed = 1380;
@@ -2682,6 +2683,8 @@ public:
 
         const uint8_t prefix_contents[3] = {0b01010101, 0b11111111, 0b00110011};
         const Diva<>::InfiniteByteString prefix = {prefix_contents, 8 * sizeof(prefix_contents)};
+        const uint64_t infix_value = 0b110111;
+        Diva<>::Infix infix(infix_value);
 
         SUBCASE("no prefix keys") {
             const uint32_t min_key_len = 6;
@@ -2697,40 +2700,54 @@ public:
             }
             std::sort(keys, keys + N);
 
-            const uint64_t infix_value = 1;
-            Diva<>::Infix infix(infix_value);
-
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110010001000000;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 10;
+                        check_infix.num_trie_bits_ = 54;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110011001000000);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110101001000000;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 10;
+                        check_infix.num_trie_bits_ = 54;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110011001000000);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
-                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110010101);
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 10;
+                        check_infix.num_trie_bits_ = 112;
+                        check_infix.trie_.push_back(0b1111100110011000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
-                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 10;
+                        check_infix.num_trie_bits_ = 112;
+                        check_infix.trie_.push_back(0b0011001100000000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110111111);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2739,34 +2756,57 @@ public:
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110010001000000;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 140;
+                        check_infix.num_trie_bits_ = 54;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110011001000000);
+                        check_infix.trie_suffixes_.push_back(0b0001100000000000011100000000000110010000000001111000000000011000);
+                        check_infix.trie_suffixes_.push_back(0b0000000000011000000000000111100000000001111100000000011011000000);
+                        check_infix.trie_suffixes_.push_back(0b000000000110);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b111110000100011001000101110100110011100110101001000000;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 140;
+                        check_infix.num_trie_bits_ = 54;
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110011001000000);
+                        check_infix.trie_suffixes_.push_back(0b0001100000000000011100000000000110010000000001111000000000011000);
+                        check_infix.trie_suffixes_.push_back(0b0000000000011000000000000111100000000001111100000000011011000000);
+                        check_infix.trie_suffixes_.push_back(0b000000000110);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
-                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110010101);
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 110;
+                        check_infix.num_trie_bits_ = 112;
+                        check_infix.trie_.push_back(0b1111100110011000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        check_infix.trie_suffixes_.push_back(0b0000101110000001000100000011001000000100110000001110100000010001);
+                        check_infix.trie_suffixes_.push_back(0b0000001000100000010001000000111010000001111100);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
-                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110101111);
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 10;
+                        check_infix.num_suffix_bits_ = 110;
+                        check_infix.num_trie_bits_ = 112;
+                        check_infix.trie_.push_back(0b0011001100000000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b111110000100011001000101110100110011100110111111);
+                        check_infix.trie_suffixes_.push_back(0b0000101110000001000100000011001000000100110000001110100000010001);
+                        check_infix.trie_suffixes_.push_back(0b0000001000100000010001000000111010000001111100);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2787,40 +2827,58 @@ public:
             }
             std::sort(keys, keys + N);
 
-            const uint64_t infix_value = 1;
-            Diva<>::Infix infix(infix_value);
-
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000100100011010;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 62;
+                        check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100110011010);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000101010011010;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 62;
+                        check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100110011010);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += add_bits + Diva<>::Infix::varlen_counter_encoding_fragment_length + 1;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1100011010011011000100101010111111111001100110000000000100011100;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 95;
+                        check_infix.trie_.push_back(0b1100011010011011000101011111111100110011000000001101100100011100);
                         check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1100011010011011000101011111111100110011000000000000000100011100;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 95;
+                        check_infix.trie_.push_back(0b1100011010011011000101111110011001100000000000001101100100011100);
                         check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2829,34 +2887,57 @@ public:
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000100100011010;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 36;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 62;
+                        check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100110011010);
+                        check_infix.trie_suffixes_.push_back(0b011001100101011001100111011101010100);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b11100101000110111001100011011001100011010011011000101010011010;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 36;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 62;
+                        check_infix.trie_.push_back(0b11100101000110111001100011011001100011010011011000100110011010);
+                        check_infix.trie_suffixes_.push_back(0b011001100101011001100111011101010100);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += add_bits + Diva<>::Infix::varlen_counter_encoding_fragment_length + 1;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1100011010011011000100101010111111111001100110000000000100011100;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 99;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 95;
+                        check_infix.trie_.push_back(0b1100011010011011000101011111111100110011000000001101100100011100);
                         check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        check_infix.trie_suffixes_.push_back(0b0000011010000000110100000001111000000011110000000101100000001001);
+                        check_infix.trie_suffixes_.push_back(0b00000001101000000011010000000101100);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1100011010011011000101011111111100110011000000000000000100011100;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 9;
+                        check_infix.num_suffix_bits_ = 99;
+                        check_infix.num_prefix_keys_ = 2;
+                        check_infix.num_trie_bits_ = 95;
+                        check_infix.trie_.push_back(0b1100011010011011000101111110011001100000000000001101100100011100);
                         check_infix.trie_.push_back(0b1110010100011011100110001101100);
+                        check_infix.trie_suffixes_.push_back(0b0000011010000000110100000001111000000011110000000101100000001001);
+                        check_infix.trie_suffixes_.push_back(0b00000001101000000011010000000101100);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2878,44 +2959,58 @@ public:
             }
             std::sort(keys, keys + N);
 
-            const uint64_t infix_value = 1;
-            Diva<>::Infix infix(infix_value);
-
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010010001000000;
-                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 20;
+                        check_infix.num_trie_bits_ = 90;
+                        check_infix.trie_.push_back(0b0110000000100101011101101001011011011010011010111010011001000000);
+                        check_infix.trie_.push_back(0b11110011111000100101111011);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010101001000000;
-                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 20;
+                        check_infix.num_trie_bits_ = 90;
+                        check_infix.trie_.push_back(0b0110000000100101011101101001011011011010011010111010011001000000);
+                        check_infix.trie_.push_back(0b11110011111000100101111011);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
-                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010010101;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 20;
+                        check_infix.num_trie_bits_ = 148;
+                        check_infix.trie_.push_back(0b1111100110011000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010101111);
                         check_infix.trie_.push_back(0b11110011111000100101);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
-                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010101111;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 20;
+                        check_infix.num_trie_bits_ = 148;
+                        check_infix.trie_.push_back(0b0011001100000000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010111111);
                         check_infix.trie_.push_back(0b11110011111000100101);
+                        check_infix.trie_suffixes_.push_back(0b0);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2924,38 +3019,63 @@ public:
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010010001000000;
-                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 100;
+                        check_infix.num_trie_bits_ = 90;
+                        check_infix.trie_.push_back(0b0110000000100101011101101001011011011010011010111010011001000000);
+                        check_infix.trie_.push_back(0b11110011111000100101111011);
+                        check_infix.trie_suffixes_.push_back(0b1001010100101101000011000100101100011100101001000010100110101000);
+                        check_infix.trie_suffixes_.push_back(0b011010101001000010000111001000011110);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b110000000100101011101101001011011011010011010111010101001000000;
-                        check_infix.trie_[1] = 0b11110011111000100101111011;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 100;
+                        check_infix.num_trie_bits_ = 90;
+                        check_infix.trie_.push_back(0b0110000000100101011101101001011011011010011010111010011001000000);
+                        check_infix.trie_.push_back(0b11110011111000100101111011);
+                        check_infix.trie_suffixes_.push_back(0b1001010100101101000011000100101100011100101001000010100110101000);
+                        check_infix.trie_suffixes_.push_back(0b011010101001000010000111001000011110);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_trie_bits_ += 2 * add_bits;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b0111111111001100110000000000100000000000000000000000000000000000;
-                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010010101;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 240;
+                        check_infix.num_trie_bits_ = 148;
+                        check_infix.trie_.push_back(0b1111100110011000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010101111);
                         check_infix.trie_.push_back(0b11110011111000100101);
+                        check_infix.trie_suffixes_.push_back(0b1011000000011010000000010010000000011010000000010111000000010010);
+                        check_infix.trie_suffixes_.push_back(0b0001111000000001001000000001001100000001011000000001001100000001);
+                        check_infix.trie_suffixes_.push_back(0b0000000110110000000100100000000111110000000101100000000110100000);
+                        check_infix.trie_suffixes_.push_back(0b000000010111000000011010000000010010000000010010);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_[0] = 0b1111100110011000000000000000100000000000000000000000000000000000;
-                        check_infix.trie_[1] = 0b1110110110000000100101011101101001011011011010011010111010101111;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 20;
+                        check_infix.num_suffix_bits_ = 240;
+                        check_infix.num_trie_bits_ = 148;
+                        check_infix.trie_.push_back(0b0011001100000000000001101100100000000000000000000000000000000000);
+                        check_infix.trie_.push_back(0b1110110110000000100101011101101001011011011010011010111010111111);
                         check_infix.trie_.push_back(0b11110011111000100101);
+                        check_infix.trie_suffixes_.push_back(0b1011000000011010000000010010000000011010000000010111000000010010);
+                        check_infix.trie_suffixes_.push_back(0b0001111000000001001000000001001100000001011000000001001100000001);
+                        check_infix.trie_suffixes_.push_back(0b110110000000100100000000111110000000101100000000110100000);
+                        check_infix.trie_suffixes_.push_back(0b00000010111000000011010000000010010000000010010);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -2977,38 +3097,52 @@ public:
             }
             std::sort(keys, keys + N);
 
-            const uint64_t infix_value = 1;
-            Diva<>::Infix infix(infix_value);
-
             SUBCASE("small slots") {
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_suffix_bits_ = 9;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b1001010;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b1001011);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b1001101;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 9;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b1001011);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_suffix_bits_ = 44;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b1000100001100011001110011111111111110101010;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 44;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b01100111011000010000100111001111111111111101);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b1000100001000010000100111001111111111111101;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 44;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b1100111011000010000100001011010110111101111);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -3017,32 +3151,49 @@ public:
                 const uint32_t slot_size = 10;
                 infix.BuildTrieAndSuffixes(keys, N, key_start_bit, slot_size);
 
-                Diva<>::Infix check_infix(infix);
                 SUBCASE("short") {
                     const uint32_t add_bits = 3;
-                    check_infix.num_suffix_bits_ = 19;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b100101000000;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 19;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b0000000100101100000);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b100110100000;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 19;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b0000000100101100000);
                         AssertInfix(infix, check_infix);
                     }
                 }
                 SUBCASE("long") {
                     const uint32_t add_bits = 32;
-                    check_infix.num_suffix_bits_ = 49;
                     SUBCASE("no offset") {
-                        infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b10000100000000010110011001111111110101010101;
+                        infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b010101);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 49;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b0000010000101101100011100000001111001100110111111);
                         AssertInfix(infix, check_infix);
                     }
                     SUBCASE("some offset") {
-                        infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                        check_infix.trie_suffixes_[0] = 0b10000100000000011100000001111001100110111111;
+                        infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                        Diva<>::Infix check_infix(0b101111);
+                        check_infix.num_suffixes_ = 1;
+                        check_infix.num_suffix_bits_ = 49;
+                        check_infix.num_trie_bits_ = 1;
+                        check_infix.trie_.push_back(0b1);
+                        check_infix.trie_suffixes_.push_back(0b0000010000101101100010000000001110011000111111100);
                         AssertInfix(infix, check_infix);
                     }
                 }
@@ -3050,32 +3201,50 @@ public:
         }
 
         SUBCASE("no trie") {
-            const uint64_t infix_value = 1;
-            Diva<>::Infix infix(infix_value);
-
+            infix.infix_ = 0b011010;
             SUBCASE("short") {
                 const uint32_t add_bits = 3;
                 SUBCASE("no offset") {
-                    infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                    Diva<>::Infix check_infix(0b1000001);
+                    infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                    Diva<>::Infix check_infix(0b010011);
+                    check_infix.num_suffixes_ = 1;
+                    check_infix.num_suffix_bits_ = 4;
+                    check_infix.num_trie_bits_ = 1;
+                    check_infix.trie_.push_back(0b1);
+                    check_infix.trie_suffixes_.push_back(0b0110);
                     AssertInfix(infix, check_infix);
                 }
                 SUBCASE("some offset") {
-                    infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                    Diva<>::Infix check_infix(0b10100001);
+                    infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                    Diva<>::Infix check_infix(0b101011);
+                    check_infix.num_suffixes_ = 1;
+                    check_infix.num_suffix_bits_ = 4;
+                    check_infix.num_trie_bits_ = 1;
+                    check_infix.trie_.push_back(0b1);
+                    check_infix.trie_suffixes_.push_back(0b0110);
                     AssertInfix(infix, check_infix);
                 }
             }
             SUBCASE("long") {
                 const uint32_t add_bits = 32;
                 SUBCASE("no offset") {
-                    infix.PrependPrefix(prefix, 0, add_bits, slot_size);
-                    Diva<>::Infix check_infix(0b0101010111111111001100110000000000001);
+                    infix.PrependPrefix(prefix, 0, add_bits, infix_len, slot_size);
+                    Diva<>::Infix check_infix(0b010101);
+                    check_infix.num_suffixes_ = 1;
+                    check_infix.num_suffix_bits_ = 44;
+                    check_infix.num_trie_bits_ = 1;
+                    check_infix.trie_.push_back(0b1);
+                    check_infix.trie_suffixes_.push_back(0b00001101101000010000100111001111111111111101);
                     AssertInfix(infix, check_infix);
                 }
                 SUBCASE("some offset") {
-                    infix.PrependPrefix(prefix, 5, add_bits, slot_size);
-                    Diva<>::Infix check_infix(0b1011111111100110011000000000000000001);
+                    infix.PrependPrefix(prefix, 5, add_bits, infix_len, slot_size);
+                    Diva<>::Infix check_infix(0b101111);
+                    check_infix.num_suffixes_ = 1;
+                    check_infix.num_suffix_bits_ = 44;
+                    check_infix.num_trie_bits_ = 1;
+                    check_infix.trie_.push_back(0b1);
+                    check_infix.trie_suffixes_.push_back(0b00001101101000010000100001011010110111101111);
                     AssertInfix(infix, check_infix);
                 }
             }

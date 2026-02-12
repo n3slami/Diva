@@ -122,7 +122,7 @@ public:
     bool PointQuery(const uint8_t *key, const uint32_t key_len) const;
     void Adapt(uint64_t key, const uint32_t new_prefix_len);
     void Adapt(std::string_view key, const uint32_t new_prefix_len);
-    void Adapt(const uint8_t *key, const uint32_t key_len, const uint32_t new_prefix_len);
+    void Adapt(const uint8_t *input_key, const uint32_t input_key_len, const uint32_t new_prefix_len);
     void ShrinkInfixSize(const uint32_t new_infix_size);
     uint64_t Size() const;
     uint32_t Serialize(char *out) const;
@@ -464,7 +464,7 @@ private:
         std::vector<Infix> SplitPrefixBits(uint32_t num_bits, uint32_t slot_size) const;
         void Merge(const Infix& other, uint32_t slot_size);
         void PrependPrefix(const InfiniteByteString prefix, uint32_t prefix_offset, uint32_t prefix_len,
-                           uint32_t slot_size);
+                           uint32_t infix_len, uint32_t slot_size);
 
         uint32_t GetSharedPrefixLen(const InfiniteByteString key_1,
                                     uint32_t start_bit_1,
@@ -711,12 +711,18 @@ private:
                          const bool expanded,
                          const uint64_t *payload_list=nullptr, const uint32_t payload_list_offset=0,
                          uint64_t *res_payload=nullptr) const;
-    std::vector<Infix> UpdateInfixVector(const std::vector<Infix> infix_vec, const uint32_t shamt,
+    std::vector<Infix> UpdateInfixVector(const std::vector<Infix>& infix_vec, const uint32_t shamt,
                                          const uint64_t lower_lim, const uint64_t upper_lim,
                                          const uint32_t implicit_size) const;
     void UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
                                const InfiniteByteString left_key, const InfiniteByteString right_key,
-                               uint64_t *infix_list, const uint32_t infix_list_len);
+                               uint64_t *infix_list, const uint32_t infix_list_len) const;
+    std::vector<typename Diva<diva_type, payload_type>::Infix> UpdateInfixVectorDelete(const uint32_t shared,
+                                                                                       const uint32_t ignore,
+                                                                                       const uint32_t implicit_size,
+                                                                                       const InfiniteByteString left_key,
+                                                                                       const InfiniteByteString right_key, 
+                                                                                       std::vector<Infix>& infix_vec) const;
 
     static bool CompareInfixes(uint64_t a, uint64_t b);
 
@@ -1985,7 +1991,7 @@ inline void Diva<diva_type, payload_type>::UpdateInfixList(const uint64_t *list,
 template <DivaType diva_type, PayloadType payload_type>
 //__attribute__((always_inline))
 inline std::vector<typename Diva<diva_type, payload_type>::Infix>
-Diva<diva_type, payload_type>::UpdateInfixVector(const std::vector<Infix> infix_vec, const uint32_t shamt,
+Diva<diva_type, payload_type>::UpdateInfixVector(const std::vector<Infix>& infix_vec, const uint32_t shamt,
                                                  const uint64_t lower_lim, const uint64_t upper_lim,
                                                  const uint32_t implicit_size) const {
     bool should_sort = false;
@@ -2542,6 +2548,8 @@ inline void Diva<diva_type, payload_type>::Delete(const uint8_t *input_key, cons
     }
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
+    // To delete from the binary tries
+    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -2549,7 +2557,8 @@ inline void Diva<diva_type, payload_type>::Delete(const uint8_t *input_key, cons
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t deletee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
 
-    DeleteRawFromInfixStore(infix_store, deletee, total_implicit, should_remove);
+    DeleteRawFromInfixStore(infix_store, deletee, total_implicit, should_remove,
+            {key.str, 8 * key.length}, key_start_bit);
     rwlock_unlock_write(infix_store.rwlock);
     n_keys_.fetch_sub(1, std::memory_order_release);
 }
@@ -2579,6 +2588,7 @@ template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::DeleteRange(const uint8_t *input_l, const uint32_t input_l_len,
                                                        const uint8_t *input_r, const uint32_t input_r_len,
                                                        std::function<bool(const uint64_t *)> should_remove) {
+    static_assert(diva_type != DivaType::BinaryTrie);   // TODO: Add binary trie support
     auto it = GetIterator(input_l, input_l_len, input_r, input_r_len,
                           should_remove ? should_remove 
                                         : [](const uint64_t *payload) { return true; });
@@ -2625,6 +2635,88 @@ inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
     rwlock_lock_write(store_r->rwlock);
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(left_key, right_key);
+    const uint64_t implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
+
+    if constexpr (diva_type == DivaType::BinaryTrie) {  // Handle the binary trie case
+        auto infix_vec = GetInfixVector(*store_l);
+        infix_vec = UpdateInfixVectorDelete(shared, ignore, implicit_size, 
+                left_key, middle_key, infix_vec);
+        auto infix_vec_right = GetInfixVector(*store_r);
+        infix_vec_right = UpdateInfixVectorDelete(shared, ignore, implicit_size, 
+                middle_key, right_key, infix_vec_right);
+        for (const auto& infix : infix_vec_right)
+            infix_vec.push_back(infix);
+        std::stable_sort(infix_vec.begin(), infix_vec.end());   // Stable sort to maintain suffix ordering
+#ifdef DEBUG
+        for (int32_t i = 0; i < infix_vec.size(); i++)
+            assert((infix_vec[i].infix_ >> infix_size_) >= implicit);
+        for (int32_t i = 1; i < infix_vec.size(); i++)
+            assert((infix_vec[i - 1].infix_ >> infix_size_) <= (infix_vec[i].infix_ >> infix_size_));
+#endif // DEBUG
+
+        // Merge equal infixes to clean things up
+        std::vector<Infix> merged_infix_vec = {infix_vec[0]};
+        uint32_t merge_count = 1;
+        for (int32_t i = 1; i < infix_vec.size(); i++) {
+            if (merged_infix_vec.back().infix_ == infix_vec[i].infix_) {
+                merged_infix_vec.back().Merge(infix_vec[i], infix_size_);
+                merge_count++;
+            }
+            else {
+                // Remove trie if possible
+                if (merge_count == 1 && infix_vec[i - 1].num_trie_bits_ == 0) {
+                    merged_infix_vec.back().num_suffixes_ = 0;
+                    merged_infix_vec.back().num_suffix_bits_ = 0;
+                    merged_infix_vec.back().num_trie_bits_ = 0;
+                    merged_infix_vec.back().trie_.clear();
+                    merged_infix_vec.back().trie_suffixes_.clear();
+                }
+
+                merged_infix_vec.push_back(infix_vec[i]);
+                merge_count = 1;
+            }
+        }
+        
+        // Subtract out the implicit offset
+        for (auto& infix : merged_infix_vec)
+            infix.infix_ -= implicit << infix_size_;
+
+        // Setup the merged Infix Store
+        const uint64_t *old_store_l_ptr = store_l->ptr;
+        const uint64_t left_extraction = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0);
+        const uint64_t right_extraction = ExtractPartialKey(right_key, shared, ignore, implicit_size, 1);
+        const uint32_t total_implicit = ((right_extraction >> infix_size_) - (left_extraction >> infix_size_)) + 1;
+        InfixStore store = AllocateInfixStoreWithVector(merged_infix_vec, total_implicit); // TODO: Handle payloads
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            // Make sure the sample payload list is moved
+            store.ptr[1] = store_l->ptr[1];
+        }
+
+        store_l->status = store.status;
+        store_l->ptr = store.ptr;
+        store_l->rwlock.store(store.rwlock.load(std::memory_order_acquire), std::memory_order_release);
+        delete[] old_store_l_ptr;
+        if constexpr (payload_type == PayloadType::FixedLength) {
+            // Free the sample payload list for the deleted key
+            free(reinterpret_cast<void *>(store_r->ptr[1]));
+        }
+        delete[] store_r->ptr;
+
+        if constexpr (diva_type == DivaType::Int) {
+            wh_int_del(better_tree_int_, middle_key.str,
+                    middle_key.length,
+                    leaves_to_unlock);
+        }
+        else {
+            wh_del(better_tree_, middle_key.str,
+                    middle_key.length,
+                    leaves_to_unlock);
+        }
+
+        UnlockLeaves(leaves_to_unlock, it_write_lock);
+        n_keys_.fetch_sub(1, std::memory_order_release);
+        return;
+    }
 
     uint64_t total_elem_count = store_l->GetFullSlotCount() + store_r->GetFullSlotCount();
     const bool should_allocate_on_heap = total_elem_count > heap_alloc_threshold;
@@ -2658,7 +2750,6 @@ inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
                           infix_list, store_l->GetFullSlotCount());
     UpdateInfixListDelete(shared, ignore, implicit_size, middle_key, right_key,
                           infix_list + store_l->GetFullSlotCount(), store_r->GetFullSlotCount());
-    const uint64_t implicit = ExtractPartialKey(left_key, shared, ignore, implicit_size, 0) >> infix_size_;
     for (int32_t i = 0; i < total_elem_count; i++)
         infix_list[i] -= implicit << infix_size_;
 
@@ -2755,10 +2846,14 @@ inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
         }
     }
 
-    if constexpr (diva_type == DivaType::Int)
-        wh_int_del(better_tree_int_, middle_key.str, middle_key.length, leaves_to_unlock);
-    else
-        wh_del(better_tree_, middle_key.str, middle_key.length, leaves_to_unlock);
+    if constexpr (diva_type == DivaType::Int) {
+        wh_int_del(better_tree_int_, middle_key.str,
+                middle_key.length, leaves_to_unlock);
+    }
+    else {
+        wh_del(better_tree_, middle_key.str,
+                middle_key.length, leaves_to_unlock);
+    }
 
     UnlockLeaves(leaves_to_unlock, it_write_lock);
     n_keys_.fetch_sub(1, std::memory_order_release);
@@ -2767,7 +2862,7 @@ inline void Diva<diva_type, payload_type>::DeleteMerge(InfiniteByteString key) {
 template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::UpdateInfixListDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
                                                                  const InfiniteByteString left_key, const InfiniteByteString right_key,
-                                                                 uint64_t *infix_list, const uint32_t infix_list_len) {
+                                                                 uint64_t *infix_list, const uint32_t infix_list_len) const {
     const uint32_t shared_word_byte = (shared / 64) * 8;
 
     auto [old_shared, old_ignore, old_implicit_size] = GetSharedIgnoreImplicitLengths(
@@ -2846,6 +2941,105 @@ inline void Diva<diva_type, payload_type>::UpdateInfixListDelete(const uint32_t 
 
 
 template <DivaType diva_type, PayloadType payload_type>
+inline std::vector<typename Diva<diva_type, payload_type>::Infix>
+Diva<diva_type, payload_type>::UpdateInfixVectorDelete(const uint32_t shared, const uint32_t ignore, const uint32_t implicit_size,
+                                                       const InfiniteByteString left_key, const InfiniteByteString right_key,
+                                                       std::vector<Infix>& infix_vec) const {
+    std::vector<Infix> res;
+    if (infix_vec.empty())
+        return std::move(res);
+    const uint32_t shared_word_byte = (shared / 64) * 8;
+
+    auto [old_shared, old_ignore, old_implicit_size] = GetSharedIgnoreImplicitLengths(
+            {left_key.str + shared_word_byte, left_key.length < shared_word_byte ? 0 : left_key.length - shared_word_byte},
+            {right_key.str + shared_word_byte, right_key.length < shared_word_byte ? 0 : right_key.length - shared_word_byte});
+    old_shared += shared_word_byte * 8;
+    const uint64_t old_left_implicit = ExtractPartialKey(left_key, old_shared, old_ignore,
+                                                         old_implicit_size, 0) >> infix_size_;
+    const uint32_t old_infix_size = old_implicit_size + infix_size_;
+    const uint32_t new_infix_size = implicit_size + infix_size_;
+
+    uint32_t prefix_shared_bits_len, prefix_ignore_bits_len, prefix_offset;
+    const bool only_ignore_bits_grew = old_shared == shared;
+    if (only_ignore_bits_grew) {
+        prefix_shared_bits_len = 0;
+        prefix_ignore_bits_len = old_ignore - ignore;
+        prefix_offset = 0;
+    }
+    else {
+        prefix_shared_bits_len = old_shared - shared - ignore - 1;
+        prefix_ignore_bits_len = old_shared + old_ignore - shared - ignore
+                                  - prefix_shared_bits_len - 1;
+        prefix_offset = (shared + ignore) % 8;
+    }
+
+    uint8_t prefix_contents[(prefix_shared_bits_len + prefix_ignore_bits_len) / 8 + 4];
+    memset(prefix_contents, 0, (prefix_shared_bits_len + prefix_ignore_bits_len) / 8 + 4);
+
+    if (!only_ignore_bits_grew) {   // Set the shared bits up
+        memcpy(prefix_contents, left_key.str + (shared + ignore + 1) / 8,
+              (prefix_shared_bits_len + prefix_offset + 1 + 7) / 8); // +1 to account for the new diff bit
+        prefix_contents[0] |= left_key.GetBit(shared) << (7 - prefix_offset);
+    }
+
+    uint64_t last_old_diff_bit = 2;     // To track if prefix needs updating
+    for (auto infix : infix_vec) {
+        // Reconstruct the old infix
+        infix.infix_ += old_left_implicit << infix_size_;
+        const uint64_t old_diff_bit = infix.infix_ >> (old_infix_size - 1);
+        infix.infix_ &= BITMASK(old_infix_size - 1);
+
+        // Update the prefix if needed
+        if (last_old_diff_bit != old_diff_bit) {
+            if (only_ignore_bits_grew) {
+                memset(prefix_contents,
+                    old_diff_bit ? 0x00 : 0xFF,
+                    (prefix_ignore_bits_len + 8) / 8);
+                prefix_contents[0] &= BITMASK(7);
+                prefix_contents[0] |= old_diff_bit << 7;
+            }
+            else {
+                uint32_t bit_pos = prefix_offset + prefix_shared_bits_len + 2;
+                memset(prefix_contents + bit_pos / 8 + 1,
+                       old_diff_bit ? 0x00 : 0xFF,
+                       (prefix_ignore_bits_len - (8 - bit_pos % 8) + 7) / 8);
+
+                bit_pos--;
+                prefix_contents[bit_pos / 8] &= ~BITMASK(8 - (bit_pos % 8));
+                prefix_contents[bit_pos / 8] |= old_diff_bit << (7 - (bit_pos % 8));
+                if (!old_diff_bit)
+                    prefix_contents[(bit_pos + 1) / 8] |= BITMASK(8 - ((bit_pos + 1) % 8));
+            }
+            last_old_diff_bit = old_diff_bit;
+        }
+
+        uint32_t prefix_len = prefix_shared_bits_len + prefix_ignore_bits_len + 1 + (!only_ignore_bits_grew);
+        InfiniteByteString prefix = {prefix_contents, prefix_offset + prefix_len};
+
+        // Adjust the infix size and prepend the prefix
+        if (new_infix_size < old_infix_size) {
+            prefix_contents[prefix.length / 8] &= ~BITMASK((8 - (prefix.length % 8)) % 8);
+            prefix_contents[prefix.length / 8] |= (infix.infix_ >> (old_infix_size - 2)) 
+                                                << (7 - (prefix.length % 8));
+            infix.infix_ &= BITMASK(old_infix_size - 2);
+            prefix_len++;
+            prefix.length++;
+        }
+        else if (new_infix_size > old_infix_size) {
+            infix.infix_ |= prefix.GetBitBitLength(prefix.length - 1) << (old_infix_size - 1);
+            prefix_len--;
+            prefix.length--;
+        }
+        infix.PrependPrefix(prefix, prefix_offset + 1, prefix_len - 1,
+                new_infix_size - 1, infix_size_);
+        infix.infix_ |= prefix.GetBitBitLength(prefix_offset) << (new_infix_size - 1);
+        res.push_back(infix);
+    }
+    return std::move(res);
+}
+
+
+template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::Adapt(uint64_t key, const uint32_t new_prefix_len) {
     key = __builtin_bswap64(key);
     Adapt(reinterpret_cast<const uint8_t *>(&key), sizeof(key), new_prefix_len);
@@ -2859,7 +3053,7 @@ inline void Diva<diva_type, payload_type>::Adapt(std::string_view key, const uin
 
 
 template <DivaType diva_type, PayloadType payload_type>
-inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint32_t key_len,
+inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *input_key, const uint32_t input_key_len,
                                                  const uint32_t new_prefix_len) {
     const bool it_write_lock = false;
     InfixStore *infix_store_ptr;
@@ -2867,11 +3061,11 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint3
 
     InfiniteByteString next_key {};
     InfiniteByteString prev_key {};
-    InfiniteByteString key_conv = {key, key_len};
+    InfiniteByteString key = {input_key, input_key_len};
 
     wormhole_int_iter it_int;
     wormhole_iter it;
-    GetLowerUpperBounds(key_conv, it_write_lock, leaves_to_unlock, it, it_int,
+    GetLowerUpperBounds(key, it_write_lock, leaves_to_unlock, it, it_int,
                         prev_key, next_key, infix_store_ptr);
     uint64_t prev_key_word, next_key_word;
     if constexpr (diva_type == DivaType::Int) {
@@ -2885,7 +3079,7 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint3
     rwlock_lock_write(infix_store.rwlock);
     UnlockLeaves(leaves_to_unlock, it_write_lock);
 
-    if (prev_key == key_conv) { // Nothing to adapt
+    if (prev_key == key) { // Nothing to adapt
         rwlock_unlock_write(infix_store.rwlock);
         return;
     }
@@ -2895,13 +3089,13 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *key, const uint3
     const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
     const uint32_t adapt_length = new_prefix_len - key_start_bit + infix_size_ - 1;
 
-    const uint64_t extraction = ExtractPartialKey(key_conv, shared, ignore, implicit_size, key_conv.GetBit(shared));
+    const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
     const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
     const uint32_t total_implicit = next_implicit - prev_implicit + 1;
     const uint64_t adaptee = ((extraction | 1ULL) - (prev_implicit << infix_size_));
     AdaptRawInInfixStore(infix_store, adaptee, 
-                         {key_conv.str, 8 * key_conv.length}, 
+                         {key.str, 8 * key.length}, 
                          key_start_bit,
                          adapt_length,
                          total_implicit);
@@ -7434,6 +7628,11 @@ inline std::pair<std::vector<typename Diva<diva_type, payload_type>::InfiniteByt
 Diva<diva_type, payload_type>::Infix::GetStrings(uint32_t slot_size) const {
     std::vector<InfiniteByteString> res;
     std::vector<uint8_t> res_contents;
+    if (num_trie_bits_ == 0) {
+        res_contents.push_back(0);
+        res.emplace_back(res_contents.data(), 0);
+        return {std::move(res), std::move(res_contents)};
+    }
     res_contents.reserve(4096);
     std::vector<uint8_t> current_string;
     current_string.reserve(1024);
@@ -7865,14 +8064,45 @@ template <DivaType diva_type, PayloadType payload_type>
 void Diva<diva_type, payload_type>::Infix::PrependPrefix(const InfiniteByteString prefix,
                                                          uint32_t prefix_offset,
                                                          uint32_t prefix_len,
+                                                         uint32_t infix_len,
                                                          uint32_t slot_size) {
-    if (trie_.empty()) {                                // Doesn't have trie, so it's okay to sacrifice information
-        const int32_t lowbit_position = lowbit_pos(infix_);
-        infix_ >>= prefix_len;
-        infix_ |= prefix.BitsAtBitLength(prefix_offset, prefix_len) << slot_size;
-        infix_ |= 1UL << std::max(lowbit_position - static_cast<int32_t>(prefix_len), 0);
+    const uint32_t old_actual_suffix_len = num_trie_bits_ > 0 ? GetActualSuffixLen(slot_size) : 0;
+
+    // Create the InfiniteByteString that includes `infix_`
+    uint8_t trie_prefix_contents[prefix_len / 8 + sizeof(infix_) + 2];
+    memset(trie_prefix_contents, 0, prefix_len / 8 + sizeof(infix_) + 2);
+    const int32_t lowbit_position = lowbit_pos(infix_);
+    const uint32_t last_byte_bits = (prefix_offset + prefix_len) % 8;
+    const uint64_t infix_prefix = __builtin_bswap64(infix_ << (64 - last_byte_bits - infix_len))
+        | (prefix.BitsAtBitLength(prefix_offset + prefix_len - last_byte_bits, last_byte_bits) 
+                << (8 - last_byte_bits));
+    memcpy(trie_prefix_contents,
+           prefix.str + prefix_offset / 8,
+           std::min((prefix_offset % 8 + prefix_len + 7) / 8,
+                       (prefix.length - prefix_offset + prefix_offset % 8 + 7) / 8));
+    memcpy(trie_prefix_contents + (prefix_offset % 8 + prefix_len) / 8,
+           &infix_prefix,
+           sizeof(infix_prefix));
+    prefix_offset %= 8;
+    InfiniteByteString trie_prefix = {trie_prefix_contents,
+        prefix_len + prefix_offset + infix_len - lowbit_position - 1};
+
+    // Update `infix_` first
+    infix_ = (prefix_len < infix_len ? (infix_ >> prefix_len) : 0UL)
+           | (trie_prefix.BitsAtBitLength(prefix_offset, std::min(prefix_len, infix_len)) 
+                   << (prefix_len < infix_len ? infix_len - prefix_len : 0))
+           | (prefix_len >= lowbit_position);
+    prefix_offset += infix_len - 1;
+    
+    // Update the trie and the suffixes
+    if (num_trie_bits_ == 0 && prefix_len > lowbit_position) {  // Create a trie to store the last bits as a suffix
+        prefix_len -= lowbit_position;
+        AddBitsToTrie(1, 1);
+        AddSuffixToTrie(trie_prefix,
+                prefix_offset + prefix_len, prefix_offset,
+                slot_size, slot_size - 1);
     }
-    else if (num_trie_bits_ == 1 && trie_[0] == 1) {    // Have a single leaf in the trie, so prepend to suffix
+    else if (num_trie_bits_ == 1 && trie_[0] == 1) {            // Have a single leaf in the trie, so prepend to suffix
         const auto [suffix_len, suffix_len_with_meta] = GetSuffixLength(0, slot_size);
         const uint32_t new_suffix_len = prefix_len + suffix_len;
         uint8_t new_suffix_contents[suffix_len / 8 + 8];
@@ -7881,7 +8111,7 @@ void Diva<diva_type, payload_type>::Infix::PrependPrefix(const InfiniteByteStrin
                 GetActualSuffixLen(slot_size));
         for (uint32_t i = 0; i < prefix_len; i += std::min(64U, prefix_len)) {
             const uint32_t bits_to_copy = std::min(64U, prefix_len);
-            const uint64_t data = __builtin_bswap64(prefix.BitsAtBitLength(prefix_offset + i, bits_to_copy) 
+            const uint64_t data = __builtin_bswap64(trie_prefix.BitsAtBitLength(prefix_offset + i, bits_to_copy) 
                                                         << (64 - bits_to_copy));
             reinterpret_cast<uint64_t *>(new_suffix_contents)[i / 64] |= data;
         }
@@ -7903,7 +8133,12 @@ void Diva<diva_type, payload_type>::Infix::PrependPrefix(const InfiniteByteStrin
         num_suffixes_++;
     }
     else 
-        PrependPrefixToTrie(prefix, prefix_offset, prefix_len);
+        PrependPrefixToTrie(trie_prefix, prefix_offset, prefix_len);
+
+    // Adjust suffix sizes if needed
+    const uint32_t new_actual_suffix_len = GetActualSuffixLen(slot_size);
+    if (old_actual_suffix_len > 0 && old_actual_suffix_len != new_actual_suffix_len)
+        AdjustActualSuffixLen(old_actual_suffix_len, new_actual_suffix_len, slot_size);
 }
 
 template <DivaType diva_type, PayloadType payload_type>

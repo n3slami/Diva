@@ -3957,6 +3957,85 @@ public:
     }
 
 
+    static void BinaryTrieDelete() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 2600;
+        const bool check_it_write = false;
+        const bool check_it_unlock = true;
+
+        const uint32_t rng_seed = 2;
+        std::mt19937_64 rng(rng_seed);
+        std::string valid_ascii_characters = "";
+        for (char c = 'A'; c <= 'Z'; c++)
+            valid_ascii_characters += c;
+        for (char c = 'a'; c <= 'z'; c++)
+            valid_ascii_characters += c;
+        for (char c = '0'; c <= '9'; c++)
+            valid_ascii_characters += c;
+        std::vector<std::string> string_keys;
+        const size_t key_length = 10;
+        for (int32_t i = 0; i < n_keys; i++) {
+            string_keys.push_back("");
+            for (int32_t j = 0; j < key_length; j++)
+                string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+        }
+        std::sort(string_keys.begin(), string_keys.end());
+
+        BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                key_length, seed, load_factor);
+
+        const uint8_t *res_key;
+        uint32_t res_size, dummy;
+        typename BinaryTrieDiva::InfixStore *store;
+        SUBCASE("simple") {
+            const uint8_t deletee[3] = {0b00110001, 0b00110011, 0b00100110};
+            s.Delete(deletee, sizeof(deletee));
+
+            wormhole_iter *it = wh_iter_create(s.better_tree_);
+            wh_iter_seek(it, nullptr, 0, check_it_write);
+            wh_iter_skip1(it, check_it_write, check_it_unlock);
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                reinterpret_cast<void **>(&store), &dummy);
+            const auto [occupieds_pos, checks] =
+                ReadStoreContentsFromFile("binary_trie/delete/simple");
+            AssertStoreContents(s, *store, occupieds_pos, checks);
+            wh_iter_destroy(it, check_it_write);
+        }
+        SUBCASE("merge") {
+            SUBCASE("remove shared") {
+                const uint8_t deletee[10] = {0b01111010, 0b01110111, 0b00110111, 0b01110110, 0b01101101, 0b01111010, 0b01001000, 0b01010001, 0b01101010, 0b00110001};
+                s.Delete(deletee, sizeof(deletee));
+
+                const uint8_t seek_key[10] = {0b01101101, 0b01001000, 0b00110011, 0b01101111, 0b01001010, 0b01101101, 0b01110101, 0b01010110, 0b00110111, 0b01110010};
+                wormhole_iter *it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, seek_key, sizeof(seek_key), check_it_write);
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                    reinterpret_cast<void **>(&store), &dummy);
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/delete/merge/remove_shared");
+                AssertStoreContents(s, *store, occupieds_pos, checks);
+                wh_iter_destroy(it, check_it_write);
+            }
+            SUBCASE("remove ignored") {
+                const uint8_t deletee[10] = {0b01001111, 0b01001001, 0b01101100, 0b01000110, 0b01101101, 0b01000100, 0b01101011, 0b00111001, 0b01110011, 0b00110111};
+                s.Delete(deletee, sizeof(deletee));
+
+                const uint8_t seek_key[10] = {0b00110000, 0b00110010, 0b00110000, 0b01000111, 0b01101010, 0b01000111, 0b01001001, 0b00110100, 0b01101111, 0b01101011};
+                wormhole_iter *it = wh_iter_create(s.better_tree_);
+                wh_iter_seek(it, seek_key, sizeof(seek_key), check_it_write);
+                wh_iter_peek_ref(it, reinterpret_cast<const void **>(&res_key), &res_size,
+                                    reinterpret_cast<void **>(&store), &dummy);
+                const auto [occupieds_pos, checks] =
+                    ReadStoreContentsFromFile("binary_trie/delete/merge/remove_ignored");
+                AssertStoreContents(s, *store, occupieds_pos, checks);
+                wh_iter_destroy(it, check_it_write);
+            }
+        }
+    }
+
+
     static void BinaryTrieAdapt() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4499,6 +4578,7 @@ TEST_SUITE("binary trie") {
     }
 
     TEST_CASE("delete") {
+        DivaTests::BinaryTrieDelete();
     }
 
     TEST_CASE("adapt") {
