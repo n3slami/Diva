@@ -29,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/types.h>
+#include <thread>
 #include <vector>
 #include "bench_utils.hpp"
 
@@ -44,6 +45,8 @@ inline uint64_t kill_exec_time_threshold = 1ULL * 3600ULL * 1000000ULL;
 inline WorkloadIO wio;
 inline InputKeys<uint64_t> initial_int_keys;
 inline InputKeys<std::string> initial_string_keys;
+inline std::vector<InputKeys<uint64_t>> insert_int_keys;
+inline std::vector<InputKeys<std::string>> insert_string_keys;
 inline timer::time_point time_points[std::numeric_limits<uint8_t>::max()];
 inline uint64_t timer_results[std::numeric_limits<uint8_t>::max()];
 
@@ -265,6 +268,112 @@ void experiment_string(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, R
 }
 
 
+template <typename InitFun, typename InsertFun, typename SizeFun, typename... Args>
+void experiment_concurrency(uint32_t num_threads, InitFun init_f, InsertFun insert_f, SizeFun size_f, Args... args) {
+    uint32_t n_keys = initial_int_keys.size();
+    time_points['c'] = timer::now();
+    auto filter = init_f(initial_int_keys.begin(), initial_int_keys.end(), memory_budget, args...);
+    timer_results['c'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['c']).count();
+
+    {
+        test_out.AddMeasure("n_keys", n_keys);
+        const size_t filter_size = size_f(filter);
+        test_out.AddMeasure("size", filter_size);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
+        test_out.AddMeasure("construction_time", timer_results['c']);
+        if (timer_results['m'] > 0)
+            test_out.AddMeasure("modeling_time", timer_results['m']);
+        std::cout << test_out.ToJson() << ',' << std::endl;
+        timer_results['c'] = 0;
+        timer_results['m'] = 0;
+        test_out.Clear();
+    }
+
+    for (const auto& keys_to_insert : insert_int_keys) {
+        std::vector<std::thread> threads;
+        time_points['i'] = timer::now();
+        for (uint32_t thread_id = 0; thread_id < num_threads; thread_id++) {
+            threads.emplace_back([&, thread_id] {
+                    for (int32_t i = thread_id; i < keys_to_insert.size(); i += num_threads)
+                        insert_f(filter, keys_to_insert[i], thread_id);
+                });
+        }
+        n_keys += keys_to_insert.size();
+        for (auto& t : threads)
+            t.join();
+
+        // Record statistics
+        test_out.AddMeasure("n_keys", n_keys);
+        const size_t filter_size = size_f(filter);
+        test_out.AddMeasure("size", filter_size);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
+        timer_results['i'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['i']).count();
+        test_out.AddMeasure("time_i", timer_results['i']);
+
+        std::cout << test_out.ToJson() << ',' << std::endl;
+
+        timer_results['i'] = 0;
+        test_out.Clear();
+        break;
+    }
+}
+
+
+template <typename InitFun, typename InsertFun, typename SizeFun, typename... Args>
+void experiment_concurrency_string(uint32_t num_threads, InitFun init_f, InsertFun insert_f, SizeFun size_f, Args... args) {
+    uint32_t n_keys = initial_string_keys.size();
+    time_points['c'] = timer::now();
+    auto filter = init_f(initial_string_keys.begin(), initial_string_keys.end(), memory_budget, args...);
+    timer_results['c'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['c']).count();
+
+    {
+        test_out.AddMeasure("n_keys", n_keys);
+        const size_t filter_size = size_f(filter);
+        test_out.AddMeasure("size", filter_size);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
+        test_out.AddMeasure("construction_time", timer_results['c']);
+        if (timer_results['m'] > 0)
+            test_out.AddMeasure("modeling_time", timer_results['m']);
+        std::cout << test_out.ToJson() << ',' << std::endl;
+        timer_results['c'] = 0;
+        timer_results['m'] = 0;
+        test_out.Clear();
+    }
+
+    for (const auto& keys_to_insert : insert_string_keys) {
+        std::vector<std::thread> threads;
+        time_points['i'] = timer::now();
+        for (uint32_t thread_id = 0; thread_id < num_threads; thread_id++) {
+            threads.emplace_back([&, thread_id] {
+                    for (int32_t i = thread_id; i < keys_to_insert.size(); i += num_threads) {
+                        insert_f(filter,
+                                reinterpret_cast<const uint8_t *>(keys_to_insert[i].data()),
+                                keys_to_insert[i].size(),
+                                thread_id);
+                    }
+                });
+        }
+        n_keys += keys_to_insert.size();
+        for (auto& t : threads)
+            t.join();
+
+        // Record statistics
+        test_out.AddMeasure("n_keys", n_keys);
+        const size_t filter_size = size_f(filter);
+        test_out.AddMeasure("size", filter_size);
+        test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
+        timer_results['i'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['i']).count();
+        test_out.AddMeasure("time_i", timer_results['i']);
+
+        std::cout << test_out.ToJson() << ',' << std::endl;
+
+        timer_results['i'] = 0;
+        test_out.Clear();
+        break;
+    }
+}
+
+
 inline argparse::ArgumentParser init_parser(const std::string& name) {
     argparse::ArgumentParser parser(name);
 
@@ -282,12 +391,18 @@ inline argparse::ArgumentParser init_parser(const std::string& name) {
             .nargs(1)
             .scan<'i', int>();
 
+    parser.add_argument("-T", "--num-threads")
+            .help("Number of threads to test with")
+            .nargs(1)
+            .scan<'i', int>();
+
     return parser;
 }
 
 inline void read_workload(const std::string& workload_file) {
     wio = WorkloadIO(workload_file, WorkloadIO::iomode::Read);
 
+    // Get the bulk loading set of keys
     WorkloadIO::opcode opcode = wio.GetOpcode();
     assert(opcode == WorkloadIO::opcode::Bulk);
     uint32_t key_count = wio.ReadValue<uint32_t>();
@@ -301,6 +416,62 @@ inline void read_workload(const std::string& workload_file) {
         else
             initial_int_keys.push_back(wio.ReadValue<uint64_t>());
     }
+
+    // Get the insertion keys for the concurrency experiment
+    insert_int_keys.push_back({});
+    insert_string_keys.push_back({});
+    const uint64_t head_snapshot = wio.GetHead();
+    while (!wio.Done()) {
+        WorkloadIO::opcode opcode = wio.GetOpcode();
+        switch (opcode) {
+            case WorkloadIO::opcode::Bulk:
+                break;
+            case WorkloadIO::opcode::Insert: {
+                if (wio.StringKeys()) {
+                    wio.GetStringKey(buf_len, buf);
+                    std::string new_key = "";
+                    new_key.resize(buf_len);
+                    memcpy(new_key.data(), buf, buf_len);
+                    insert_string_keys.back().push_back(new_key);
+                }
+                else
+                    insert_int_keys.back().push_back(wio.ReadValue<uint64_t>());
+                break;
+            }
+            case WorkloadIO::opcode::Delete: {
+                if (wio.StringKeys())
+                    wio.GetStringKey(buf_len, buf);
+                else
+                    wio.ReadValue<uint64_t>();
+                break;
+            }
+            case WorkloadIO::opcode::Query: {
+                if (wio.StringKeys()) {
+                    wio.GetStringKey(buf_len, buf);
+                    wio.GetStringKey(buf_len, buf);
+                }
+                else {
+                    wio.ReadValue<uint64_t>();
+                    wio.ReadValue<uint64_t>();
+                }
+                break;
+            }
+            case WorkloadIO::opcode::Timer: {
+                wio.ReadValue<char>();
+                break;
+            }
+            case WorkloadIO::opcode::Flush: {
+                if (wio.StringKeys())
+                    insert_string_keys.push_back({});
+                else
+                    insert_int_keys.push_back({});
+                break;
+            }
+            case WorkloadIO::opcode::ResetDB: 
+                break;
+        }
+    }
+    wio.SetHead(head_snapshot);
 }
 
 

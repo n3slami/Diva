@@ -19,11 +19,16 @@
 #include "../bench_template.hpp"
 #include <cmath>
 #include <cstdint>
+#include <random>
+#include <stdexcept>
 #include "diva.hpp"
+
+static const uint32_t max_thread_count = 1024;
+static const uint32_t rng_seed = 1024;
+static inline std::mt19937_64 rngs[max_thread_count];
 
 template <typename t_itr>
 inline diva::Diva<diva::DivaType::Standard> *init(const t_itr begin, const t_itr end, const double bpk) {
-    const uint32_t rng_seed = 1024;
     const double load_factor = 0.95;
     const uint32_t infix_size = std::round(load_factor * (bpk - 1));
     
@@ -37,6 +42,12 @@ inline diva::Diva<diva::DivaType::Standard> *init(const t_itr begin, const t_itr
 inline void insert(diva::Diva<diva::DivaType::Standard> *filter,
                    const uint8_t *key, uint16_t key_length) {
     filter->Insert(key, key_length);
+}
+
+inline void insert_concurrent(diva::Diva<diva::DivaType::Standard> *filter,
+                              const uint8_t * key, uint16_t key_length,
+                              uint32_t thread_id) {
+    filter->Insert(key, key_length, nullptr, rngs[thread_id]());
 }
 
 inline void del(diva::Diva<diva::DivaType::Standard> *filter,
@@ -68,8 +79,17 @@ int main(int argc, char const *argv[]) {
     }
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
+    const uint32_t num_threads = parser.get<int>("--num-threads");
 
-    experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
+    if (num_threads == 1)
+        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
+    else {
+        if (num_threads > max_thread_count)
+            throw std::runtime_error("Number of threads requested exceed the maximum of 1024");
+        for (int32_t i = 0; i < num_threads; i++)
+            rngs[i].seed(rng_seed + i);
+        experiment_concurrency_string(num_threads, pass_fun(init), pass_fun(insert_concurrent), pass_fun(size));
+    }
 
     return 0;
 }

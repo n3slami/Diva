@@ -433,6 +433,14 @@ public:
         return string_keys_;
     }
 
+    uint64_t GetHead() const {
+        return head_;
+    }
+
+    void SetHead(uint64_t new_head) {
+        head_ = new_head;
+    }
+
 private:
     std::fstream io_;
     iomode mode_;
