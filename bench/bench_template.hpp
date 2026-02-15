@@ -314,7 +314,6 @@ void experiment_concurrency(uint32_t num_threads, InitFun init_f, InsertFun inse
 
         timer_results['i'] = 0;
         test_out.Clear();
-        break;
     }
 }
 
@@ -322,6 +321,16 @@ void experiment_concurrency(uint32_t num_threads, InitFun init_f, InsertFun inse
 template <typename InitFun, typename InsertFun, typename SizeFun, typename... Args>
 void experiment_concurrency_string(uint32_t num_threads, InitFun init_f, InsertFun insert_f, SizeFun size_f, Args... args) {
     uint32_t n_keys = initial_string_keys.size();
+    if (n_keys == 0) {      // Convert int keys to strings if necessary
+        n_keys = initial_int_keys.size();
+        initial_string_keys = std::vector<std::string>(n_keys);
+        std::transform(initial_int_keys.begin(), initial_int_keys.end(), initial_string_keys.begin(), [&](uint64_t k) { return uint64ToString(k); });
+        insert_string_keys = std::vector<std::vector<std::string>>(insert_int_keys.size());
+        for (int32_t i = 0; i < insert_int_keys.size(); i++) {
+            insert_string_keys[i].resize(insert_int_keys[i].size());
+            std::transform(insert_int_keys[i].begin(), insert_int_keys[i].end(), insert_string_keys[i].begin(), [&](uint64_t k) { return uint64ToString(k); });
+        }
+    }
     time_points['c'] = timer::now();
     auto filter = init_f(initial_string_keys.begin(), initial_string_keys.end(), memory_budget, args...);
     timer_results['c'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['c']).count();
@@ -369,7 +378,6 @@ void experiment_concurrency_string(uint32_t num_threads, InitFun init_f, InsertF
 
         timer_results['i'] = 0;
         test_out.Clear();
-        break;
     }
 }
 
@@ -394,6 +402,7 @@ inline argparse::ArgumentParser init_parser(const std::string& name) {
     parser.add_argument("-T", "--num-threads")
             .help("Number of threads to test with")
             .nargs(1)
+            .default_value(0)
             .scan<'i', int>();
 
     return parser;
@@ -429,10 +438,7 @@ inline void read_workload(const std::string& workload_file) {
             case WorkloadIO::opcode::Insert: {
                 if (wio.StringKeys()) {
                     wio.GetStringKey(buf_len, buf);
-                    std::string new_key = "";
-                    new_key.resize(buf_len);
-                    memcpy(new_key.data(), buf, buf_len);
-                    insert_string_keys.back().push_back(new_key);
+                    insert_string_keys.back().push_back({reinterpret_cast<const char *>(buf), buf_len});
                 }
                 else
                     insert_int_keys.back().push_back(wio.ReadValue<uint64_t>());
