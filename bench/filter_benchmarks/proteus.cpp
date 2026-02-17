@@ -79,6 +79,10 @@ inline void del(proteus::Proteus& f, uint64_t key) {
     throw std::runtime_error("Fitler does not support deletes");
 }
 
+inline void adapt(proteus::Proteus& f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(proteus::Proteus& f, uint64_t left, uint64_t right) {
     if (left == right)
         return f.Query(left);
@@ -110,7 +114,7 @@ int main(int argc, char const *argv[]) {
     }
 
     auto queries = wio.GetIntQueries();
-    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size),
+    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size),
                queries, default_sample_rate);
 
     return 0;

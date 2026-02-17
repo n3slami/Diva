@@ -142,7 +142,11 @@ inline void insert(RENCODER& f, uint64_t key) {
 }
 
 inline void del(RENCODER& f, uint64_t key) {
+    throw std::runtime_error("Fitler does not support adaptations");
+}
 
+inline void adapt(RENCODER& f, uint64_t key, uint16_t adapt_length) {
+    return;
 }
 
 inline bool query(RENCODER& f, uint64_t left, uint64_t right) {
@@ -170,7 +174,7 @@ int main(int argc, char const *argv[]) {
 
     std::cout << "[INFO] " << "REncoder version: " << VERSION << std::endl;
 
-    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size), 
+    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size), 
                wio.GetIntQueries());
 
     return 0;

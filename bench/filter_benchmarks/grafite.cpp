@@ -44,6 +44,11 @@ inline void del(grafite::filter<REContainer>& f, uint64_t key) {
 }
 
 template <typename REContainer>
+inline void adapt(grafite::filter<REContainer>& f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
+
+template <typename REContainer>
 inline bool query(grafite::filter<REContainer>& f, uint64_t left, uint64_t right) {
     return f.query(left, right);
 }
@@ -74,10 +79,10 @@ int main(int argc, char const *argv[]) {
     std::cout << "[+] using container `" << container << "`" << std::endl;
     if (container == "sux")
         experiment(pass_fun(init<grafite::ef_sux_vector>), pass_ref(insert), 
-                   pass_ref(del), pass_ref(query), pass_ref(size));
+                   pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size));
     else if (container == "sdsl")
         experiment(pass_fun(init<grafite::ef_sdsl_vector>), pass_ref(insert), 
-                   pass_ref(del), pass_ref(query), pass_ref(size));
+                   pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size));
     else
         throw std::runtime_error("Unknown range emptiness data structure");
 

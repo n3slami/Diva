@@ -8,18 +8,27 @@ global benchmarks_dir
 global output_prefix
 RANGE_FIXED_FILTERS = ["memento", "memento_expandable", "rosetta", "proteus"]
 
-def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False):
+def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False, num_threads=0):
     file_to_execute = f"bench/bench_{filter}_wiredtiger" if wiredtiger else f"bench/bench_{filter}"
     range_size_option = f"--range-size {force_range_size}" if force_range_size else ""
     command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
     cli_message_command = f"<build_dir>/{file_to_execute} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} {range_size_option} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}.json"
+    if num_threads != 0:
+        command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} --num-threads {num_threads} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}_{num_threads}.json"
+        cli_message_command = f"<build_dir>/{file_to_execute} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} --num-threads {num_threads} {range_size_option} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}_{num_threads}.json"
 
     print(f"[ Executing: {cli_message_command} ]")
     subprocess.run(command, shell=True)
     print("[ Command finished ]")
 
+def rebuild_benchmark(build_dir, mode=0):
+    rebuild_command = f"cd {build_dir} && cmake .. -DCMAKE_BUILD_TYPE=Release -DACTUAL_SUFFIX_LEN_MODE={mode} && make -j8"
+    print(f"[ Rebuilding: {rebuild_command} ]")
+    subprocess.run(rebuild_command, shell=True)
+    print("[ Rebuilding finished ]")
+
 def corr_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    filters = ["diva", "diva_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     memory_footprints = [16]
     workload_subdir = "corr_bench"
@@ -34,10 +43,10 @@ def corr_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def fpr_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    filters = ["diva", "diva_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     memory_footprints = [10, 16]
-    MEDIAN_RANGE_SIZE = 2 ** 7
+    MEDIAN_RANGE_SIZE = 2 ** 10
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
@@ -61,7 +70,8 @@ def fpr_bench():
                                   MEDIAN_RANGE_SIZE if filter in RANGE_FIXED_FILTERS else None)
 
 def fpr_string_bench():
-    filters = ["steroids", "surf"]
+    filters = ["diva", "diva_binary_trie", "surf"]
+    datasets = ["norm", "enwiki", "emails", "quotes"]
     memory_footprints = [12, 14, 16, 18, 20]
     workload_subdir = "fpr_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -70,11 +80,26 @@ def fpr_string_bench():
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
         if workload.is_file() and workload.name.endswith("string"):
+            should_skip = True
+            for dataset in datasets:
+                if dataset in workload.name:
+                    should_skip = False
+            if should_skip:
+                continue
             for filter, bpk in itertools.product(filters, memory_footprints):
+                rebuild_mode = 0
+                if "enwiki" in workload.name:
+                    rebuild_mode = 1
+                elif "emails" in workload.name:
+                    rebuild_mode = 2
+                elif "quotes" in workload.name:
+                    rebuild_mode = 3
+                rebuild_benchmark(build_dir, mode=rebuild_mode)
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+    rebuild_benchmark(build_dir)    # Reset build configuration to the default
 
 def true_bench():
-    filters = ["steroids", "steroids_int", "memento", "grafite", "surf",
+    filters = ["diva", "diva_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     DEFAULT_MEMORY_FOOTPRINT = 16
@@ -95,7 +120,7 @@ def true_bench():
                                       MEDIAN_RANGE_SIZE if filter in RANGE_FIXED_FILTERS else None)
 
 def expansion_bench():
-    filters = ["steroids", "steroids_int", "memento_expandable", "rosetta",
+    filters = ["diva", "diva_int", "memento_expandable", "rosetta",
                "rencoder", "snarf"]
     memory_footprints = [16]
     workload_subdir = "expansion_bench"
@@ -104,13 +129,14 @@ def expansion_bench():
 
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
-        if workload.is_file() and "unif" in workload.name:
+        if workload.is_file():
             for filter, bpk in itertools.product(filters, memory_footprints):
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
-                                  filter, bpk - (2 if "steroids" in filter else 0))
+                                  filter, bpk - (1 if "diva" in filter else 0) \
+                                              + (1 if "memento" in filter else 0))
 
 def delete_bench():
-    filters = ["steroids", "steroids_int", "memento_expandable", "snarf"]
+    filters = ["diva", "diva_int", "memento_expandable", "snarf"]
     memory_footprints = [16]
     workload_subdir = "delete_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -126,7 +152,7 @@ def delete_bench():
 
 def construction_bench():
     filters = ["surf", "rosetta", "proteus", "rencoder", "snarf", "oasis",
-               "memento", "steroids", "steroids_int", "grafite"]
+               "memento", "diva", "diva_int", "grafite"]
     memory_footprints = [16]
     workload_subdir = "construction_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -139,7 +165,7 @@ def construction_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def wiredtiger_bench():
-    filters = ["steroids", "steroids_int", "memento_expandable", "base"]
+    filters = ["diva", "diva_int", "memento_expandable", "base"]
     memory_footprints = [16]
     workload_subdir = "wiredtiger_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
@@ -149,17 +175,88 @@ def wiredtiger_bench():
     for workload in workload_path.iterdir():
         if workload.is_file():
             for filter, bpk in itertools.product(filters, memory_footprints):
-                remove_amount = 1 if "steroids" in filter else 0
+                remove_amount = 1 if "diva" in filter else 0
                 execute_benchmark(build_dir, output_base, workload_subdir, workload,
                                   filter, bpk - remove_amount, wiredtiger=True)
 
+def concurrency_bench():
+    filters = ["diva", "diva_int"]
+    MEMORY_FOOTPRINT = 16
+    num_threads = [1, 2, 4, 8]
+    workload_subdir = "concurrency_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if not workload.is_file():
+            continue
+        for filter, num_thread in itertools.product(filters, num_threads):
+            execute_benchmark(build_dir, output_base, workload_subdir, workload,
+                              filter, MEMORY_FOOTPRINT - (1 if "diva" in filter else 0),
+                              num_threads=num_thread)
+
+def adapt_bench():
+    filters = ["diva", "diva_binary_trie", "surf"]
+    datasets = ["enwiki", "emails", "quotes"]
+    memory_footprints = [12, 14, 16, 18, 20]
+    workload_subdir = "adapt_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if workload.is_file() and workload.name.endswith("string"):
+            should_skip = True
+            for dataset in datasets:
+                if dataset in workload.name:
+                    should_skip = False
+            if should_skip:
+                continue
+            for filter, bpk in itertools.product(filters, memory_footprints):
+                rebuild_mode = 0
+                if "enwiki" in workload.name:
+                    rebuild_mode = 1
+                elif "emails" in workload.name:
+                    rebuild_mode = 2
+                elif "quotes" in workload.name:
+                    rebuild_mode = 3
+                rebuild_benchmark(build_dir, mode=rebuild_mode)
+                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+    rebuild_benchmark(build_dir)    # Reset build configuration to the default
+
+def mixed_bench():
+    filters = ["diva", "diva_int", "memento", "grafite", "surf",
+               "rosetta", "proteus", "rencoder", "snarf", "oasis"]
+    memory_footprints = [10, 12, 14, 16, 18, 20]
+    DEFAULT_MEMORY_FOOTPRINT = 16
+    MEDIAN_RANGE_SIZE = 2 ** 7
+    workload_subdir = "mixed_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if workload.is_file():
+            if workload.name.endswith("_12"):
+                for filter, bpk in itertools.product(filters, memory_footprints):
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+            else:
+                for filter in filters:
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, DEFAULT_MEMORY_FOOTPRINT, 
+                                      MEDIAN_RANGE_SIZE if filter in RANGE_FIXED_FILTERS else None)
+
+
 RUNNERS = {"fpr": fpr_bench,
-            "fpr_string": fpr_string_bench,
-            "true": true_bench,
-            "construction": construction_bench,
-            "expansion": expansion_bench,
-            "delete": delete_bench,
-            "wiredtiger": wiredtiger_bench}
+           "fpr_string": fpr_string_bench,
+           "true": true_bench,
+           "construction": construction_bench,
+           "expansion": expansion_bench,
+           "delete": delete_bench,
+           "wiredtiger": wiredtiger_bench,
+           "concurrency": concurrency_bench,
+           "adapt": adapt_bench,
+           "mixed": mixed_bench}
 
 
 if __name__ == "__main__":
@@ -187,4 +284,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Received exception: {str(e)}, cleaning up output and closing")
         shutil.rmtree(output_prefix)
-

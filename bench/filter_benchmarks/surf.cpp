@@ -58,6 +58,10 @@ inline void del(surf::SuRF& f, const uint8_t *key, uint16_t key_length) {
     throw std::runtime_error("Fitler does not support deletes");
 }
 
+inline void adapt(surf::SuRF& f, const uint8_t *key, uint16_t key_length, uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(surf::SuRF& f, const uint8_t *left, uint16_t left_length,
                                  const uint8_t *right, uint16_t right_length) {
     std::string left_str {reinterpret_cast<const char *>(left), left_length};
@@ -96,9 +100,9 @@ int main(int argc, char const *argv[]) {
     }
 
     if (surf_hash)
-        experiment_string(pass_fun(init_hash), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
+        experiment_string(pass_fun(init_hash), pass_ref(insert), pass_ref(del), pass_ref(adapt),  pass_ref(query), pass_ref(size));
     else
-        experiment_string(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
+        experiment_string(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size));
 
     return 0;
 }

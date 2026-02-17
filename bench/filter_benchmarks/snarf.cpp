@@ -37,6 +37,9 @@ inline void del(snarf_updatable_gcs<uint64_t>& f, uint64_t key) {
     f.delete_key(key);
 }
 
+inline void adapt(snarf_updatable_gcs<uint64_t>& f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
 
 inline bool query(snarf_updatable_gcs<uint64_t>& f, uint64_t left, uint64_t right) {
     return f.range_query(left, right);
@@ -60,7 +63,7 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
+    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size));
 
     return 0;
 }

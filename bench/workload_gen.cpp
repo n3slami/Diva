@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -37,6 +38,7 @@
 #include <vector>
 
 #include "bench_utils.hpp"
+#include "zipf/zipf.h"
 #include <argparse/argparse.hpp>
 #include <x86intrin.h>
 
@@ -83,6 +85,118 @@ bool create_dir_recursive(const std::string_view& dir_name) {
     return true;
 }
 
+inline std::vector<ByteString> read_enwiki_data_txt(const std::string& filename) {
+    std::vector<std::string> data;
+    std::fstream in(filename, std::ios::in);
+    std::string line;
+
+    std::string valid_characters = "()$-,._'\"";
+    bool is_valid[std::numeric_limits<uint8_t>::max()] = {};
+    for (char c : valid_characters)
+        is_valid[c] = true;
+    std::string split_characters = ",._";
+    bool is_split[std::numeric_limits<uint8_t>::max()] = {};
+    for (char c : split_characters)
+        is_split[c] = true;
+
+    while (std::getline(in, line)) {
+        bool skip = line.size() < 3;
+        for (char c : line)
+            skip |= (!isalnum(c) && !is_valid[c]);
+        if (skip)
+            continue;
+        uint32_t pos = 0;
+        while (pos < line.size()) {
+            uint32_t new_pos = pos + 1;
+            while (new_pos < line.size() && !is_split[line[new_pos]])
+                new_pos++;
+            data.push_back(line.substr(pos, new_pos - pos));
+            pos = new_pos + 1;
+        }
+    }
+    in.close();
+    std::sort(data.begin(), data.end());
+    data.resize(std::unique(data.begin(), data.end()) - data.begin());
+
+    return compress_data(data);
+}
+
+inline std::vector<ByteString> read_emails_data_txt(const std::string& filename) {
+    std::vector<std::string> data;
+    std::fstream in(filename, std::ios::in);
+    std::string line;
+    std::string valid_characters = "\r\n\t -+@,._";
+    bool is_valid[std::numeric_limits<uint8_t>::max()] = {};
+    for (char c : valid_characters)
+        is_valid[c] = true;
+
+    while (std::getline(in, line)) {
+        bool skip = line.size() > 1000;
+        for (uint32_t i = 0; i < line.size(); i++) {
+            if (std::isspace(line[i])) {
+                line = line.substr(0, i);
+                break;
+            }
+            else
+                skip |= (!isalnum(line[i]) && !is_valid[line[i]]);
+        }
+        if (skip)
+            continue;
+
+        const uint64_t at_offset = line.find('@');
+        std::string reversed_line = "";
+        reversed_line.reserve(line.size());
+        uint64_t last_offset = at_offset + 1;
+        for (uint64_t dot_offset = line.find('.', last_offset);
+                dot_offset != std::string::npos;
+                dot_offset = line.find('.', last_offset)) {
+            reversed_line = std::string(".") + line.substr(last_offset, dot_offset - last_offset) + reversed_line;
+            last_offset = dot_offset + 1;
+        }
+        reversed_line = line.substr(last_offset, line.size() - last_offset) 
+            + reversed_line + std::string("@") + line.substr(0, at_offset);
+        data.push_back(reversed_line);
+    }
+    in.close();
+    std::sort(data.begin(), data.end());
+    data.resize(std::unique(data.begin(), data.end()) - data.begin());
+
+    return compress_data(data);
+}
+
+inline std::vector<ByteString> read_quotes_data_txt(const std::string& filename) {
+    std::vector<std::string> data;
+    std::fstream in(filename, std::ios::in);
+    std::string line;
+
+    std::string valid_characters = "\t ()&%$-+,.:;?=/_'\"";
+    bool is_valid[std::numeric_limits<uint8_t>::max()] = {};
+    for (char c : valid_characters)
+        is_valid[c] = true;
+
+    while (std::getline(in, line)) {
+        if (line[0] != 'P')
+            continue;
+        bool skip = line.size() < 3;
+        for (char c : line)
+            skip |= (!isalnum(c) && !is_valid[c]);
+        if (skip)
+            continue;
+
+        uint32_t url_start_offset = 1;
+        while (!isalnum(line[url_start_offset]))
+            url_start_offset++;
+        std::string url = line.substr(url_start_offset, 
+                std::min<uint32_t>(64, line.size() - url_start_offset));
+        data.push_back(url);
+    }
+    in.close();
+    std::sort(data.begin(), data.end());
+    data.resize(std::unique(data.begin(), data.end()) - data.begin());
+
+    return compress_data(data);
+}
+
 std::set<uint64_t> generate_int_keys_uniform(uint64_t n_keys, std::mt19937_64& rng) {
     std::set<uint64_t> keys;
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
@@ -104,6 +218,13 @@ std::set<uint64_t> generate_int_keys_normal(uint64_t n_keys, long double mu, lon
         print_progress(1.0 * keys.size() / n_keys);
     }
     std::cout << std::endl;
+    return keys;
+}
+
+std::vector<uint64_t> generate_int_keys_zipf(uint64_t n_keys, uint64_t universe_size, long double char_exp, std::mt19937_64& rng) {
+    std::vector<uint64_t> keys;
+    keys.resize(n_keys);
+    generate_random_keys(keys.data(), universe_size, n_keys, char_exp);
     return keys;
 }
 
@@ -358,7 +479,7 @@ void standard_int_bench(argparse::ArgumentParser& parser) {
 
 void standard_string_bench(argparse::ArgumentParser& parser) {
     WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, true);
-    uint32_t kdist_ind = 0, qdist_ind = 0;
+    uint32_t kdist_ind = 0;
     auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
     uint32_t key_norm_byte = 0;
     if (key_dist == "norm")
@@ -370,63 +491,270 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
 
     std::vector<uint64_t> key_lens = parser.get<std::vector<uint64_t>>("--string-lens");
     std::set<ByteString> keys;
-    if (key_dist == "unif")
+    std::vector<ByteString> keys_vec;
+    if (key_dist == "unif") {
         keys = generate_string_keys_uniform(n_keys, key_lens, rng);
-    else if (key_dist == "norm")
+        keys_vec = {keys.begin(), keys.end()};
+    }
+    else if (key_dist == "norm") {
         keys = generate_string_keys_normal(n_keys, key_lens, key_dist_mu, key_dist_std,
                                            key_norm_byte, rng);
-    else
-        keys = read_data_binary<ByteString>(key_file);
-    std::vector<ByteString> keys_vec {keys.begin(), keys.end()};
+        keys_vec = {keys.begin(), keys.end()};
+    }
+    else {
+        const std::string enwiki_str = "enwiki.txt";
+        const std::string emails_str = "emails.txt";
+        const std::string quotes_str = "quotes.txt";
+        if (std::equal(enwiki_str.rbegin(), enwiki_str.rend(), key_file.rbegin()))
+            keys_vec = read_enwiki_data_txt(key_file);
+        else if (std::equal(emails_str.rbegin(), emails_str.rend(), key_file.rbegin()))
+            keys_vec = read_emails_data_txt(key_file);
+        else if (std::equal(quotes_str.rbegin(), quotes_str.rend(), key_file.rbegin()))
+            keys_vec = read_quotes_data_txt(key_file);
+        else {
+            keys = read_data_binary<ByteString>(key_file);
+            keys_vec = {keys.begin(), keys.end()};
+        }
+    }
 
     const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
-    wio.Bulk(keys_vec);
-    wio.Timer('q');
-    std::cout << "Generating queries..." << std::endl;
-    std::uniform_int_distribution<uint32_t> picker(0, n_keys - 2);
-    std::uniform_int_distribution<uint64_t> length_picker(0, key_lens.size() - 1);
-    std::uniform_int_distribution<uint8_t> byte_dist(0, std::numeric_limits<uint8_t>::max());
-    std::uniform_int_distribution<uint64_t> unif_dist(0, std::numeric_limits<uint64_t>::max());
-    std::normal_distribution<long double> norm_dist(key_dist_mu, key_dist_std);
-    for (uint32_t i = 0; i < n_queries;) {
-        uint32_t picked;
-        if (key_dist == "unif") {
-            ByteString sample = generate_single_string_key_uniform(rng, key_lens, length_picker, unif_dist);
-            picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
-            picked = std::min(picked, n_keys - 2);
-        }
-        else if (key_dist == "norm") {
-            ByteString sample = generate_single_string_key_normal(rng, key_lens, key_norm_byte, length_picker, norm_dist);
-            picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
-            picked = std::min(picked, n_keys - 2);
-        }
-        else 
-            picked = picker(rng);
-        const uint32_t lcp = calculate_lcp(keys_vec[picked].str, keys_vec[picked].length,
-                                           keys_vec[picked + 1].str, keys_vec[picked + 1].length);
-        const uint8_t left_diff = lcp < keys_vec[picked].length ? keys_vec[picked].str[lcp] : 0x00;
-        const uint8_t right_diff = lcp < keys_vec[picked + 1].length ? keys_vec[picked + 1].str[lcp] : 0xFF;
-        const uint32_t left_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
-        const uint32_t right_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
-        uint8_t l_key[left_len], r_key[right_len];
-        memcpy(l_key, keys_vec[picked].str, lcp);
-        memcpy(r_key, keys_vec[picked + 1].str, lcp);
-        std::uniform_int_distribution<uint8_t> diff_dist(left_diff, right_diff);
-        l_key[lcp] = diff_dist(rng);
-        r_key[lcp] = diff_dist(rng);
-        for (uint32_t i = lcp + 1; i < left_len; i++)
-            l_key[i] = byte_dist(rng);
-        for (uint32_t i = lcp + 1; i < right_len; i++)
-            r_key[i] = byte_dist(rng);
+    if (key_dist == "unif" || key_dist == "norm") {
+        wio.Bulk(keys_vec);
+        wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
+        std::uniform_int_distribution<uint32_t> picker(0, n_keys - 2);
+        std::uniform_int_distribution<uint64_t> length_picker(0, key_lens.size() - 1);
+        std::uniform_int_distribution<uint8_t> byte_dist(0, std::numeric_limits<uint8_t>::max());
+        std::uniform_int_distribution<uint64_t> unif_dist(0, std::numeric_limits<uint64_t>::max());
+        std::normal_distribution<long double> norm_dist(key_dist_mu, key_dist_std);
+        for (uint32_t i = 0; i < n_queries;) {
+            uint32_t picked;
+            if (key_dist == "unif") {
+                ByteString sample = generate_single_string_key_uniform(rng, key_lens, length_picker, unif_dist);
+                picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+                picked = std::min(picked, n_keys - 2);
+            }
+            else {
+                ByteString sample = generate_single_string_key_normal(rng, key_lens, key_norm_byte, length_picker, norm_dist);
+                picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+                picked = std::min(picked, n_keys - 2);
+            }
+            const uint32_t lcp = calculate_lcp(keys_vec[picked].str, keys_vec[picked].length,
+                    keys_vec[picked + 1].str, keys_vec[picked + 1].length);
+            const uint8_t left_diff = lcp < keys_vec[picked].length ? keys_vec[picked].str[lcp] : 0x00;
+            const uint8_t right_diff = lcp < keys_vec[picked + 1].length ? keys_vec[picked + 1].str[lcp] : 0xFF;
+            const uint32_t left_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
+            const uint32_t right_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
+            uint8_t l_key[left_len], r_key[right_len];
+            memcpy(l_key, keys_vec[picked].str, lcp);
+            memcpy(r_key, keys_vec[picked + 1].str, lcp);
+            std::uniform_int_distribution<uint8_t> diff_dist(left_diff, right_diff);
+            l_key[lcp] = diff_dist(rng);
+            r_key[lcp] = diff_dist(rng);
+            for (uint32_t i = lcp + 1; i < left_len; i++)
+                l_key[i] = byte_dist(rng);
+            for (uint32_t i = lcp + 1; i < right_len; i++)
+                r_key[i] = byte_dist(rng);
 
-        ByteString l(l_key, left_len), r(r_key, right_len);
-        if (l > r)
-            std::swap(l, r);
-        if (set_range_query(keys, l, r))
-            continue;
-        wio.Query(l, r, false);
-        i++;
-        print_progress(1.0 * i / n_queries);
+            ByteString l(l_key, left_len), r(r_key, right_len);
+            if (l > r)
+                std::swap(l, r);
+            if (set_range_query(keys, l, r))
+                continue;
+            wio.Query(l, r, false);
+            i++;
+            print_progress(1.0 * i / n_queries);
+        }
+        wio.Timer('q');
+        wio.Flush();
+    }
+    else {
+        std::vector<bool> used_for_queries(keys_vec.size(), false);
+        std::vector<std::pair<ByteString, ByteString>> queries;
+        while (queries.size() < n_queries) {
+            const uint32_t picked = rng() % (keys_vec.size() - 1);
+            if (used_for_queries[picked] || used_for_queries[picked + 1])
+                continue;
+            queries.push_back({keys_vec[picked], keys_vec[picked + 1]});
+            used_for_queries[picked] = used_for_queries[picked + 1] = true;
+            print_progress(1.0 * queries.size() / n_queries);
+        }
+        std::vector<ByteString> keys_vec_filtered;
+        for (uint32_t i = 0; i < keys_vec.size(); i++) {
+            if (!used_for_queries[i])
+                keys_vec_filtered.push_back(keys_vec[i]);
+        }
+        wio.Bulk(keys_vec_filtered);
+        wio.Timer('q');
+        for (auto [l, r] : queries)
+            wio.Query(l, r, false);
+        wio.Timer('q');
+        wio.Flush();
+    }
+}
+
+
+static uint32_t get_longest_common_prefix_in_bits(const uint8_t *a, const uint32_t a_len,
+                                                  const uint8_t *b, const uint32_t b_len) {
+    uint32_t res_byte = 0;
+    while (res_byte < std::min(a_len, b_len) && a[res_byte] == b[res_byte])
+        res_byte++;
+    uint32_t res_bit_offset = 0, compare_mask = ~((1UL << (8 - res_bit_offset)) - 1);
+    while ((a[res_byte] & compare_mask) == (b[res_byte] & compare_mask)) {
+        res_bit_offset++;
+        compare_mask = ~((1UL << (8 - res_bit_offset)) - 1);
+    }
+    return 8 * res_byte + res_bit_offset;
+}
+
+void adapt_string_bench(argparse::ArgumentParser& parser) {
+    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, true);
+    uint32_t kdist_ind = 0;
+    auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
+    uint32_t key_norm_byte = 0;
+    if (key_dist == "norm")
+        key_norm_byte = std::stoi(parser.get<std::vector<std::string>>("--kdist")[kdist_ind++]);
+
+    const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
+    const uint64_t seed = parser.get<uint64_t>("--seed");
+    std::mt19937_64 rng(seed);
+
+    std::vector<uint64_t> key_lens = parser.get<std::vector<uint64_t>>("--string-lens");
+    std::set<ByteString> keys;
+    std::vector<ByteString> keys_vec, keys_vec_bulk;
+    if (key_dist == "unif") {
+        keys = generate_string_keys_uniform(n_keys, key_lens, rng);
+        keys_vec = {keys.begin(), keys.end()};
+    }
+    else if (key_dist == "norm") {
+        keys = generate_string_keys_normal(n_keys, key_lens, key_dist_mu, key_dist_std,
+                                           key_norm_byte, rng);
+        keys_vec = {keys.begin(), keys.end()};
+    }
+    else {
+        const std::string enwiki_str = "enwiki.txt";
+        const std::string emails_str = "emails.txt";
+        const std::string quotes_str = "quotes.txt";
+        if (std::equal(enwiki_str.rbegin(), enwiki_str.rend(), key_file.rbegin()))
+            keys_vec = read_enwiki_data_txt(key_file);
+        else if (std::equal(emails_str.rbegin(), emails_str.rend(), key_file.rbegin()))
+            keys_vec = read_emails_data_txt(key_file);
+        else if (std::equal(quotes_str.rbegin(), quotes_str.rend(), key_file.rbegin()))
+            keys_vec = read_quotes_data_txt(key_file);
+        else {
+            keys = read_data_binary<ByteString>(key_file);
+            keys_vec = {keys.begin(), keys.end()};
+        }
+    }
+
+    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
+
+    std::vector<std::pair<ByteString, ByteString>> queries;
+    std::vector<std::pair<uint32_t, uint32_t>> adapt_ind_and_length;
+
+    std::cout << "Generating queries..." << std::endl;
+    if (key_dist == "unif" || key_dist == "norm") {
+        std::uniform_int_distribution<uint32_t> picker(0, n_keys - 2);
+        std::uniform_int_distribution<uint64_t> length_picker(0, key_lens.size() - 1);
+        std::uniform_int_distribution<uint8_t> byte_dist(0, std::numeric_limits<uint8_t>::max());
+        std::uniform_int_distribution<uint64_t> unif_dist(0, std::numeric_limits<uint64_t>::max());
+        std::normal_distribution<long double> norm_dist(key_dist_mu, key_dist_std);
+        for (uint32_t i = 0; i < n_queries;) {
+            uint32_t picked;
+            if (key_dist == "unif") {
+                ByteString sample = generate_single_string_key_uniform(rng, key_lens, length_picker, unif_dist);
+                picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+                picked = std::min(picked, n_keys - 2);
+            }
+            else {
+                ByteString sample = generate_single_string_key_normal(rng, key_lens, key_norm_byte, length_picker, norm_dist);
+                picked = std::upper_bound(keys_vec.begin(), keys_vec.end(), sample) - keys_vec.begin() - 1;
+                picked = std::min(picked, n_keys - 2);
+            }
+            const uint32_t lcp = calculate_lcp(keys_vec[picked].str, keys_vec[picked].length,
+                    keys_vec[picked + 1].str, keys_vec[picked + 1].length);
+            const uint8_t left_diff = lcp < keys_vec[picked].length ? keys_vec[picked].str[lcp] : 0x00;
+            const uint8_t right_diff = lcp < keys_vec[picked + 1].length ? keys_vec[picked + 1].str[lcp] : 0xFF;
+            const uint32_t left_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
+            const uint32_t right_len = std::max<uint32_t>(lcp + 1 + sizeof(uint64_t), key_lens[length_picker(rng)]);
+            uint8_t l_key[left_len], r_key[right_len];
+            memcpy(l_key, keys_vec[picked].str, lcp);
+            memcpy(r_key, keys_vec[picked + 1].str, lcp);
+            std::uniform_int_distribution<uint8_t> diff_dist(left_diff, right_diff);
+            l_key[lcp] = diff_dist(rng);
+            r_key[lcp] = diff_dist(rng);
+            for (uint32_t i = lcp + 1; i < left_len; i++)
+                l_key[i] = byte_dist(rng);
+            for (uint32_t i = lcp + 1; i < right_len; i++)
+                r_key[i] = byte_dist(rng);
+
+            ByteString l(l_key, left_len), r(r_key, right_len);
+            if (l > r)
+                std::swap(l, r);
+            if (set_range_query(keys, l, r))
+                continue;
+            queries.emplace_back(l, r);
+            adapt_ind_and_length.emplace_back(picked,
+                    get_longest_common_prefix_in_bits(l.str, l.length,
+                        keys_vec[picked].str, keys_vec[picked].length) + 1);
+            adapt_ind_and_length.emplace_back(picked + 1,
+                    get_longest_common_prefix_in_bits(r.str, r.length,
+                        keys_vec[picked + 1].str, keys_vec[picked + 1].length) + 1);
+            i++;
+            print_progress(1.0 * i / n_queries);
+        }
+        keys_vec_bulk = keys_vec;
+    }
+    else {
+        // Make sure the keys to be adapted exist
+        std::vector<bool> used_for_queries(keys_vec.size(), false);
+        std::vector<bool> keep_for_queries(keys_vec.size(), false);
+        std::vector<uint32_t> picked_pos_vec;
+        while (picked_pos_vec.size() < n_queries) {
+            const uint32_t picked = rng() % (keys_vec.size() - 3) + 1;
+            bool skip = keep_for_queries[picked] | keep_for_queries[picked + 1];
+            for (int32_t i = picked - 1; i <= picked + 2; i++)
+                skip |= used_for_queries[i];
+            if (skip)
+                continue;
+            picked_pos_vec.push_back(picked);
+            used_for_queries[picked] = used_for_queries[picked + 1] = true;
+            keep_for_queries[picked - 1] = keep_for_queries[picked + 2] = true;
+        }
+
+        for (uint32_t i = 0; i < keys_vec.size(); i++) {
+#ifdef DEBUG
+            assert(!(used_for_queries[i] && keep_for_queries[i]));
+#endif // DEBUG
+            if (!used_for_queries[i])
+                keys_vec_bulk.push_back(keys_vec[i]);
+        }
+        while (queries.size() < n_queries) {
+            const uint32_t picked = picked_pos_vec[queries.size()];
+            queries.emplace_back(keys_vec[picked], keys_vec[picked + 1]);
+            adapt_ind_and_length.emplace_back(picked - 1,
+                    get_longest_common_prefix_in_bits(keys_vec[picked].str, keys_vec[picked].length,
+                        keys_vec[picked - 1].str, keys_vec[picked - 1].length) + 1);
+            adapt_ind_and_length.emplace_back(picked + 2,
+                    get_longest_common_prefix_in_bits(keys_vec[picked + 1].str, keys_vec[picked + 1].length,
+                        keys_vec[picked + 2].str, keys_vec[picked + 2].length) + 1);
+            print_progress(1.0 * queries.size() / n_queries);
+        }
+    }
+
+    wio.Bulk(keys_vec_bulk);
+    wio.Timer('q');
+    auto zipf_query_indices = generate_int_keys_zipf(n_queries,
+                                parser.get<uint64_t>("--query-zipf-universe"),
+                                parser.get<double>("--query-zipf-exp"),
+                                rng);
+    for (auto ind : zipf_query_indices) {
+        wio.Query(queries[ind].first, queries[ind].second, false);
+        // Adapt if needed
+        wio.Adapt(keys_vec[adapt_ind_and_length[2 * ind].first],
+                  adapt_ind_and_length[2 * ind].second);
+        wio.Adapt(keys_vec[adapt_ind_and_length[2 * ind + 1].first],
+                  adapt_ind_and_length[2 * ind + 1].second);
     }
     wio.Timer('q');
     wio.Flush();
@@ -435,7 +763,7 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
 
 void true_bench(argparse::ArgumentParser& parser) {
     WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
-    uint32_t kdist_ind = 0, qdist_ind = 0;
+    uint32_t kdist_ind = 0;
     auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
 
     const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
@@ -649,7 +977,6 @@ void delete_bench(argparse::ArgumentParser& parser) {
     auto [query_dist, query_dist_mu, query_dist_std] = get_qdist(parser, qdist_ind);
 
     const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
-    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
     const uint64_t seed = parser.get<uint64_t>("--seed");
     std::mt19937_64 rng(seed);
 
@@ -934,15 +1261,178 @@ void wiredtiger_bench(argparse::ArgumentParser& parser) {
 }
 
 
+void concurrency_bench(argparse::ArgumentParser& parser) {
+    WorkloadIO wio(parser.get<std::string>("--output-file"), WorkloadIO::iomode::Write, false);
+    uint32_t kdist_ind = 0, qdist_ind = 0;
+    auto [key_dist, key_dist_mu, key_dist_std, key_file] = get_kdist(parser, kdist_ind);
+    auto [query_dist, query_dist_mu, query_dist_std] = get_qdist(parser, qdist_ind);
+
+    const uint32_t n_keys = parser.get<uint64_t>("--n-keys");
+    const uint32_t n_queries = parser.get<uint64_t>("--n-queries");
+    const uint64_t seed = parser.get<uint64_t>("--seed");
+    std::mt19937_64 rng(seed);
+
+    std::set<uint64_t> keys;
+    if (key_dist == "unif")
+        keys = generate_int_keys_uniform(n_keys, rng);
+    else if (key_dist == "norm")
+        keys = generate_int_keys_normal(n_keys, key_dist_mu, key_dist_std, rng);
+    else
+        keys = read_data_binary<uint64_t>(key_file);
+    std::vector<uint64_t> keys_vec {keys.begin(), keys.end()};
+
+    const uint32_t n_expansions = parser.get<uint64_t>("--n-expansions");
+    std::shuffle(keys_vec.begin(), keys_vec.end(), rng);
+    uint32_t cur_n_keys = n_keys >> n_expansions;
+    std::sort(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
+    keys = std::set<uint64_t>(keys_vec.begin(), keys_vec.begin() + cur_n_keys);
+
+    {
+        std::vector<uint64_t> init_keys_vec = {keys_vec.begin(), keys_vec.begin() + cur_n_keys};
+
+        wio.Bulk(init_keys_vec);
+
+        wio.Timer('q');
+        std::cout << "Generating queries..." << std::endl;
+        if (query_dist == "unif") {
+            std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = dist(rng);
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "norm") {
+            std::normal_distribution<long double> dist(query_dist_mu, query_dist_std);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = static_cast<uint64_t>(dist(rng));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "corr") {
+            const double corr_deg = parser.get<double>("--corr-degree");
+            const uint64_t corr_distance = static_cast<uint64_t>(std::min(std::pow(2.0, 64 * (1 - corr_deg)),
+                                                                 std::pow(2.0, 64)));
+            std::uniform_int_distribution<uint64_t> picker(0, n_keys);
+            std::uniform_int_distribution<uint64_t> corr_distance_dist(1, corr_distance);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint32_t picked = picker(rng);
+                const uint64_t query_size = query_size_dist(rng);
+                const uint64_t distance = corr_distance_dist(rng);
+                if (keys_vec[picked] < distance + query_size - 1)
+                    continue;
+                uint64_t r_key = keys_vec[picked] - distance;
+                uint64_t l_key = r_key - query_size + 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else 
+            throw std::runtime_error("Invalid query distribution type for this benchmark");
+        wio.Timer('q');
+        wio.Flush();
+    }
+
+    for (int32_t expansion = 0; expansion < n_expansions * 4; expansion++) {
+        const uint32_t n_inserts = cur_n_keys / 4;
+        const uint32_t pos = cur_n_keys + (expansion % 4) * cur_n_keys / 4;
+        for (uint32_t i = pos; i < pos + n_inserts; i++) {
+            wio.Insert(keys_vec[i]);
+            keys.insert(keys_vec[i]);
+        }
+
+        std::cout << "Generating queries..." << std::endl;
+        if (query_dist == "unif") {
+            std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = dist(rng);
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "norm") {
+            std::normal_distribution<long double> dist(query_dist_mu, query_dist_std);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint64_t query_size = query_size_dist(rng);
+                uint64_t l_key = static_cast<uint64_t>(dist(rng));
+                if (std::numeric_limits<uint64_t>::max() - l_key < query_size)
+                    continue;
+                uint64_t r_key = l_key + query_size - 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else if (query_dist == "corr") {
+            const double corr_deg = parser.get<double>("--corr-degree");
+            const uint64_t corr_distance = static_cast<uint64_t>(std::min(std::pow(2.0, 64 * (1 - corr_deg)),
+                                                                 std::pow(2.0, 64)));
+            std::uniform_int_distribution<uint64_t> picker(0, pos + n_inserts - 1);
+            std::uniform_int_distribution<uint64_t> corr_distance_dist(1, corr_distance);
+            for (uint32_t i = 0; i < n_queries;) {
+                const uint32_t picked = picker(rng);
+                const uint64_t query_size = query_size_dist(rng);
+                const uint64_t distance = corr_distance_dist(rng);
+                if (keys_vec[picked] < distance + query_size - 1)
+                    continue;
+                uint64_t r_key = keys_vec[picked] - distance;
+                uint64_t l_key = r_key - query_size + 1;
+                if (set_range_query(keys, l_key, r_key))
+                    continue;
+                wio.Query(l_key, r_key, false);
+                i++;
+                print_progress(1.0 * i / n_queries);
+            }
+        }
+        else 
+            throw std::runtime_error("Invalid query distribution type for this benchmark");
+        std::cout << std::endl;
+
+        if (expansion % 4 == 3)
+            cur_n_keys *= 2;
+    }
+    wio.Flush();
+}
+
+
 std::unordered_map<std::string, std::function<void(argparse::ArgumentParser&)>> benches = {
     {"correlated", correlated_bench},
     {"standard-int", standard_int_bench},
     {"standard-string", standard_string_bench},
+    {"adapt-string", adapt_string_bench},
     {"true", true_bench},
     {"expansion", expansion_bench},
     {"delete", delete_bench},
     {"construction", construction_bench},
     {"wiredtiger", wiredtiger_bench},
+    {"concurrency", concurrency_bench},
 };
 
 int main(int argc, char const *argv[]) {
@@ -1047,6 +1537,20 @@ int main(int argc, char const *argv[]) {
             .required()
             .default_value(1380UL)
             .scan<'u', uint64_t>()
+            .nargs(1);
+
+    parser.add_argument("--query-zipf-universe")
+            .help("The universe size of the Zipfian distribution used to repeat queries")
+            .required()
+            .default_value(10000UL)
+            .scan<'u', uint64_t>()
+            .nargs(1);
+
+    parser.add_argument("--query-zipf-exp")
+            .help("The exponent of the Zipfian distribution used to repeat queries")
+            .required()
+            .default_value(1.0)
+            .scan<'g', double>()
             .nargs(1);
 
     try {

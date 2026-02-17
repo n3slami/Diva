@@ -150,6 +150,10 @@ inline void del(QF *f, uint64_t key) {
     assert(res == 0);
 }
 
+inline void adapt(QF *f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(QF *f, uint64_t left, uint64_t right) {
     uint64_t l_key = left >> f->metadata->memento_bits;
     uint64_t l_memento = left & ((1ULL << f->metadata->memento_bits) - 1);
@@ -184,7 +188,7 @@ int main(int argc, char const *argv[]) {
     }
     std::cerr << "welp predef_memento_size=" << predef_memento_size << std::endl;
 
-    experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_ref(query), pass_ref(size),
+    experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_ref(query), pass_ref(size),
                wio.GetIntQueries(), -1);
 
     return 0;
