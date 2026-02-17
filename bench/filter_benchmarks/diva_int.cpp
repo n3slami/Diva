@@ -77,10 +77,11 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
     memory_budget = parser.get<double>("arg");
-    read_workload(parser.get<std::string>("--workload"));
     const uint32_t num_threads = parser.get<int>("--num-threads");
+    concurrency_mode = num_threads != 0;
+    read_workload(parser.get<std::string>("--workload"));
 
-    if (num_threads == 0)
+    if (!concurrency_mode)
         experiment(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
     else {
         if (num_threads > max_thread_count)

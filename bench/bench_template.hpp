@@ -54,6 +54,8 @@ inline std::vector<std::tuple<std::string, std::string, bool>> concurrent_string
 inline timer::time_point time_points[std::numeric_limits<uint8_t>::max()];
 inline uint64_t timer_results[std::numeric_limits<uint8_t>::max()];
 
+inline bool concurrency_mode = false;
+
 template <typename InitFun, typename InsertFun, typename DeleteFun, typename AdaptFun, typename RangeFun, typename SizeFun, typename... Args>
 void experiment(InitFun init_f, InsertFun insert_f, DeleteFun delete_f, AdaptFun adapt_f, RangeFun range_f, SizeFun size_f, Args... args) {
     uint32_t n_keys = initial_int_keys.size(), n_queries = 0;
@@ -361,7 +363,7 @@ void experiment_concurrency(uint32_t num_threads, InitFun init_f, InsertFun inse
     const size_t filter_size = size_f(filter);
     test_out.AddMeasure("size", filter_size);
     test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
-    timer_results['o'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['i']).count();
+    timer_results['o'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['o']).count();
     test_out.AddMeasure("time_o", timer_results['o']);
 
     std::cout << test_out.ToJson() << ',' << std::endl;
@@ -447,7 +449,7 @@ void experiment_concurrency_string(uint32_t num_threads, InitFun init_f, InsertF
     const size_t filter_size = size_f(filter);
     test_out.AddMeasure("size", filter_size);
     test_out.AddMeasure("bpk", static_cast<long double>(filter_size * 8) / n_keys);
-    timer_results['o'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['i']).count();
+    timer_results['o'] = std::chrono::duration_cast<std::chrono::milliseconds>(timer::now() - time_points['o']).count();
     test_out.AddMeasure("time_o", timer_results['o']);
 
     std::cout << test_out.ToJson() << ',' << std::endl;
@@ -500,6 +502,9 @@ inline void read_workload(const std::string& workload_file) {
         else
             initial_int_keys.push_back(wio.ReadValue<uint64_t>());
     }
+
+    if (!concurrency_mode)
+        return;
 
     // Get the insertions and queries for the concurrency experiment
     const uint64_t head_snapshot = wio.GetHead();

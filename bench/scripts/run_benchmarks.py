@@ -87,12 +87,14 @@ def fpr_string_bench():
             if should_skip:
                 continue
             for filter, bpk in itertools.product(filters, memory_footprints):
-                if dataset in ["enwiki", "quotes"]:     # Use actual suffixes at least as long as half of the slot width
-                    rebuild_benchmark(build_dir, mode=1)
-                elif dataset == "emails":               # Use actual suffixes slightly longer than half of the slot width
-                    rebuild_benchmark(build_dir, mode=2)
-                else:
-                    rebuild_benchmark(build_dir)
+                rebuild_mode = 0
+                if "enwiki" in workload.name:
+                    rebuild_mode = 1
+                elif "emails" in workload.name:
+                    rebuild_mode = 2
+                elif "quotes" in workload.name:
+                    rebuild_mode = 3
+                rebuild_benchmark(build_dir, mode=rebuild_mode)
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
     rebuild_benchmark(build_dir)    # Reset build configuration to the default
 
@@ -194,10 +196,38 @@ def concurrency_bench():
                               filter, MEMORY_FOOTPRINT - (1 if "diva" in filter else 0),
                               num_threads=num_thread)
 
+def adapt_bench():
+    filters = ["diva", "diva_binary_trie", "surf"]
+    datasets = ["enwiki", "emails", "quotes"]
+    memory_footprints = [12, 14, 16, 18, 20]
+    workload_subdir = "adapt_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    workload_path = Path(f"{workload_dir}/{workload_subdir}")
+    for workload in workload_path.iterdir():
+        if workload.is_file() and workload.name.endswith("string"):
+            should_skip = True
+            for dataset in datasets:
+                if dataset in workload.name:
+                    should_skip = False
+            if should_skip:
+                continue
+            for filter, bpk in itertools.product(filters, memory_footprints):
+                rebuild_mode = 0
+                if "enwiki" in workload.name:
+                    rebuild_mode = 1
+                elif "emails" in workload.name:
+                    rebuild_mode = 2
+                elif "quotes" in workload.name:
+                    rebuild_mode = 3
+                rebuild_benchmark(build_dir, mode=rebuild_mode)
+                execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+    rebuild_benchmark(build_dir)    # Reset build configuration to the default
+
 def mixed_bench():
     filters = ["diva", "diva_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
-    filters = ["rosetta"]
     memory_footprints = [10, 12, 14, 16, 18, 20]
     DEFAULT_MEMORY_FOOTPRINT = 16
     MEDIAN_RANGE_SIZE = 2 ** 7
@@ -216,6 +246,7 @@ def mixed_bench():
                     execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, DEFAULT_MEMORY_FOOTPRINT, 
                                       MEDIAN_RANGE_SIZE if filter in RANGE_FIXED_FILTERS else None)
 
+
 RUNNERS = {"fpr": fpr_bench,
            "fpr_string": fpr_string_bench,
            "true": true_bench,
@@ -224,6 +255,7 @@ RUNNERS = {"fpr": fpr_bench,
            "delete": delete_bench,
            "wiredtiger": wiredtiger_bench,
            "concurrency": concurrency_bench,
+           "adapt": adapt_bench,
            "mixed": mixed_bench}
 
 
