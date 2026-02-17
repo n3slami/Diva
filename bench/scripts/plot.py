@@ -834,7 +834,6 @@ def plot_adapt(result_dir, output_dir):
         axes[0][i].set_ylim(top=1.9)
         axes[0][i].set_yticks(YTICKS)
         axes[0][i].set_ylim(bottom=1e-3 if i == 0 else 8e-4 if i == 1 else 1e-2)
-        #axes[1][i].set_yscale("log")
         axes[1][i].set_ylim(bottom=0.0)
         axes[1][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(50 if i == 0 else 100 if i == 1 else 200))
     fig.subplots_adjust(wspace=0.3, hspace=0.1)

@@ -4540,7 +4540,9 @@ inline void Diva<diva_type, payload_type>::InsertRawIntoInfixStore(InfixStore &s
                     infix_to_update.num_suffix_bits_ = infix_size_ - 1;
                     infix_to_update.trie_suffixes_ = {0b1};
                 }
-                infix_to_update.InsertTrie(original_key, original_key_start_bit, infix_size_);
+                infix_to_update.InsertTrie(original_key,
+                        original_key_start_bit + infix_size_ - 1,
+                        infix_size_);
                 const uint32_t new_num_slots = infix_to_update.GetNumSlots(infix_size_);
                 num_slots_filled = new_num_slots - original_num_slots;
                 if (new_num_slots > original_num_slots)
@@ -6996,9 +6998,15 @@ inline void Diva<diva_type, payload_type>::Infix::BuildTrieRecurse(const Infinit
 
 template <DivaType diva_type, PayloadType payload_type>
 inline uint32_t Diva<diva_type, payload_type>::Infix::GetActualSuffixLen(uint32_t slot_size) const {
+#if ACTUAL_SUFFIX_LEN_MODE == 0     // Normal operation
+    const uint32_t key_count = GetNumPrefixKeys() + num_suffixes_;
+    const uint32_t actual_suffix_len = slot_size * std::max<int32_t>(key_count, 0) < num_trie_bits_ ? 0 
+                                       : (slot_size * std::max<int32_t>(key_count, 0) - num_trie_bits_) / num_suffixes_;
+#else
     const uint32_t key_count = GetNumPrefixKeys() + num_suffixes_;
     const uint32_t actual_suffix_len = slot_size * std::max<int32_t>(key_count - 1, 0) < num_trie_bits_ ? 0 
                                        : (slot_size * std::max<int32_t>(key_count - 1, 0) - num_trie_bits_) / num_suffixes_;
+#endif
 #if ACTUAL_SUFFIX_LEN_MODE == 0     // Normal operation
     return std::max<int32_t>(actual_suffix_len, 1);
 #elif ACTUAL_SUFFIX_LEN_MODE == 1   // EnWiki dataset

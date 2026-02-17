@@ -1749,7 +1749,7 @@ public:
     static void BinaryTrieInsertRaw() {
         const uint32_t N_bulk = 6;
         const uint32_t N_bulk_keys = 60;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 10;
@@ -1791,12 +1791,15 @@ public:
                 s.size_scalar_shrink_grow_sep);
         s.LoadVectorToInfixStore(store, infix_vec);
 
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
+
         {
             uint8_t original_key[1] = {0b10000000};
             s.InsertRawIntoInfixStore(store, 0b0100000000101101, infix_store_target_size,
                                     nullptr,
                                     {original_key, 8 * sizeof(original_key)},
-                                    0);
+                                    key_start_bit);
         }
         SUBCASE("inserting new suffix into a single run") {
             auto [occupieds_pos, checks] =
@@ -1816,7 +1819,7 @@ public:
             s.InsertRawIntoInfixStore(store, 0b0011111111100011, infix_store_target_size,
                                     nullptr,
                                     {original_key, 8 * sizeof(original_key)},
-                                    0);
+                                    key_start_bit);
         }
         SUBCASE("switch encoding and shift next run") {
             auto [occupieds_pos, checks] =
@@ -1842,7 +1845,8 @@ public:
             uint8_t original_key[2] = {0b00001000, 0b10101010};
             s.InsertRawIntoInfixStore(store, 0b0000000000000011, infix_store_target_size,
                                     nullptr,
-                                    {original_key, 8 * sizeof(original_key)}, 0);
+                                    {original_key, 8 * sizeof(original_key)},
+                                    key_start_bit);
         }
         SUBCASE("inserting new suffix and shifting at the beginning") {
             auto [occupieds_pos, checks] =
@@ -1862,7 +1866,7 @@ public:
             s.InsertRawIntoInfixStore(store, 0b0000000000101011, infix_store_target_size,
                                     nullptr,
                                     {original_key, 8 * sizeof(original_key)},
-                                    0);
+                                    key_start_bit);
         }
         SUBCASE("convert infix into trie") {
             auto [occupieds_pos, checks] =
@@ -1889,7 +1893,7 @@ public:
             s.InsertRawIntoInfixStore(store, 0b0111111111110101, infix_store_target_size,
                                     nullptr,
                                     {original_key, 8 * sizeof(original_key)},
-                                    0);
+                                    key_start_bit);
         }
         SUBCASE("convert infix to trie at the end") {
             auto [occupieds_pos, checks] =
@@ -1915,7 +1919,7 @@ public:
 
     static void BinaryTriePointQuery() {
         const uint32_t N = 600;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 16;
@@ -1950,6 +1954,9 @@ public:
             infix_vec.back().BuildTrieAndSuffixes(keys + i, num_keys_in_infix, key_start_bit, infix_size);
             i += num_keys_in_infix - 1;
         }
+
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
 
         BinaryTrieDiva s(infix_size, seed, load_factor);
         const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
@@ -1977,21 +1984,21 @@ public:
                 REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b001000110001101,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
             {
                 const uint8_t original_key[3] = {0b01111111, 0b11110000, 0b00110011};
                 REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b000011000101101,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
             {
                 const uint8_t original_key[3] = {0b10010100, 0b00001011, 0b11111111};
                 REQUIRE_FALSE(s.PointQueryInfixStore(store, 0b100000010011011,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
         }
 
@@ -2001,21 +2008,21 @@ public:
                 REQUIRE(s.PointQueryInfixStore(store, 0b001000110001101,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
             {
                 const uint8_t original_key[3] = {0b01111111, 0b11110000, 0b00110011};
                 REQUIRE(s.PointQueryInfixStore(store, 0b011011000101101,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
             {
                 const uint8_t original_key[3] = {0b10010100, 0b10101011, 0b11111111};
                 REQUIRE(s.PointQueryInfixStore(store, 0b100000010011011,
                             infix_store_target_size,
                             {original_key, 8 * sizeof(original_key)},
-                            0));
+                            1 - infix_size));
             }
         }
     }
@@ -2023,7 +2030,7 @@ public:
 
     static void BinaryTrieRangeQuery() {
         const uint32_t N = 600;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 16;
@@ -2059,6 +2066,9 @@ public:
             i += num_keys_in_infix - 1;
         }
 
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
+
         BinaryTrieDiva s(infix_size, seed, load_factor);
         const uint32_t total_slots = s.scaled_sizes_[s.size_scalar_shrink_grow_sep];
         BinaryTrieDiva::InfixStore store(total_slots, s.infix_size_,
@@ -2074,7 +2084,7 @@ public:
                     memcpy(key_l, keys[key_ind].str, current_key_len);
                     memcpy(key_r, keys[key_ind].str, current_key_len);
                     for (int32_t j = 0; j < current_key_len; j++) {
-                        int32_t rand_pos = std::max((key_start_bit + 1) / 8, rand() % current_key_len);
+                        int32_t rand_pos = std::max((key_start_bit + infix_size) / 8, rand() % current_key_len);
                         if (std::numeric_limits<uint8_t>::min() < keys[key_ind].str[rand_pos] 
                                 && keys[key_ind].str[rand_pos] < std::numeric_limits<uint8_t>::max()) {
                             key_l[rand_pos]--;
@@ -2098,7 +2108,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs false true") {
                 const uint8_t original_key_l[2] = {0b00100101, 0b00011010};
@@ -2107,7 +2117,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("three non-empty runs") {
                 const uint8_t original_key_l[2] = {0b00100101, 0b00011010};
@@ -2116,7 +2126,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs with single leaf trie in the second") {
                 const uint8_t original_key_l[2] = {0b00100111, 0b11110101};
@@ -2125,7 +2135,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
         }
 
@@ -2137,7 +2147,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("diverge right") {
                 const uint8_t original_key_l[2] = {0b00100000, 0b11010101};
@@ -2146,7 +2156,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("diverge both ways") {
                 const uint8_t original_key_l[2] = {0b00100000, 0b11010101};
@@ -2155,7 +2165,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("diverge leftmost") {
                 const uint8_t original_key_l[2] = {0b00010000, 0b11010101};
@@ -2164,7 +2174,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("diverge rightmost") {
                 const uint8_t original_key_l[2] = {0b00100100, 0b11010101};
@@ -2173,7 +2183,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs") {
                 const uint8_t original_key_l[2] = {0b00100110, 0b11010101};
@@ -2182,7 +2192,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
         }
 
@@ -2194,7 +2204,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs false true") {
                 const uint8_t original_key_l[2] = {0b00100111, 0b11110101};
@@ -2203,7 +2213,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs true false") {
                 const uint8_t original_key_l[2] = {0b00100001, 0b00011111};
@@ -2212,7 +2222,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
             SUBCASE("two runs true true") {
                 const uint8_t original_key_l[2] = {0b00100110, 0b11111111};
@@ -2221,7 +2231,7 @@ public:
                             infix_store_target_size,
                             {original_key_l, 8 * sizeof(original_key_l)},
                             {original_key_r, 8 * sizeof(original_key_r)},
-                            0));
+                            1 - infix_size));
             }
         }
     }
@@ -2230,7 +2240,7 @@ public:
     static void BinaryTrieDeleteRaw() {
         const uint32_t N_bulk = 6;
         const uint32_t N_bulk_keys = 61;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 10;
@@ -2280,6 +2290,9 @@ public:
                 s.size_scalar_shrink_grow_sep);
         s.LoadVectorToInfixStore(store, infix_vec);
 
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
+
         SUBCASE("single match, shift left") {
             {
                 const uint8_t original_key[2] = {0b00001000, 0b01000000};
@@ -2287,7 +2300,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_left/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2298,7 +2311,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_left/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2312,7 +2325,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2323,7 +2336,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2334,7 +2347,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/multiple_matches/shift_left/3");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2347,7 +2360,7 @@ public:
                     infix_store_target_size,
                     nullptr, 
                     {original_key, 8 * sizeof(original_key)},
-                    0);
+                    key_start_bit);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_left");
             AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2358,7 +2371,8 @@ public:
                 s.DeleteRawFromInfixStore(store, infix_vec[0].infix_,
                         infix_store_target_size,
                         nullptr, 
-                        keys[i], 0);
+                        keys[i], 
+                        key_start_bit);
             }
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/destroy_run/shift_left");
@@ -2372,7 +2386,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_right/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2383,7 +2397,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 *sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] = 
                     ReadStoreContentsFromFile("binary_trie/delete/single_match/shift_right/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2397,7 +2411,8 @@ public:
             for (int32_t i = 0; i < infix_vec.back().num_suffixes_ + infix_vec.back().GetNumPrefixKeys(); i++) {
                 s.DeleteRawFromInfixStore(store, infix_vec.back().infix_, infix_store_target_size,
                         nullptr,
-                        keys[key_offset + i], 0);
+                        keys[key_offset + i],
+                        key_start_bit);
             }
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/delete/destroy_run/shift_right");
@@ -2411,7 +2426,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/1");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2422,7 +2437,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/2");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2433,7 +2448,7 @@ public:
                         infix_store_target_size,
                         nullptr, 
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 const auto [occupieds_pos, checks] =
                     ReadStoreContentsFromFile("binary_trie/delete/end_of_run/shift_right/3");
                 AssertStoreContents(s, store, occupieds_pos, checks);
@@ -2453,7 +2468,8 @@ public:
                         s.DeleteRawFromInfixStore(store, infix.infix_,
                                 infix_store_target_size,
                                 nullptr,
-                                keys[key_ind], key_start_bit);
+                                keys[key_ind],
+                                key_start_bit);
                         key_ind++;
                     }
                 }
@@ -2477,7 +2493,7 @@ public:
     static void BinaryTrieGetLongestMatchingInfixSize() {
         const uint32_t N_bulk = 6;
         const uint32_t N_bulk_keys = 61;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 10;
@@ -2526,13 +2542,16 @@ public:
                 s.size_scalar_shrink_grow_sep);
         s.LoadVectorToInfixStore(store, infix_vec);
 
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
+
         SUBCASE("single infix, exact trie match") {
             const uint8_t original_key[2] = {0b00101011, 0b10100110};
             REQUIRE_EQ(s.GetLongestMatchingInfixSize(store, 0b0000000001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     infix_size + 8 - 1);
         }
 
@@ -2542,7 +2561,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     infix_size + 25 - 1);
         }
 
@@ -2552,7 +2571,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     infix_size + 24 - 1);
         }
 
@@ -2562,7 +2581,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     infix_size - 1);
         }
 
@@ -2572,7 +2591,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     infix_size - 1 - 1);
         }
 
@@ -2582,7 +2601,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0), 
+                        key_start_bit), 
                     -1);
         }
     }
@@ -2590,7 +2609,7 @@ public:
 
     static void BinaryTrieResize() {
         const uint32_t N = 662;
-        const uint32_t key_start_bit = 0;
+        uint32_t key_start_bit = 0;
         const uint32_t min_key_len = 6;
         const uint32_t max_key_len = 17;
         const uint32_t max_num_keys_in_infix = 16;
@@ -2633,6 +2652,9 @@ public:
                 s.size_scalar_shrink_grow_sep);
         s.LoadVectorToInfixStore(store, infix_vec);
         
+        // To make sure that the strings stored in the tries after the infix is aligned with the input
+        key_start_bit -= infix_size - 1;
+
         SUBCASE("expand") {
             {
                 const uint8_t original_key[2] = {0b00010011, 0b10000000};
@@ -2640,7 +2662,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
             {
                 const uint8_t original_key[2] = {0b00010011, 0b11111111};
@@ -2648,7 +2670,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
 
             {
@@ -2657,43 +2679,43 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00011111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b01111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b11111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b10000111;
                 s.InsertRawIntoInfixStore(store, 0b0000100000001001,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
 
             {
@@ -2702,19 +2724,19 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b00111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010000;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
 
                 original_key[0] = 0b00010011;
                 original_key[1] = 0b11111111;
@@ -2722,7 +2744,7 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
 
                 original_key[0] = 0b00010110;
                 original_key[1] = 0b00111111;
@@ -2731,56 +2753,56 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b01111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b11111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00011111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b01111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b11111111;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
 
                 original_key[1] = 0b01010101;
                 s.InsertRawIntoInfixStore(store, 0b0000100011110101,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
 
             {
@@ -2789,55 +2811,55 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b01111111;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010110;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010100;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00010000;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00110000;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b01110000;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b11110000;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)}, 
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b11111111;
                 s.InsertRawIntoInfixStore(store, 0b0000101001000011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
 
             {
@@ -2846,67 +2868,67 @@ public:
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b00000000;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b01000000;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b11000000;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00100011;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00100111;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00101111;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b00111111;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b01111111;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[0] = 0b11111111;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
                 original_key[1] = 0b01010101;
                 s.InsertRawIntoInfixStore(store, 0b0000110101111011,
                         infix_store_target_size,
                         nullptr,
                         {original_key, 8 * sizeof(original_key)},
-                        0);
+                        key_start_bit);
             }
 
             const auto [occupieds_pos, checks] =
@@ -2921,7 +2943,8 @@ public:
                 s.DeleteRawFromInfixStore(store, infix_vec[infix_ind].infix_,
                         infix_store_target_size,
                         nullptr,
-                        keys[keys_ind], key_start_bit);
+                        keys[keys_ind],
+                        key_start_bit);
                 keys_ind++;
                 if (keys_ind - last_keys_ind >=
                         infix_vec[infix_ind].num_suffixes_ + infix_vec[infix_ind].GetNumPrefixKeys()) {
@@ -2992,7 +3015,7 @@ public:
             const uint8_t original_key[2] = {0b00101011, 0b00010000};
             s.AdaptRawInInfixStore(store, 0b0000000001000011,
                     {original_key, 8 * sizeof(original_key)},
-                    0, 
+                    1 - infix_size, 
                     infix_size - 1 + 11);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/add_suffix");
@@ -3003,7 +3026,7 @@ public:
             const uint8_t original_key[2] = {0b00101011, 0b00010000};
             s.AdaptRawInInfixStore(store, 0b0000000001000011,
                     {original_key, 8 * sizeof(original_key)},
-                    0, 
+                    1 - infix_size, 
                     infix_size - 1 + 16);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/add_multiple_suffixes");
@@ -3014,7 +3037,7 @@ public:
             const uint8_t original_key[4] = {0b01000100, 0b00110101, 0b01001100, 0b10101010};
             s.AdaptRawInInfixStore(store, 0b0100000000101101,
                     {original_key, 8 * sizeof(original_key)},
-                    0, 
+                    1 - infix_size, 
                     infix_size - 1 + 32);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/add_suffix_in_prefix_trie");
@@ -3025,7 +3048,7 @@ public:
             const uint8_t original_key[4] = {0b01000100, 0b00110101, 0b01001100, 0b01010101};
             s.AdaptRawInInfixStore(store, 0b0100000000101101,
                     {original_key, 8 * sizeof(original_key)},
-                    0, 
+                    1 - infix_size, 
                     infix_size - 1 + 32);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/prefix_key");
@@ -3036,7 +3059,7 @@ public:
             const uint8_t original_key[1] = {0b00000000};
             s.AdaptRawInInfixStore(store, 0b0011111111100101, 
                     {original_key, 8 * sizeof(original_key)},
-                    0,
+                    1 - infix_size,
                     infix_size - 1);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/partial_infix");
@@ -3047,7 +3070,7 @@ public:
             const uint8_t original_key[2] = {0b11001100, 0b00110011};
             s.AdaptRawInInfixStore(store, 0b0100000000111111,
                     {original_key, 8 * sizeof(original_key)},
-                    0, 
+                    1 - infix_size, 
                     infix_size - 1 + 16);
             const auto [occupieds_pos, checks] =
                 ReadStoreContentsFromFile("binary_trie/adapt/create_trie");

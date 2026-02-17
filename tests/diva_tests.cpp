@@ -4066,7 +4066,7 @@ public:
                 key_length, seed, load_factor);
 
         const uint8_t adaptee[4] = {0b00110001, 0b01011010, 0b01011001, 0b10011001};
-        s.Adapt(adaptee, sizeof(adaptee), 24);
+        s.Adapt(adaptee, sizeof(adaptee), 25);
 
         const uint8_t *res_key;
         uint32_t res_size, dummy;
