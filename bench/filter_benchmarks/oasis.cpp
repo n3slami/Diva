@@ -36,6 +36,10 @@ inline void del(oasis_plus::OasisPlus& f, uint64_t key) {
     throw std::runtime_error("Fitler does not support deletes");
 }
 
+inline void adapt(oasis_plus::OasisPlus& f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(oasis_plus::OasisPlus& f, uint64_t left, uint64_t right) {
     return f.query(left, right);
 }
@@ -57,7 +61,7 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size));
+    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size));
 
     return 0;
 }

@@ -76,6 +76,10 @@ inline void del(DstFilter<BloomFilter<>>& f, uint64_t key) {
     throw std::runtime_error("Fitler does not support deletes");
 }
 
+inline void adapt(DstFilter<BloomFilter<>>& f, uint64_t key, uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(DstFilter<BloomFilter<>>& f, uint64_t left, uint64_t right) {
     if (left == right)
         return f.Query(left);
@@ -106,7 +110,7 @@ int main(int argc, char const *argv[]) {
         range_size = *max_range_size;
     }
 
-    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(query), pass_ref(size),
+    experiment(pass_fun(init), pass_ref(insert), pass_ref(del), pass_ref(adapt), pass_ref(query), pass_ref(size),
                wio.GetIntQueries());
 
     return 0;

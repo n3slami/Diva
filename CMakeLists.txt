@@ -7,6 +7,9 @@ option(BUILD_TESTS "Build the tests" ON)
 option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_BENCHMARKS "Build the benchmark targets" ON)
 
+set(ACTUAL_SUFFIX_LEN_MODE "0" CACHE STRING "Controls the lower limit for the actual suffix length used in Diva's binary trie mode. 0: No limit (used in the unit tests). 1: At least half of the slot size (used for the EnWiki and Quotes datasets). 2: Slightly longer than half of the slot width (used for the Emails dataset).")
+message(STATUS "Diva binary trie actual suffix length mode: ${ACTUAL_SUFFIX_LEN_MODE}")
+
 set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -16,7 +19,7 @@ else()
     #set(USE_MULTI_THREADED OFF)
 endif ()
 
-set(BITHACKING_COMPILE_FLAGS -march=native)
+set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
                                ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh.h)
@@ -49,7 +52,7 @@ target_include_directories(
 add_library(DivaLib STATIC ./include/diva.hpp)
 set_target_properties(DivaLib PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(DivaLib PUBLIC ./include)
-target_compile_options(DivaLib PUBLIC ${BITHACKING_COMPILE_FLAGS}) # -fsanitize=thread)
+target_compile_options(DivaLib PUBLIC ${BITHACKING_COMPILE_FLAGS} -DACTUAL_SUFFIX_LEN_MODE=${ACTUAL_SUFFIX_LEN_MODE}) # -fsanitize=thread)
 target_link_libraries(DivaLib PRIVATE WormholeLib WormholeIntLib)
 #target_link_options(DivaLib PUBLIC -fsanitize=thread)
 

@@ -41,7 +41,13 @@ inline void insert(diva::Diva<diva::DivaType::BinaryTrie> *filter,
 
 inline void del(diva::Diva<diva::DivaType::BinaryTrie> *filter,
                 const uint8_t *key, uint16_t key_length) {
-    //filter->Delete(key, key_length);
+    filter->Delete(key, key_length);
+}
+
+inline void adapt(diva::Diva<diva::DivaType::BinaryTrie> *filter,
+                  const uint8_t *key, uint16_t key_length, 
+                  uint16_t adapt_length) {
+    filter->Adapt(key, key_length, adapt_length);
 }
 
 inline bool query(const diva::Diva<diva::DivaType::BinaryTrie> *filter,
@@ -69,7 +75,7 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
+    experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
 
     return 0;
 }

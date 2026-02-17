@@ -25,6 +25,13 @@
 #include "util.hpp"
 #include "wormhole/wh_int.h"
 
+// 0: Allows for non-existent actual suffixes. For unit tests.
+// 1: Forces a suffix length of at least half of the slot width. For the EnWiki and Quotes datasets.
+// 2: Forces a suffix length slightly larger than half of the slot width. For the Emails dataset.
+#ifndef ACTUAL_SUFFIX_LEN_MODE 
+#define ACTUAL_SUFFIX_LEN_MODE 0
+#endif
+
 namespace diva {
 
 static void print_key(const uint8_t *key, const uint32_t key_len, const bool binary=true) {
@@ -1283,7 +1290,7 @@ inline void Diva<diva_type, payload_type>::InsertSimple(const InfiniteByteString
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
     // To insert into the binary tries
-    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+    const uint32_t key_start_bit = shared + ignore + implicit_size;
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -1355,7 +1362,6 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
     // To query the binary tries
-    const uint32_t tof_bit_count = 5;
     const uint32_t key_start_bit = shared + ignore + implicit_size;
 
     if constexpr (diva_type == DivaType::Int) {
@@ -1461,7 +1467,7 @@ inline bool Diva<diva_type, payload_type>::PointQuery(const uint8_t *input_key, 
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
     // To query the binary tries
-    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+    const uint32_t key_start_bit = shared + ignore + implicit_size;
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t prev_implicit = ExtractPartialKey(prev_key, shared, ignore, implicit_size, 0) >> infix_size_;
@@ -2550,7 +2556,7 @@ inline void Diva<diva_type, payload_type>::Delete(const uint8_t *input_key, cons
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
     // To delete from the binary tries
-    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
+    const uint32_t key_start_bit = shared + ignore + implicit_size;
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -3087,8 +3093,12 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *input_key, const
 
     auto [shared, ignore, implicit_size] = GetSharedIgnoreImplicitLengths(prev_key, next_key);
     // To adapt the binary tries
-    const uint32_t key_start_bit = shared + ignore + implicit_size + infix_size_ - 1;
-    const uint32_t adapt_length = new_prefix_len - key_start_bit + infix_size_ - 1;
+    const uint32_t key_start_bit = shared + ignore + implicit_size;
+    if (new_prefix_len < key_start_bit + 1) {   // Nothing to adapt
+        rwlock_unlock_write(infix_store.rwlock);
+        return;
+    }
+    const uint32_t adapt_length = new_prefix_len - key_start_bit - 1;
 
     const uint64_t extraction = ExtractPartialKey(key, shared, ignore, implicit_size, key.GetBit(shared));
     const uint64_t next_implicit = ExtractPartialKey(next_key, shared, ignore, implicit_size, 1) >> infix_size_;
@@ -3104,6 +3114,7 @@ inline void Diva<diva_type, payload_type>::Adapt(const uint8_t *input_key, const
 }
 
 
+// TODO: Add the trie tof here too
 template <DivaType diva_type, PayloadType payload_type>
 template <class t_itr>
 inline void Diva<diva_type, payload_type>::BulkLoadFixedLength(const t_itr begin, const t_itr end, const uint32_t key_len,
@@ -3588,6 +3599,7 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(std::string_view ke
 }
 
 
+// TODO: Add the trie tof here too
 template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key, const uint32_t key_len,
                                                              const uint64_t *payload) {
@@ -4238,7 +4250,7 @@ inline void Diva<diva_type, payload_type>::ShiftRunendsRight(InfixStore &store, 
     // Update `popcnts`
     const uint32_t num_bits_to_read = std::max<int32_t>(r + shamt - std::max(infix_store_target_size / 2, l + shamt), 0)
                                     - std::max<int32_t>(r - std::max(infix_store_target_size / 2, l), 0);
-    uint32_t read_bit_pos = infix_store_target_size / 2 - shamt;
+    uint32_t read_bit_pos = infix_store_target_size / 2 - num_bits_to_read;
     uint64_t read_buf = 0;
     uint32_t read_buf_filled_len = 0, num_bits_read = 0;
     while (num_bits_read < num_bits_to_read) {
@@ -4616,13 +4628,14 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
         if ((current_slot & (current_slot - 1)) > explicit_part)
             break;
         const uint64_t mask = ((current_slot & -current_slot) << 1) - 1;
-        const bool is_full_infix = current_slot & 1;
+        const uint32_t mask_size = lowbit_pos(current_slot) + 1;
         if ((current_slot | mask) == (explicit_part | mask)) {
-            if (is_full_infix && SlotHasTrie(store, current_pos, runend_pos)) {
+            if (SlotHasTrie(store, current_pos, runend_pos)) {
                 infix_to_adapt = Infix(store.ptr + num_metadata_offset_words, 
                                        infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * current_pos,
                                        infix_size_);
-                adapt_pos = infix_to_adapt.GetLongestMatch(original_key, original_key_start_bit, infix_size_) >= 0 ? current_pos
+                const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
+                adapt_pos = infix_to_adapt.GetLongestMatch(original_key, key_start_bit, infix_size_) >= 0 ? current_pos
                           : adapt_pos;
                 current_pos += infix_to_adapt.GetNumSlots(infix_size_);
                 break;
@@ -4632,7 +4645,7 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
                 current_pos++;
             }
         }
-        else if (is_full_infix && SlotHasTrie(store, current_pos, runend_pos)) {
+        else if (SlotHasTrie(store, current_pos, runend_pos)) {
             const Infix infix_to_skip = Infix(store.ptr + num_metadata_offset_words, 
                                               infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * current_pos,
                                               infix_size_);
@@ -4645,10 +4658,14 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
     assert(adapt_pos != -1);
 #endif // DEBUG
     const uint64_t adapt_slot = GetSlot(store, adapt_pos);
+    const uint32_t mask_size = lowbit_pos(adapt_slot) + 1;
+    if (adapt_length <= infix_size_ - mask_size)     // Nothing to adapt
+        return;
     uint32_t num_slots_filled = 0;
-    if ((adapt_slot & 1) && SlotHasTrie(store, adapt_pos, runend_pos)) {
+    if (SlotHasTrie(store, adapt_pos, runend_pos)) {
         const uint32_t original_num_slots = infix_to_adapt.GetNumSlots(infix_size_);
-        infix_to_adapt.AdaptTrie(original_key, original_key_start_bit, adapt_length - infix_size_ + 1, infix_size_);
+        const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
+        infix_to_adapt.AdaptTrie(original_key, key_start_bit, adapt_length - infix_size_ + mask_size, infix_size_);
         const uint32_t new_num_slots = infix_to_adapt.GetNumSlots(infix_size_);
         num_slots_filled = new_num_slots - original_num_slots;
         store.UpdateFullSlotCount(num_slots_filled);
@@ -4663,17 +4680,11 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
         infix_to_adapt.SerializeToInfixStore(store, adapt_pos, scaled_sizes_[size_grade], infix_size_);
     }
     else {
-        ShiftSlotsLeft(store, adapt_pos + 1, current_pos, 1);
-        if constexpr (payload_type == PayloadType::FixedLength)
-            ShiftPayloadsLeft(store, adapt_pos + 1, current_pos, 1);
-        adapt_pos = current_pos - 1;
         infix_to_adapt = Infix(explicit_part);
+        const uint32_t key_start_bit = original_key_start_bit + infix_size_ - 1;
         if (adapt_length >= infix_size_) {
-            const InfiniteByteString converted_original_key = 
-                    {original_key.str, original_key_start_bit + adapt_length - infix_size_ + 1};
-            infix_to_adapt.BuildTrieAndSuffixes(&converted_original_key , 1, 
-                    original_key_start_bit, infix_size_,
-                    false, true);
+            infix_to_adapt.BuildTrieAndSuffixes(&original_key , 1, key_start_bit, infix_size_);
+            infix_to_adapt.AdaptTrie(original_key, key_start_bit, adapt_length - infix_size_ + 1, infix_size_);
         }
         num_slots_filled = infix_to_adapt.GetNumSlots(infix_size_) - 1;
         if (num_slots_filled > 0) {
@@ -4689,6 +4700,28 @@ inline void Diva<diva_type, payload_type>::AdaptRawInInfixStore(InfixStore &stor
         infix_to_adapt.SerializeToInfixStore(store, adapt_pos, scaled_sizes_[size_grade], infix_size_);
     }
     store.UpdateFullSlotCount(num_slots_filled);
+
+#ifdef DEBUG
+    {
+        const uint32_t *store_popcnts = reinterpret_cast<const uint32_t *>(store.ptr);
+        const uint64_t *occupieds = store.ptr + num_metadata_offset_words;
+        const uint64_t *runends = store.ptr + num_metadata_offset_words + infix_store_target_size / 64;
+        uint32_t occupied_count = 0, runend_count = 0, popcnts[2] = {};
+        for (int32_t i = 0; i < infix_store_target_size / 64; i++) {
+            if (i < infix_store_target_size / 128)
+                popcnts[0] += __builtin_popcountll(occupieds[i]);
+            occupied_count += __builtin_popcountll(occupieds[i]);
+        }
+        for (int32_t i = 0; i < scaled_sizes_[size_grade]; i++) {
+            if (i < infix_store_target_size / 2)
+                popcnts[1] += get_bitmap_bit(runends, i);
+            runend_count += get_bitmap_bit(runends, i);
+        }
+        assert(occupied_count == runend_count);
+        assert(store_popcnts[0] == popcnts[0]);
+        assert(store_popcnts[1] == popcnts[1]);
+    }
+#endif // DEBUG
 }
 
 
@@ -4738,7 +4771,6 @@ inline void Diva<diva_type, payload_type>::DeleteRawFromInfixStore(InfixStore &s
     bool found_empty_right = false;
     while (current_pos < store_size && !found_empty_right) {
         const uint64_t mask = ((current_slot & -current_slot) << 1) - 1;
-        const bool is_full_infix = current_slot & 1;
         bool remove = (implicit_part == current_implicit) && ((current_slot | mask) == (explicit_part | mask));
         if constexpr (payload_type == PayloadType::FixedLength) {
             if (should_remove && remove) {
@@ -4748,18 +4780,20 @@ inline void Diva<diva_type, payload_type>::DeleteRawFromInfixStore(InfixStore &s
             }
         }
         if constexpr (diva_type == DivaType::BinaryTrie) {  // TODO: Figure out integration of this with payloads
-            if (remove && (is_full_infix && SlotHasTrie(store, current_pos, current_runend_pos))) {
+            if (remove && SlotHasTrie(store, current_pos, current_runend_pos)) {
                 const Infix infix_to_get_longest_match(store.ptr + num_metadata_offset_words,
                         infix_store_target_size + store_size + infix_size_ * current_pos,
                         infix_size_);
-                remove &= infix_to_get_longest_match.GetLongestMatch(original_key, original_key_start_bit, infix_size_) >= 0;
+                const uint32_t mask_size = lowbit_pos(infix_to_get_longest_match.infix_) + 1;
+                const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
+                remove &= infix_to_get_longest_match.GetLongestMatch(original_key, key_start_bit, infix_size_) >= 0;
             }
         }
         to_remove = remove ? current_pos : to_remove;
 
         // Advance to the next infix
         if constexpr (diva_type == DivaType::BinaryTrie) {
-            if (is_full_infix && SlotHasTrie(store, current_pos, current_runend_pos)) {
+            if (SlotHasTrie(store, current_pos, current_runend_pos)) {
                 const Infix infix_to_skip(store.ptr + num_metadata_offset_words,
                         infix_store_target_size + store_size + infix_size_ * current_pos,
                         infix_size_);
@@ -4854,7 +4888,9 @@ inline void Diva<diva_type, payload_type>::DeleteRawFromInfixStore(InfixStore &s
                     infix_store_target_size + store_size + infix_size_ * to_remove,
                     infix_size_);
             deleted_count = infix_to_delete_from.GetNumSlots(infix_size_);
-            infix_to_delete_from.DeleteTrie(original_key, original_key_start_bit, infix_size_);
+            const uint32_t mask_size = lowbit_pos(infix_to_delete_from.infix_) + 1;
+            const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
+            infix_to_delete_from.DeleteTrie(original_key, key_start_bit, infix_size_);
             deleted_count -= infix_to_delete_from.GetNumSlots(infix_size_) - (infix_to_delete_from.num_trie_bits_ == 0);
             ShiftSlotsLeft(store, to_remove + deleted_count, r[num_runs_to_left], deleted_count);
             if (infix_to_delete_from.num_trie_bits_ > 0)
@@ -5302,14 +5338,15 @@ inline int32_t Diva<diva_type, payload_type>::GetLongestMatchingInfixSize(const 
         for (int32_t i = runstart_pos; i <= runend_pos; i++) {
             const uint64_t current_slot = GetSlot(store, i);
             const uint64_t mask = ((current_slot & -current_slot) << 1) - 1;
-            const bool is_full_infix = current_slot & 1;
             if ((current_slot | mask) == (explicit_part | mask)) {
-                if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
+                if (SlotHasTrie(store, i, runend_pos)) {
                     const Infix infix_to_query(store.ptr + num_metadata_offset_words,
                             infix_store_target_size + store_size + infix_size_ * i,
                             infix_size_);
+                    const uint32_t mask_size = lowbit_pos(infix_to_query.infix_) + 1;
+                    const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
                     const int32_t trie_match_size = infix_to_query.GetLongestMatch(original_key,
-                                                                                   original_key_start_bit,
+                                                                                   key_start_bit,
                                                                                    infix_size_);
                     res = trie_match_size > 0 ? std::max(res, infix_size_ + trie_match_size) 
                                               : res;
@@ -5518,14 +5555,14 @@ inline bool Diva<diva_type, payload_type>::PointQueryInfixStore(InfixStore &stor
                                                static_cast<int32_t>(FindEmptySlotBefore(store, runend_pos))) + 1;
         for (int32_t i = runstart_pos; i <= runend_pos; i++) {
             const uint64_t slot_value = GetSlot(store, i);
-            const bool is_full_infix = slot_value & 1;
             const uint64_t mask = ((slot_value & (-slot_value)) << 1) - 1;
+            const uint32_t mask_size = lowbit_pos(slot_value) + 1;
             if ((explicit_part | mask) == (slot_value | mask)) {
-                if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
+                if (SlotHasTrie(store, i, runend_pos)) {
                     const Infix infix_to_query(store.ptr + num_metadata_offset_words,
                             infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * i, infix_size_);
-                    if (infix_to_query.QueryTrie(original_key, original_key,
-                                original_key_start_bit, infix_size_))
+                    const uint32_t key_start_bit = original_key_start_bit + infix_size_ - mask_size;
+                    if (infix_to_query.QueryTrie(original_key, original_key, key_start_bit, infix_size_))
                         return true;
                     i += infix_to_query.GetNumSlots(infix_size_) - 1;
                 }
@@ -5909,14 +5946,13 @@ Diva<diva_type, payload_type>::GetInfixVector(const InfixStore &store, uint64_t 
     res.reserve(store.GetFullSlotCount());
     for (int32_t i = 0; i < store_size; i++) {
         const uint64_t explicit_part = GetSlot(store, i);
-        const bool is_full_infix = explicit_part & 1;
         if (explicit_part) {
 #ifdef DEBUG
             assert(implicit_part < infix_store_target_size);
 #endif // DEBUG
             res.emplace_back((implicit_part << infix_size_) | explicit_part);
             if constexpr (diva_type == DivaType::BinaryTrie) {
-                if (is_full_infix && SlotHasTrie(store, i, runend_pos)) {
+                if (SlotHasTrie(store, i, runend_pos)) {
                     res.back() = Infix(store.ptr + num_metadata_offset_words, 
                                        infix_store_target_size + scaled_sizes_[size_grade] + infix_size_ * i,
                                        infix_size_);
@@ -6958,11 +6994,16 @@ inline void Diva<diva_type, payload_type>::Infix::BuildTrieRecurse(const Infinit
 
 template <DivaType diva_type, PayloadType payload_type>
 inline uint32_t Diva<diva_type, payload_type>::Infix::GetActualSuffixLen(uint32_t slot_size) const {
-    //return slot_size / 2 + 0;    // Use this for the experiments
     const uint32_t key_count = GetNumPrefixKeys() + num_suffixes_;
     const uint32_t actual_suffix_len = slot_size * std::max<int32_t>(key_count - 1, 0) < num_trie_bits_ ? 0 
                                        : (slot_size * std::max<int32_t>(key_count - 1, 0) - num_trie_bits_) / num_suffixes_;
-    return std::max<int32_t>(actual_suffix_len, slot_size / 2 + 0U);
+#if ACTUAL_SUFFIX_LEN_MODE == 0     // Normal operation
+    return std::max<int32_t>(actual_suffix_len, 1);
+#elif ACTUAL_SUFFIX_LEN_MODE == 1   // EnWiki and Quotes datasets
+    return std::max<int32_t>(actual_suffix_len, slot_size / 2 + 0);
+#else                               // Emails dataset
+    return std::max<int32_t>(actual_suffix_len, slot_size / 2 + (slot_size - 10) * 2 / 3);
+#endif
 }
 
 
@@ -7786,6 +7827,10 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
     const uint32_t actual_suffix_len_backup = GetActualSuffixLen(slot_size);
     int32_t last_depth = -1;
     bool prefix_match = false, should_check_suffix = true;
+    if (num_trie_bits_ == 1) {  // Might have only one suffix, so there's nothing to traverse
+        it.depth_branch_.clear();
+        goto AdaptTrieAfterLoop;
+    }
     while (true) {
         it.Advance(has_prefix_keys);
         auto [depth, children] = it.depth_branch_.back();
@@ -7821,6 +7866,7 @@ void Diva<diva_type, payload_type>::Infix::AdaptTrie(const InfiniteByteString ke
             break;
         last_depth = depth;
     }
+AdaptTrieAfterLoop:
     assert(it.depth_branch_.empty() || it.depth_branch_.back().first >= 0);
     uint32_t depth = (it.depth_branch_.empty() ? -1 : it.depth_branch_.back().first) + 1;
 

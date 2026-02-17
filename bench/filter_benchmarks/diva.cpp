@@ -55,6 +55,12 @@ inline void del(diva::Diva<diva::DivaType::Standard> *filter,
     filter->Delete(key, key_length);
 }
 
+inline void adapt(diva::Diva<diva::DivaType::Standard> *f,
+                  const uint8_t *key, uint16_t key_length,
+                  uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(const diva::Diva<diva::DivaType::Standard> *filter,
                   const uint8_t *l_key, uint16_t l_key_length,
                   const uint8_t *r_key, uint16_t r_key_length) {
@@ -82,13 +88,13 @@ int main(int argc, char const *argv[]) {
     const uint32_t num_threads = parser.get<int>("--num-threads");
 
     if (num_threads == 0)
-        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(query), pass_fun(size));
+        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
     else {
         if (num_threads > max_thread_count)
             throw std::runtime_error("Number of threads requested exceed the maximum of 1024");
         for (int32_t i = 0; i < num_threads; i++)
             rngs[i].seed(rng_seed + i);
-        experiment_concurrency_string(num_threads, pass_fun(init), pass_fun(insert_concurrent), pass_fun(size));
+        experiment_concurrency_string(num_threads, pass_fun(init), pass_fun(insert_concurrent), pass_fun(query), pass_fun(size));
     }
 
     return 0;

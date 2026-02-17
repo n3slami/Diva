@@ -47,9 +47,27 @@ generate_corr_bench() {
     x=0.0
     while [ $i -le 5 ]
     do
-        $WORKLOAD_GEN_PATH -t correlated --min-range-size 1 --max-range-size 1 --corr-degree ${x} -o unif_0_${i}
-        $WORKLOAD_GEN_PATH -t correlated --max-range-size $short --corr-degree ${x} -o unif_10_${i}
-        $WORKLOAD_GEN_PATH -t correlated --max-range-size $long  --corr-degree ${x} -o unif_20_${i}
+        if ! test -f unif_0_${i}; then
+            echo "    [++] generating unif_0_${i}"
+            $WORKLOAD_GEN_PATH -t correlated --min-range-size 1 --max-range-size 1 --corr-degree ${x} -o unif_0_${i}
+        else 
+            echo "    [--] unif_0_${i} already generated"
+        fi
+
+        if ! test -f unif_10_${i}; then
+            echo "    [++] generating unif_10_${i}"
+            $WORKLOAD_GEN_PATH -t correlated --max-range-size $short --corr-degree ${x} -o unif_10_${i}
+        else 
+            echo "    [--] unif_10_${i} already generated"
+        fi
+
+        if ! test -f unif_20_${i}; then
+            echo "    [++] generating unif_20_${i}"
+            $WORKLOAD_GEN_PATH -t correlated --max-range-size $long  --corr-degree ${x} -o unif_20_${i}
+        else 
+            echo "    [--] unif_20_${i} already generated"
+        fi
+
         x=$(echo $x + 0.1 | bc)
         i=$(($i + 1))
     done
@@ -63,25 +81,82 @@ generate_fpr_bench() {
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
-        $WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
-        $WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
-        $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
-        $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
+        if ! test -f unif_${i}; then
+            echo "    [++] generating unif_${i}"
+            $WORKLOAD_GEN_PATH -t standard-int --kdist unif --qdist unif --max-range-size $range_size -o unif_${i}
+        else 
+            echo "    [--] unif_${i} already generated"
+        fi
+
+        if ! test -f norm_${i}; then
+            echo "    [++] generating norm_${i}"
+            $WORKLOAD_GEN_PATH -t standard-int --kdist norm $norm_mu $norm_std --qdist norm $norm_mu $norm_std --max-range-size $range_size -o norm_${i}
+        else 
+            echo "    [--] norm_${i} already generated"
+        fi
+
+        if ! test -f books_${i}; then
+            echo "    [++] generating books_${i}"
+            $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist real --max-range-size $range_size -o books_${i}
+        else 
+            echo "    [--] books_${i} already generated"
+        fi
+
+        if ! test -f osm_${i}; then
+            echo "    [++] generating osm_${i}"
+            $WORKLOAD_GEN_PATH -t standard-int --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real --max-range-size $range_size -o osm_${i}
+        else 
+            echo "    [--] osm_${i} already generated"
+        fi
+
         i=$(($i + 4))
     done
-    $WORKLOAD_GEN_PATH -t standard-string --kdist unif --max-range-size 1024 -o unif_string
-    $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size 1024 -o norm_string
+
+    if ! test -f norm_string; then
+        echo "    [++] generating norm_string"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist norm $norm_mu $norm_std $norm_byte --max-range-size 1024 -o norm_string
+    else 
+        echo "    [--] norm_string already generated"
+    fi
+
+    if ! test -f enwiki_string; then
+        echo "    [++] generating enwiki_string"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -o enwiki_string -q 500000
+    else 
+        echo "    [--] enwiki_string already generated"
+    fi
+
+    if ! test -f emails_string; then
+        echo "    [++] generating emails_string"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 500000
+    else 
+        echo "    [--] emails_string already generated"
+    fi
+
+    if ! test -f quotes_string; then
+        echo "    [++] generating quotes_string"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/quotes.txt -o quotes_string -q 500000
+    else 
+        echo "    [--] quotes_string already generated"
+    fi
 }
 
 generate_true_bench() {
     short=1024
-    $WORKLOAD_GEN_PATH -t true --max-range-size $short -o unif
+    if ! test -f unif; then
+        $WORKLOAD_GEN_PATH -t true --max-range-size $short -o unif
+    fi
 
     i=0
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
-        $WORKLOAD_GEN_PATH -t true --kdist unif --qdist unif --min-range-size $range_size --max-range-size $range_size -o unif_${i}
+        if ! test -f unif_${i}; then
+            echo "    [++] generating unif_${i}"
+            $WORKLOAD_GEN_PATH -t true --kdist unif --qdist unif --min-range-size $range_size --max-range-size $range_size -o unif_${i}
+        else 
+            echo "    [--] unif_${i} already generated"
+        fi
         i=$(($i + 4))
     done
 }
@@ -93,8 +168,47 @@ generate_expansion_bench() {
     norm_std=$(echo 2 ^ 50 | bc)
     n_expansions=6
 
-    $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
-    $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
+    if ! test -f unif_short; then
+        echo "    [++] generating unif_short"
+        $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $short -o unif_short
+    else 
+        echo "    [--] unif_short already generated"
+    fi
+
+    if ! test -f unif_long; then
+        echo "    [++] generating unif_long"
+        $WORKLOAD_GEN_PATH -t expansion -e $n_expansions --max-range-size $long -o unif_long
+    else 
+        echo "    [--] unif_long already generated"
+    fi
+
+    if ! test -f books_short; then
+        echo "    [++] generating books_short"
+        $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64  --qdist real -e $n_expansions --max-range-size $short -o books_short
+    else 
+        echo "    [--] books_short already generated"
+    fi
+
+    if ! test -f books_long; then
+        echo "    [++] generating books_long"
+        $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/books_200M_uint64  --qdist real -e $n_expansions --max-range-size $long -o books_long
+    else 
+        echo "    [--] books_long already generated"
+    fi
+
+    if ! test -f osm_short; then
+        echo "    [++] generating osm_short"
+        $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $short -o osm_short
+    else 
+        echo "    [--] osm_short already generated"
+    fi
+
+    if ! test -f osm_long; then
+        echo "    [++] generating osm_long"
+        $WORKLOAD_GEN_PATH -t expansion --kdist real $REAL_DATASETS_PATH/osm_cellids_200M_uint64 --qdist real -e $n_expansions --max-range-size $long -o osm_long
+    else 
+        echo "    [--] osm_long already generated"
+    fi
 }
 
 generate_delete_bench() {
@@ -104,7 +218,12 @@ generate_delete_bench() {
     norm_std=$(echo 2 ^ 50 | bc)
     n_deletes=500000
 
-    $WORKLOAD_GEN_PATH -t delete -d $n_deletes -o unif
+    if ! test -f unif; then
+        echo "    [++] generating unif"
+        $WORKLOAD_GEN_PATH -t delete -d $n_deletes -o unif
+    else 
+        echo "    [--] unif already generated"
+    fi
 }
 
 generate_construction_bench() {
@@ -112,7 +231,12 @@ generate_construction_bench() {
     x=100000
     while [ $i -le 7 ]
     do
-        $WORKLOAD_GEN_PATH -t construction --max-range-size 1024 -n ${x} -q $(echo "($x * 0.1)/1" | bc) -o unif_${i}
+        if ! test -f unif_${i}; then
+            echo "    [++] generating unif_${i}"
+            $WORKLOAD_GEN_PATH -t construction --max-range-size 1024 -n ${x} -q $(echo "($x * 0.1)/1" | bc) -o unif_${i}
+        else 
+            echo "    [--] unif_${i} already generated"
+        fi
         x=$(echo "$x * 10" | bc)
         i=$(($i + 1))
     done
@@ -121,9 +245,56 @@ generate_construction_bench() {
 generate_wiredtiger_bench() {
     short=$(echo 2 ^ 10 | bc)
     n_expansions=6
-    $WORKLOAD_GEN_PATH -t wiredtiger --qdist unif -e $n_expansions --max-range-size $short -o unif_short
+    if ! test -f unif_short; then
+        echo "    [++] generating unif_short"
+        $WORKLOAD_GEN_PATH -t wiredtiger --qdist unif -e $n_expansions --max-range-size $short -o unif_short
+    else 
+        echo "    [--] unif_short already generated"
+    fi
 }
 
+generate_adapt_bench() {
+    if ! test -f enwiki_string; then
+        echo "    [++] generating enwiki_string"
+        $WORKLOAD_GEN_PATH -t adapt-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -o enwiki_string -q 100000
+    else 
+        echo "    [--] enwiki_string already generated"
+    fi
+
+    if ! test -f emails_string; then
+        echo "    [++] generating emails_string"
+        $WORKLOAD_GEN_PATH -t adapt-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 100000
+    else 
+        echo "    [--] emails_string already generated"
+    fi
+
+    if ! test -f quotes_string; then
+        echo "    [++] generating quotes_string"
+        $WORKLOAD_GEN_PATH -t adapt-string --kdist real $REAL_DATASETS_PATH/quotes.txt -o quotes_string -q 100000
+    else 
+        echo "    [--] quotes_string already generated"
+    fi
+}
+
+generate_concurrency_bench() {
+    short=$(echo 2 ^ 10 | bc)
+    n_expansions=6
+    if ! test -f books; then
+        echo "    [++] generating books"
+        $WORKLOAD_GEN_PATH -t concurrency --kdist real $REAL_DATASETS_PATH/books_200M_uint64 -q 0 -e $n_expansions --max-range-size $short -o books
+    else 
+        echo "    [--] books already generated"
+    fi
+    if ! test -f books_query; then
+        echo "    [++] generating books_query"
+        $WORKLOAD_GEN_PATH -t concurrency --kdist real $REAL_DATASETS_PATH/books_200M_uint64 --qdist corr -e $n_expansions --max-range-size $short -o books_query
+    else 
+        echo "    [--] books_query already generated"
+    fi
+}
+
+
+echo "[!!] generating corr_bench"
 mkdir -p $OUT_PATH/corr_bench && cd $OUT_PATH/corr_bench || exit 1
 if ! generate_corr_bench ; then
     echo "[!!] generate_corr_bench generation failed"
@@ -131,6 +302,7 @@ if ! generate_corr_bench ; then
 fi
 echo "[!!] corr_bench generated"
 
+echo "[!!] generating fpr_bench"
 mkdir -p $OUT_PATH/fpr_bench && cd $OUT_PATH/fpr_bench || exit 1
 if ! generate_fpr_bench ; then
     echo "[!!] fpr_bench generation failed"
@@ -138,6 +310,7 @@ if ! generate_fpr_bench ; then
 fi
 echo "[!!] fpr_bench generated"
 
+echo "[!!] generating true_bench"
 mkdir -p $OUT_PATH/true_bench && cd $OUT_PATH/true_bench || exit 1
 if ! generate_true_bench ; then
     echo "[!!] true_bench generation failed"
@@ -145,6 +318,7 @@ if ! generate_true_bench ; then
 fi
 echo "[!!] true_bench generated"
 
+echo "[!!] generating expansion_bench"
 mkdir -p $OUT_PATH/expansion_bench && cd $OUT_PATH/expansion_bench || exit 1
 if ! generate_expansion_bench ; then
     echo "[!!] expansion_bench generation failed"
@@ -152,6 +326,7 @@ if ! generate_expansion_bench ; then
 fi
 echo "[!!] expansion_bench generated"
 
+echo "[!!] generating delete_bench"
 mkdir -p $OUT_PATH/delete_bench && cd $OUT_PATH/delete_bench || exit 1
 if ! generate_delete_bench ; then
     echo "[!!] delete_bench generation failed"
@@ -159,6 +334,7 @@ if ! generate_delete_bench ; then
 fi
 echo "[!!] delete_bench generated"
 
+echo "[!!] generating construction_bench"
 mkdir -p $OUT_PATH/construction_bench && cd $OUT_PATH/construction_bench || exit 1
 if ! generate_construction_bench ; then
     echo "[!!] construction_bench generation failed"
@@ -166,11 +342,29 @@ if ! generate_construction_bench ; then
 fi
 echo "[!!] construction_bench generated"
 
+echo "[!!] generating wiredtiger_bench"
 mkdir -p $OUT_PATH/wiredtiger_bench && cd $OUT_PATH/wiredtiger_bench || exit 1
 if ! generate_wiredtiger_bench ; then
     echo "[!!] wiredtiger_bench generation failed"
     exit 1
 fi
 echo "[!!] wiredtiger_bench generated"
+
+echo "[!!] generating adapt_bench"
+mkdir -p $OUT_PATH/adapt_bench && cd $OUT_PATH/adapt_bench || exit 1
+if ! generate_adapt_bench ; then
+    echo "[!!] adapt_bench generation failed"
+    exit 1
+fi
+echo "[!!] adapt_bench generated"
+
+echo "[!!] generating concurrency_bench"
+mkdir -p $OUT_PATH/concurrency_bench && cd $OUT_PATH/concurrency_bench || exit 1
+if ! generate_concurrency_bench ; then
+    echo "[!!] concurrency_bench generation failed"
+    exit 1
+fi
+echo "[!!] concurrency_bench generated"
+
 
 echo "[!!] success, all workloads generated"

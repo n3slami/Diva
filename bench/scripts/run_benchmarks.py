@@ -21,6 +21,12 @@ def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter,
     subprocess.run(command, shell=True)
     print("[ Command finished ]")
 
+def rebuild_benchmark(build_dir, mode=0):
+    rebuild_command = f"cd {build_dir} && cmake .. -DCMAKE_BUILD_TYPE=Release -DACTUAL_SUFFIX_LEN_MODE={mode} && make -j8"
+    print(f"[ Rebuilding: {rebuild_command} ]")
+    subprocess.run(rebuild_command, shell=True)
+    print("[ Rebuilding finished ]")
+
 def corr_bench():
     filters = ["diva", "diva_int", "memento", "grafite", "surf",
                "rosetta", "proteus", "rencoder", "snarf", "oasis"]
@@ -81,7 +87,14 @@ def fpr_string_bench():
             if should_skip:
                 continue
             for filter, bpk in itertools.product(filters, memory_footprints):
+                if dataset in ["enwiki", "quotes"]:     # Use actual suffixes at least as long as half of the slot width
+                    rebuild_benchmark(build_dir, mode=1)
+                elif dataset == "emails":               # Use actual suffixes slightly longer than half of the slot width
+                    rebuild_benchmark(build_dir, mode=2)
+                else:
+                    rebuild_benchmark(build_dir)
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
+    rebuild_benchmark(build_dir)    # Reset build configuration to the default
 
 def true_bench():
     filters = ["diva", "diva_int", "memento", "grafite", "surf",
@@ -168,17 +181,18 @@ def concurrency_bench():
     filters = ["diva", "diva_int"]
     MEMORY_FOOTPRINT = 16
     num_threads = [1, 2, 4, 8]
-    workload_subdir = "expansion_bench"
-    output_base = Path(f"./{output_prefix}/concurrency_bench/")
+    workload_subdir = "concurrency_bench"
+    output_base = Path(f"./{output_prefix}/{workload_subdir}/")
     output_base.mkdir(parents=True, exist_ok=True)
 
     workload_path = Path(f"{workload_dir}/{workload_subdir}")
     for workload in workload_path.iterdir():
-        if workload.is_file() and "books_short" in workload.name:
-            for filter, num_thread in itertools.product(filters, num_threads):
-                execute_benchmark(build_dir, output_base, workload_subdir, workload,
-                                  filter, MEMORY_FOOTPRINT - (1 if "diva" in filter else 0),
-                                  num_threads=num_thread)
+        if not workload.is_file():
+            continue
+        for filter, num_thread in itertools.product(filters, num_threads):
+            execute_benchmark(build_dir, output_base, workload_subdir, workload,
+                              filter, MEMORY_FOOTPRINT - (1 if "diva" in filter else 0),
+                              num_threads=num_thread)
 
 def mixed_bench():
     filters = ["diva", "diva_int", "memento", "grafite", "surf",
