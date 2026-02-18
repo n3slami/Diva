@@ -15,10 +15,12 @@ import argparse
 import json
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import itertools, os
 from pathlib import Path
 import logging
+from copy import deepcopy
 
 
 rc_fonts = {
@@ -32,7 +34,8 @@ logging.getLogger().setLevel(logging.INFO)
 
 RANGE_FILTERS_STYLE_KWARGS = {"diva_int": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva (Int)"},
                               "diva": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva", "linestyle": ":"},
-                              "diva_binary_trie": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva++", "linestyle": "--"},
+                              "diva_binary_trie": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva++"},
+                              "diva_binary_trie_no_adapt": {"marker": 'v', "color": "fuchsia", "zorder": 12, "label": "Diva++ (No Adaptations)", "linestyle": "--"},
                               "memento": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento"},
                               "memento_shorter_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "Memento ($2^{7}$ Range)"},
                               "memento_longer_range": {"marker": '4', "color": "C1", "zorder": 11, "label": "\\textbf{Memento ($2^{10}$ Range)}", "linestyle": ":"},
@@ -184,13 +187,13 @@ def plot_fpr_string(result_dir, output_dir):
     YLABEL_FONT_SIZE = 9.5
     XLABEL_FONT_SIZE = 9.5
     WIDTH = 9.0
-    HEIGHT = 2.75
+    HEIGHT = 3.0
     YTICKS = [1, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05]
     YTICKS_QUERY = [1000, 100, 10, 1]
     DIVA_LOAD_FACTOR = 0.95
 
     workloads = ["norm", "enwiki", "emails", "quotes"]
-    filters = ["diva", "diva_binary_trie", "surf"]
+    filters = ["diva_binary_trie", "diva", "surf"]
     memory_footprints = [12, 14, 16, 18, 20, 22]
     workload_subdir = Path("fpr_bench")
 
@@ -237,15 +240,18 @@ def plot_fpr_string(result_dir, output_dir):
             axes[0][i].set_ylim(top=1.9)
             axes[0][i].set_yticks(YTICKS)
         elif i <= 2:
+            axes[0][i].set_ylim(bottom=0.0, top=0.3)
             axes[0][i].set_yticks([0.0, 0.1, 0.2, 0.3])
-            axes[0][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.02 if i < 3 else 0.05))
+            axes[0][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.02))
         else:
+            axes[0][i].set_ylim(bottom=0.0, top=0.6)
+            axes[0][i].set_yticks([0.0, 0.2, 0.4, 0.6])
             axes[0][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.05))
             axes[0][i].set_ylim(bottom=0.0)
         #axes[1][i].set_yscale("log")
-        axes[1][i].set_ylim(bottom=0.0)
-        axes[1][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(100 if 1 <= i and i <= 2 else 200))
-    fig.subplots_adjust(wspace=0.3, hspace=0.1)
+        axes[1][i].set_ylim(bottom=0, top=2500)
+        axes[1][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(200))
+    fig.subplots_adjust(wspace=0.3, hspace=0.15)
 
     legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
     axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(0.15, 1.475),
@@ -726,7 +732,7 @@ def plot_concurrency(result_dir, output_dir):
     HEIGHT = 1.55
     XTICK_FONT_SIZE = 9
 
-    filters = ["diva", "diva_int"]
+    filters = ["diva_int", "diva"]
     datasets = ["books", "books_query"]
     MEMORY_FOOTPRINT = 16
     num_threads = [1, 2, 4, 8]
@@ -755,7 +761,9 @@ def plot_concurrency(result_dir, output_dir):
                 insert_throughput_data[filter].append(new_entry)
     for filter in filters:
         ax.plot(*zip(*insert_throughput_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
-        ax.plot(*zip(*mixed_throughput_data[filter]), **RANGE_FILTERS_STYLE_KWARGS[filter], **LINES_STYLE)
+        RANGE_FILTER_STYLE_KWARGS = deepcopy(RANGE_FILTERS_STYLE_KWARGS[filter])
+        RANGE_FILTER_STYLE_KWARGS["marker"] = "^"
+        ax.plot(*zip(*mixed_throughput_data[filter]), **RANGE_FILTER_STYLE_KWARGS, **LINES_STYLE)
 
     # Workload labels
     ax.text(5.1, 2.4, "Inserts", fontsize=NUM_THREAD_LABEL_FONT_SIZE);
@@ -769,10 +777,14 @@ def plot_concurrency(result_dir, output_dir):
     ax.set_ylabel("Throughput [Mop/s]", fontsize=YLABEL_FONT_SIZE)
     ax.set_ylim(bottom=-0.1, top=6)
 
-    legend_lines, legend_labels = ax.get_legend_handles_labels()
-    legend_lines = legend_lines[::2]
-    legend_labels = legend_labels[::2]
-    ax.legend(legend_lines, legend_labels, loc="upper left", bbox_to_anchor=(1.0, 0.7),
+    # Create proxies: same color and linestyle, but NO marker
+    legend_proxies = []
+    for filter in filters:
+        RANGE_FILTER_STYLE_KWARGS = RANGE_FILTERS_STYLE_KWARGS[filter]
+        RANGE_FILTER_STYLE_KWARGS["marker"] = ""
+        RANGE_FILTER_STYLE_KWARGS["linewidth"] = 0.8
+        legend_proxies.append(mlines.Line2D([], [], **RANGE_FILTER_STYLE_KWARGS))
+    ax.legend(handles=legend_proxies, loc="upper left", bbox_to_anchor=(1.0, 0.7),
               fancybox=True, shadow=False, ncol=1, fontsize=LEGEND_FONT_SIZE)
     fig.subplots_adjust(hspace=0.1, wspace=0.1)
     fig.savefig(output_dir / "concurrency.pdf", bbox_inches='tight', pad_inches=0.01)
@@ -789,7 +801,7 @@ def plot_adapt(result_dir, output_dir):
     DIVA_LOAD_FACTOR = 0.95
 
     workloads = ["enwiki", "emails", "quotes"]
-    filters = ["diva", "diva_binary_trie", "surf"]
+    filters = ["diva_binary_trie", "diva_binary_trie_no_adapt", "diva", "surf"]
     memory_footprints = [12, 14, 16, 18, 20, 22]
     workload_subdir = Path("adapt_bench")
 
@@ -801,6 +813,8 @@ def plot_adapt(result_dir, output_dir):
         for memory_footprint in memory_footprints:
             for filter in filters:
                 file_path = result_dir / workload_subdir / Path(f"{filter}_{memory_footprint}_{workload}_string.json")
+                if filter == "diva_binary_trie_no_adapt":
+                    file_path = result_dir / workload_subdir / Path(f"diva_binary_trie_{memory_footprint}_{workload}_string_no_adapt.json")
                 if not file_path.is_file():
                     continue
                 with open(file_path, 'r') as result_file:
@@ -833,13 +847,13 @@ def plot_adapt(result_dir, output_dir):
         axes[0][i].yaxis.set_minor_locator(matplotlib.ticker.LogLocator(numticks=10, subs='auto'))
         axes[0][i].set_ylim(top=1.9)
         axes[0][i].set_yticks(YTICKS)
-        axes[0][i].set_ylim(bottom=1e-3 if i == 0 else 8e-4 if i == 1 else 1e-2)
-        axes[1][i].set_ylim(bottom=0.0)
-        axes[1][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(50 if i == 0 else 100 if i == 1 else 200))
+        axes[0][i].set_ylim(bottom=1e-3, top=1)
+        axes[1][i].set_ylim(bottom=0.0, top=2500 if i <= 1 else 7000)
+        axes[1][i].yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(200 if i <= 1 else 500))
     fig.subplots_adjust(wspace=0.3, hspace=0.1)
 
     legend_lines, legend_labels = axes[0][1].get_legend_handles_labels()
-    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-0.6, 1.475),
+    axes[0][1].legend(legend_lines, legend_labels, loc='upper left', bbox_to_anchor=(-1.1, 1.475),
                       fancybox=True, shadow=False, ncol=5, fontsize=LEGEND_FONT_SIZE)
     fig.savefig(output_dir / "adapt.pdf", bbox_inches='tight', pad_inches=0.01)
 
