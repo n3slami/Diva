@@ -482,6 +482,11 @@ inline argparse::ArgumentParser init_parser(const std::string& name) {
             .default_value(0)
             .scan<'i', int>();
 
+    parser.add_argument("--disable-adaptations")
+            .help("Whether to disable adaptations")
+            .default_value(false)
+            .implicit_value(true);
+
     return parser;
 }
 

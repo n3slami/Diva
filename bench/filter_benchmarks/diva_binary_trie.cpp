@@ -50,6 +50,12 @@ inline void adapt(diva::Diva<diva::DivaType::BinaryTrie> *filter,
     filter->Adapt(key, key_length, adapt_length);
 }
 
+inline void adapt_noop(diva::Diva<diva::DivaType::BinaryTrie> *filter,
+                       const uint8_t *key, uint16_t key_length, 
+                       uint16_t adapt_length) {
+    return;
+}
+
 inline bool query(const diva::Diva<diva::DivaType::BinaryTrie> *filter,
                   const uint8_t *l_key, uint16_t l_key_length,
                   const uint8_t *r_key, uint16_t r_key_length) {
@@ -75,7 +81,10 @@ int main(int argc, char const *argv[]) {
     memory_budget = parser.get<double>("arg");
     read_workload(parser.get<std::string>("--workload"));
 
-    experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
+    if (parser.get<bool>("--disable-adaptations"))
+        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt_noop), pass_fun(query), pass_fun(size));
+    else
+        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
 
     return 0;
 }

@@ -8,7 +8,7 @@ global benchmarks_dir
 global output_prefix
 RANGE_FIXED_FILTERS = ["memento", "memento_expandable", "rosetta", "proteus"]
 
-def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False, num_threads=0):
+def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk, force_range_size=None, wiredtiger=False, disable_adaptations=False, num_threads=0):
     file_to_execute = f"bench/bench_{filter}_wiredtiger" if wiredtiger else f"bench/bench_{filter}"
     range_size_option = f"--range-size {force_range_size}" if force_range_size else ""
     command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}.json"
@@ -16,6 +16,13 @@ def execute_benchmark(build_dir, output_base, workload_subdir, workload, filter,
     if num_threads != 0:
         command = f"{build_dir}/{file_to_execute} {bpk} -w {workload} --num-threads {num_threads} {range_size_option} | tee {output_base}/{filter}_{bpk}_{workload.name}_{num_threads}.json"
         cli_message_command = f"<build_dir>/{file_to_execute} {bpk} -w <workload_dir>/{workload_subdir}/{workload.name} --num-threads {num_threads} {range_size_option} | tee <output_dir>/{workload_subdir}/{filter}_{bpk}_{workload.name}_{num_threads}.json"
+    if disable_adaptations:
+        bar_pos = command.find('|')
+        command = command[:bar_pos] + "--disable-adaptations " + command[bar_pos:]
+        command = command[:-5] + "_no_adapt" + command[-5:]
+        bar_pos = cli_message_command.find('|')
+        cli_message_command = cli_message_command[:bar_pos] + "--disable-adaptations " + cli_message_command[bar_pos:]
+        cli_message_command = cli_message_command[:-5] + "_no_adapt" + cli_message_command[-5:]
 
     print(f"[ Executing: {cli_message_command} ]")
     subprocess.run(command, shell=True)
@@ -214,6 +221,10 @@ def adapt_bench():
             if should_skip:
                 continue
             for filter, bpk in itertools.product(filters, memory_footprints):
+                if filter == "diva_binary_trie":    # Compare Diva++ without adaptations as well
+                    rebuild_benchmark(build_dir)
+                    execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk,
+                                      disable_adaptations=True)
                 rebuild_mode = 0
                 if "enwiki" in workload.name:
                     rebuild_mode = 1
