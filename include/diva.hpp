@@ -4826,6 +4826,7 @@ inline std::pair<typename Diva<int_optimized, payload_type>::Iterator::KeyType, 
                 current_key_contents_[bit_pos / 8] |= BITMASK(ignore_) << (8 - bit_pos % 8 - ignore_);
         }
         uint32_t bit_pos = shared_ + ignore_ + 1;
+        infix &= infix - 1;
         infix <<= 65 - extraction_size;
         infix = __builtin_bswap64(infix >> (bit_pos % 8));
         const uint32_t loop_end_i = (bit_pos % 8 + implicit_ + explicit_part_length - 1 + 7) / 8;
