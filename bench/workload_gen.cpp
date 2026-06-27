@@ -25,7 +25,6 @@
 #include <filesystem>
 #include <functional>
 #include <iostream>
-#include <iterator>
 #include <limits>
 #include <random>
 #include <set>
@@ -193,7 +192,6 @@ inline std::vector<ByteString> read_quotes_data_txt(const std::string& filename)
     in.close();
     std::sort(data.begin(), data.end());
     data.resize(std::unique(data.begin(), data.end()) - data.begin());
-
     return compress_data(data);
 }
 

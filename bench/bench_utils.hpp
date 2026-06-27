@@ -214,71 +214,135 @@ inline std::set<ByteString> read_data_binary(const std::string& filename) {
     return data;
 }
 
-constexpr uint32_t byte_range = 256;
-static uint32_t freq[byte_range][byte_range][byte_range];
-static uint32_t ht_code[byte_range][byte_range][byte_range], ht_len[byte_range][byte_range][byte_range];
-static void recurse_ht_encoding(uint32_t a, uint32_t b, uint32_t l, uint32_t r) {
+template <typename T>
+constexpr T ipow(T num, uint32_t pow) {
+    return (pow >= sizeof(uint32_t) * 8) ? 0 :
+        pow == 0 ? 1 : num * ipow(num, pow - 1);
+}
+#define MB_ORDER 2
+constexpr uint64_t byte_range = 256;
+static uint32_t *freq;
+static uint32_t *mb_code;
+static uint8_t *mb_len;
+
+static void recurse_mb_encoding(uint32_t *specific_freq, uint32_t *specific_mb_code, uint8_t *specific_mb_len,
+                                const std::vector<uint8_t>& context, uint32_t l, uint32_t r) {
     uint32_t non_zero = 0, total_freq = 0;
     for (uint32_t i = l; i < r; i++) {
-        non_zero += freq[a][b][i] > 0;
-        total_freq += freq[a][b][i];
+        non_zero += specific_freq[i] > 0;
+        total_freq += specific_freq[i];
     }
     if (non_zero <= 1)
         return;
     uint32_t running_sum = 0, running_non_zero = 0, mid;
     for (mid = l; mid < r; mid++) {
-        running_sum += freq[a][b][mid];
-        running_non_zero += freq[a][b][mid] > 0;
+        running_sum += specific_freq[mid];
+        running_non_zero += specific_freq[mid] > 0;
         if (running_sum > total_freq / 2) {
             mid += running_non_zero == 1;
             break;
         }
     }
     for (uint32_t i = l; i < r; i++) {
-        if (freq[a][b][i] > 0) {
-            ht_code[a][b][i] = (ht_code[a][b][i] << 1) | static_cast<uint32_t>(i >= mid);
-            ht_len[a][b][i]++;
+        if (specific_freq[i] > 0) {
+            specific_mb_code[i] = (specific_mb_code[i] << 1) | static_cast<uint32_t>(i >= mid);
+            specific_mb_len[i]++;
         }
     }
-    recurse_ht_encoding(a, b, l, mid);
-    recurse_ht_encoding(a, b, mid, r);
+    recurse_mb_encoding(specific_freq, specific_mb_code, specific_mb_len, context, l, mid);
+    recurse_mb_encoding(specific_freq, specific_mb_code, specific_mb_len, context, mid, r);
 }
 
-static void compute_ht_encoding() {
-    memset(ht_code, 0, sizeof(ht_code));
-    memset(ht_len, 0, sizeof(ht_len));
-    for (uint32_t a = 0; a < byte_range; a++) {
-        for (uint32_t b = 0; b < byte_range; b++)
-            recurse_ht_encoding(a, b, 0, byte_range);
+static void compute_mb_encoding() {
+    const uint64_t num_entries = ipow(byte_range, MB_ORDER + 1);
+    mb_code = new uint32_t[num_entries];
+    mb_len = new uint8_t[num_entries];
+    memset(mb_code, 0, sizeof(mb_code[0]) * num_entries);
+    memset(mb_len, 0, sizeof(mb_len[0]) * num_entries);
+
+    std::vector<uint8_t> context(MB_ORDER, 0);
+    while (true) {
+      uint64_t specific_offset = 0, offset_pw = byte_range;
+      for (const auto symbol : context) {
+        specific_offset += offset_pw * symbol;
+        offset_pw *= byte_range;
+      }
+      recurse_mb_encoding(freq + specific_offset, 
+                          mb_code + specific_offset,
+                          mb_len + specific_offset,
+                          context, 0, byte_range);
+
+      if (MB_ORDER == 0) 
+        break;
+      int32_t i = -1;
+      do {
+        i++;
+        context[i] = (context[i] + 1) % byte_range;
+      } while (i < context.size() - 1 && context[i] == 0);
+      if (i == context.size() - 1 && context[i] == 0)
+        break;
     }
 }
 
 static std::vector<ByteString> compress_data(std::vector<std::string> data) {
-    memset(freq, 0, sizeof(freq));
-    std::vector<ByteString> res;
-    for (std::string& s : data) { 
-        uint8_t bytes[3] = {0, 0, 0};
+    std::cout <<  "INFO: Mehlhorn's bisection order: " << MB_ORDER << std::endl;
+    {
+      std::cout << "INFO: Number of keys in the dataset: " << data.size() << std::endl;
+      uint64_t dataset_size = 0;
+      for (const auto& s : data) 
+        dataset_size += s.size();
+      std::cout << "INFO: Dataset size: " << dataset_size << std::endl;
+    }
+
+    const uint64_t num_entries = ipow(byte_range, MB_ORDER + 1);
+    freq = new uint32_t[num_entries];
+    memset(freq, 0, sizeof(freq[0]) * num_entries);
+    auto freq_count_timer = timer::now();
+    for (const auto& s : data) { 
+        uint8_t bytes[MB_ORDER + 1];
+        memset(bytes, 0, sizeof(bytes));
         uint32_t bytes_ind = 0;
         for (uint32_t i = 0; i < s.size(); i++) {
             bytes[bytes_ind++] = s[i];
-            bytes_ind %= 3;
-            freq[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]]++;
+            bytes_ind %= (MB_ORDER + 1);
+
+            uint64_t specific_freq_offset = 0, offset_pw = 1;
+            for (int32_t j = MB_ORDER; j >= 0; j--) {
+              specific_freq_offset += offset_pw * bytes[(bytes_ind + j) % (MB_ORDER + 1)];
+              offset_pw *= byte_range;
+            }
+            freq[specific_freq_offset]++;
         }
     }
-    compute_ht_encoding();
+    std::cout << "INFO: Time to compute byte frequencies: " << std::chrono::duration_cast<std::chrono::nanoseconds>(timer::now() - freq_count_timer).count() << std::endl;
+
+    auto encoding_tree_timer = timer::now();
+    compute_mb_encoding();
+    std::cout << "INFO: Time to compute encoding trees: " << std::chrono::duration_cast<std::chrono::nanoseconds>(timer::now() - encoding_tree_timer).count() << std::endl;
+
+    std::vector<ByteString> res;
+    uint64_t compressed_size = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         if (i < data.size() - 1 && std::mismatch(data[i].begin(), data[i].end(), data[i + 1].begin()).first == data[i].end())
             continue;
-        std::string& s = data[i];
-        uint8_t bytes[3] = {0, 0, 0}, compressed_key[1024];
+        const auto& s = data[i];
+        uint8_t bytes[MB_ORDER + 1], compressed_key[1024];
         uint32_t bytes_ind = 0;
+        memset(bytes, 0, sizeof(bytes));
         memset(compressed_key, 0, sizeof(compressed_key));
         uint64_t buf = 0, buf_filled_bits = 0, ind = 0;
         for (uint32_t j = 0; j < s.size(); j++) {
             bytes[bytes_ind++] = s[j];
-            bytes_ind %= 3;
-            const uint64_t code_frag = ht_code[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]];
-            const uint32_t code_frag_len = ht_len[bytes[bytes_ind]][bytes[(bytes_ind + 1) % 3]][bytes[(bytes_ind + 2) % 3]];
+            bytes_ind %= (MB_ORDER + 1);
+
+            uint64_t specific_code_offset = 0, offset_pw = 1;
+            for (int32_t j = MB_ORDER; j >= 0; j--) {
+              specific_code_offset += offset_pw * bytes[(bytes_ind + j) % (MB_ORDER + 1)];
+              offset_pw *= byte_range;
+            }
+            const uint64_t code_frag = mb_code[specific_code_offset];
+            const uint64_t code_frag_len = mb_len[specific_code_offset];
+
             buf |= code_frag << (64 - buf_filled_bits - code_frag_len);
             buf_filled_bits += code_frag_len;
             while (buf_filled_bits >= 8) {
@@ -290,10 +354,11 @@ static std::vector<ByteString> compress_data(std::vector<std::string> data) {
         if (buf_filled_bits > 0)
             compressed_key[ind++] = static_cast<uint8_t>((buf >> (64 - 8)) & 0xFF);
         res.emplace_back(compressed_key, ind);
+        compressed_size += ind;
     }
+    std::cout << "INFO: Compressed dataset size: " << compressed_size << std::endl;
     return res;
 }
-
 
 
 class WorkloadIO {
