@@ -40,44 +40,12 @@ if [ ! -f "$WORKLOAD_GEN_PATH" ]; then
 fi
 
 OUT_PATH=$(realpath ./workloads)
-generate_corr_bench() {
-    short=1024
-    long=1048576
-    i=0
-    x=0.0
-    while [ $i -le 5 ]
-    do
-        if ! test -f unif_0_${i}; then
-            echo "    [++] generating unif_0_${i}"
-            $WORKLOAD_GEN_PATH -t correlated --min-range-size 1 --max-range-size 1 --corr-degree ${x} -o unif_0_${i}
-        else 
-            echo "    [--] unif_0_${i} already generated"
-        fi
-
-        if ! test -f unif_10_${i}; then
-            echo "    [++] generating unif_10_${i}"
-            $WORKLOAD_GEN_PATH -t correlated --max-range-size $short --corr-degree ${x} -o unif_10_${i}
-        else 
-            echo "    [--] unif_10_${i} already generated"
-        fi
-
-        if ! test -f unif_20_${i}; then
-            echo "    [++] generating unif_20_${i}"
-            $WORKLOAD_GEN_PATH -t correlated --max-range-size $long  --corr-degree ${x} -o unif_20_${i}
-        else 
-            echo "    [--] unif_20_${i} already generated"
-        fi
-
-        x=$(echo $x + 0.1 | bc)
-        i=$(($i + 1))
-    done
-}
-
 generate_fpr_bench() {
     i=0
     norm_mu=$(echo 2 ^ 63 | bc)
     norm_std=$(echo 2 ^ 50 | bc)
     norm_byte=2
+    : '
     while [ $i -le 24 ]
     do
         range_size=$(echo 2 ^ $i | bc)
@@ -111,6 +79,7 @@ generate_fpr_bench() {
 
         i=$(($i + 4))
     done
+    '
 
     if ! test -f norm_string; then
         echo "    [++] generating norm_string"
@@ -121,14 +90,14 @@ generate_fpr_bench() {
 
     if ! test -f enwiki_string; then
         echo "    [++] generating enwiki_string"
-        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -o enwiki_string -q 500000
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -o enwiki_string -q 100000
     else 
         echo "    [--] enwiki_string already generated"
     fi
 
     if ! test -f emails_string; then
         echo "    [++] generating emails_string"
-        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 500000
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 10000
     else 
         echo "    [--] emails_string already generated"
     fi
@@ -136,8 +105,29 @@ generate_fpr_bench() {
     if ! test -f quotes_string; then
         echo "    [++] generating quotes_string"
         $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/quotes.txt -o quotes_string -q 500000
-    else 
+    else
         echo "    [--] quotes_string already generated"
+    fi
+
+    if ! test -f enwiki_string_uncompressed; then
+        echo "    [++] generating enwiki_string_uncompressed"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/enwiki.txt -C false -o enwiki_string_uncompressed -q 100000
+    else
+        echo "    [--] enwiki_string_uncompressed already generated"
+    fi
+
+    if ! test -f emails_string_uncompressed; then
+        echo "    [++] generating emails_string_uncompressed"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/emails.txt -C false -o emails_string_uncompressed -q 10000
+    else
+        echo "    [--] emails_string_uncompressed already generated"
+    fi
+
+    if ! test -f quotes_string_uncompressed; then
+        echo "    [++] generating quotes_string_uncompressed"
+        $WORKLOAD_GEN_PATH -t standard-string --kdist real $REAL_DATASETS_PATH/quotes.txt -C false -o quotes_string_uncompressed -q 500000
+    else
+        echo "    [--] quotes_string_uncompressed already generated"
     fi
 }
 
@@ -263,7 +253,7 @@ generate_adapt_bench() {
 
     if ! test -f emails_string; then
         echo "    [++] generating emails_string"
-        $WORKLOAD_GEN_PATH -t adapt-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 100000
+        $WORKLOAD_GEN_PATH -t adapt-string --kdist real $REAL_DATASETS_PATH/emails.txt -o emails_string -q 10000
     else 
         echo "    [--] emails_string already generated"
     fi
@@ -294,14 +284,6 @@ generate_concurrency_bench() {
 }
 
 
-echo "[!!] generating corr_bench"
-mkdir -p $OUT_PATH/corr_bench && cd $OUT_PATH/corr_bench || exit 1
-if ! generate_corr_bench ; then
-    echo "[!!] generate_corr_bench generation failed"
-    exit 1
-fi
-echo "[!!] corr_bench generated"
-
 echo "[!!] generating fpr_bench"
 mkdir -p $OUT_PATH/fpr_bench && cd $OUT_PATH/fpr_bench || exit 1
 if ! generate_fpr_bench ; then
@@ -310,6 +292,7 @@ if ! generate_fpr_bench ; then
 fi
 echo "[!!] fpr_bench generated"
 
+: '
 echo "[!!] generating true_bench"
 mkdir -p $OUT_PATH/true_bench && cd $OUT_PATH/true_bench || exit 1
 if ! generate_true_bench ; then
@@ -349,6 +332,7 @@ if ! generate_wiredtiger_bench ; then
     exit 1
 fi
 echo "[!!] wiredtiger_bench generated"
+'
 
 echo "[!!] generating adapt_bench"
 mkdir -p $OUT_PATH/adapt_bench && cd $OUT_PATH/adapt_bench || exit 1
@@ -358,6 +342,7 @@ if ! generate_adapt_bench ; then
 fi
 echo "[!!] adapt_bench generated"
 
+: '
 echo "[!!] generating concurrency_bench"
 mkdir -p $OUT_PATH/concurrency_bench && cd $OUT_PATH/concurrency_bench || exit 1
 if ! generate_concurrency_bench ; then
@@ -365,6 +350,7 @@ if ! generate_concurrency_bench ; then
     exit 1
 fi
 echo "[!!] concurrency_bench generated"
+'
 
 
 echo "[!!] success, all workloads generated"

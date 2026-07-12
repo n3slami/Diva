@@ -86,5 +86,13 @@ int main(int argc, char const *argv[]) {
     else
         experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
 
+    std::cerr << "stats: num_duplicate_infixes=" << diva::stats_num_duplicate_infixes << std::endl;
+    std::cerr << "       total_trie_count=" << diva::stats_total_trie_count << std::endl;
+    std::cerr << "       total_trie_key_count=" << diva::stats_total_trie_key_count << std::endl;
+    std::cerr << "       total_trie_size=" << diva::stats_total_trie_size << std::endl;
+    std::cerr << "       total_trie_depths=" << diva::stats_total_trie_depths << std::endl;
+    std::cerr << "       total_path_lens=" << diva::stats_total_path_lens << std::endl;
+    std::cerr << "       total_binary_length_tries_count=" << diva::stats_total_binary_length_tries_count << std::endl;
+
     return 0;
 }

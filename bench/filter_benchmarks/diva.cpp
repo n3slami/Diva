@@ -98,5 +98,7 @@ int main(int argc, char const *argv[]) {
         experiment_concurrency_string(num_threads, pass_fun(init), pass_fun(insert_concurrent), pass_fun(query), pass_fun(size));
     }
 
+    std::cerr << "stats: num_duplicate_infixes=" << diva::stats_num_duplicate_infixes << std::endl;
+
     return 0;
 }

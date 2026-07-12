@@ -39,6 +39,8 @@
 #include <string_view>
 #include <tuple>
 
+#include "../include/diva.hpp"
+
 /**
  * This file contains some utility functions and data structures used in the benchmarks.
  */

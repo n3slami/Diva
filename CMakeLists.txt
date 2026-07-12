@@ -12,14 +12,14 @@ message(STATUS "Diva binary trie actual suffix length mode: ${ACTUAL_SUFFIX_LEN_
 
 set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Ofast")
 else()
     add_definitions(-DDEBUG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wunused-variable -Wunused-function")
     #set(USE_MULTI_THREADED OFF)
 endif ()
 
-set(BITHACKING_COMPILE_FLAGS -Ofast -march=native)
+set(BITHACKING_COMPILE_FLAGS -march=native)
 
 add_library(WormholeLib STATIC ./include/wormhole/kv.c ./include/wormhole/lib.c ./include/wormhole/wh.c
                                ./include/wormhole/kv.h ./include/wormhole/lib.h ./include/wormhole/wh.h)

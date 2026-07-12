@@ -12,13 +12,6 @@
   ((nbits) == 64 ? 0xffffffffffffffff : MAX_VALUE(nbits))
 
 
-__attribute__((always_inline))
-static inline uint32_t fast_reduce(uint32_t hash, uint32_t n) {
-    // http://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
-    return (uint32_t) (((uint64_t) hash * n) >> 32);
-}
-
-
 /**
  * Returns the position of the k-th 1 in the 64-bit word x.
  * k is 0-based, so k=0 returns the position of the first 1.
@@ -441,8 +434,10 @@ inline void write_bits_to_bitmap(void *bitmap, uint32_t bitmap_pos,
     bitmap_words[bitmap_pos / 64] |= bits << (bitmap_pos % 64);
     const int32_t next_word_bit_count = std::max(static_cast<int32_t>(bitmap_pos) % 64 
                                             + static_cast<int32_t>(num_bits_to_copy) - 64, 0);
-    bitmap_words[bitmap_pos / 64 + 1] &= ~BITMASK(next_word_bit_count);
-    bitmap_words[bitmap_pos / 64 + 1] |= bits >> (num_bits_to_copy - next_word_bit_count);
+    if (next_word_bit_count > 0) {
+        bitmap_words[bitmap_pos / 64 + 1] &= ~BITMASK(next_word_bit_count);
+        bitmap_words[bitmap_pos / 64 + 1] |= bits >> (num_bits_to_copy - next_word_bit_count);
+    }
 }
 
 
@@ -461,7 +456,7 @@ inline void write_bits_from_string_to_bitmap(void *bitmap, uint32_t bitmap_pos,
         bitmap_pos -= bit_count_to_write;
         uint64_t data = 0;
         if (str) {
-            data = str_words[str_pos / 64];
+            memcpy(&data, str_words + str_pos / 64, std::min(bit_count_to_write + str_pos % 64 + 7, 64U) / 8);
             data = __builtin_bswap64(data) >> (8 * sizeof(data) - bit_count_to_write - str_pos % 64);
             data &= BITMASK(bit_count_to_write);
         }

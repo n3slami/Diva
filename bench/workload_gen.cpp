@@ -84,7 +84,30 @@ bool create_dir_recursive(const std::string_view& dir_name) {
     return true;
 }
 
-inline std::vector<ByteString> read_enwiki_data_txt(const std::string& filename) {
+// Parses a boolean command-line argument, treating the common "falsy" spellings
+// as false and everything else (including the default) as true.
+static bool parse_bool_arg(const std::string& s) {
+    return !(s == "false" || s == "False" || s == "0" || s == "off" || s == "no");
+}
+
+// Mirrors compress_data's prefix de-duplication (a key that is a prefix of the
+// next one is dropped), but stores the raw key bytes instead of their Mehlhorn
+// encoding. Used when string compression is disabled via -C/--compress.
+static std::vector<ByteString> uncompressed_data(const std::vector<std::string>& data) {
+    std::vector<ByteString> res;
+    uint64_t uncompressed_size = 0;
+    for (uint32_t i = 0; i < data.size(); i++) {
+        if (i < data.size() - 1 && std::mismatch(data[i].begin(), data[i].end(), data[i + 1].begin()).first == data[i].end())
+            continue;
+        const auto& s = data[i];
+        res.emplace_back(reinterpret_cast<const uint8_t *>(s.data()), s.size());
+        uncompressed_size += s.size();
+    }
+    std::cout << "INFO: Uncompressed dataset size: " << uncompressed_size << std::endl;
+    return res;
+}
+
+inline std::vector<ByteString> read_enwiki_data_txt(const std::string& filename, bool compress=true) {
     std::vector<std::string> data;
     std::fstream in(filename, std::ios::in);
     std::string line;
@@ -117,20 +140,24 @@ inline std::vector<ByteString> read_enwiki_data_txt(const std::string& filename)
     std::sort(data.begin(), data.end());
     data.resize(std::unique(data.begin(), data.end()) - data.begin());
 
-    return compress_data(data);
+    return compress ? compress_data(data) : uncompressed_data(data);
 }
 
-inline std::vector<ByteString> read_emails_data_txt(const std::string& filename) {
+inline std::vector<ByteString> read_emails_data_txt(const std::string& filename, bool compress=true) {
     std::vector<std::string> data;
     std::fstream in(filename, std::ios::in);
     std::string line;
-    std::string valid_characters = "\r\n\t -+@,._";
+    std::string valid_characters = "\r\n\t -@._";
     bool is_valid[std::numeric_limits<uint8_t>::max()] = {};
     for (char c : valid_characters)
         is_valid[c] = true;
 
     while (std::getline(in, line)) {
         bool skip = line.size() > 1000;
+        std::transform(line.begin(), line.end(), line.begin(),
+                [](unsigned char c) {
+                                return std::tolower(c);
+                            });
         for (uint32_t i = 0; i < line.size(); i++) {
             if (std::isspace(line[i])) {
                 line = line.substr(0, i);
@@ -160,10 +187,10 @@ inline std::vector<ByteString> read_emails_data_txt(const std::string& filename)
     std::sort(data.begin(), data.end());
     data.resize(std::unique(data.begin(), data.end()) - data.begin());
 
-    return compress_data(data);
+    return compress ? compress_data(data) : uncompressed_data(data);
 }
 
-inline std::vector<ByteString> read_quotes_data_txt(const std::string& filename) {
+inline std::vector<ByteString> read_quotes_data_txt(const std::string& filename, bool compress=true) {
     std::vector<std::string> data;
     std::fstream in(filename, std::ios::in);
     std::string line;
@@ -192,7 +219,7 @@ inline std::vector<ByteString> read_quotes_data_txt(const std::string& filename)
     in.close();
     std::sort(data.begin(), data.end());
     data.resize(std::unique(data.begin(), data.end()) - data.begin());
-    return compress_data(data);
+    return compress ? compress_data(data) : uncompressed_data(data);
 }
 
 std::set<uint64_t> generate_int_keys_uniform(uint64_t n_keys, std::mt19937_64& rng) {
@@ -487,6 +514,7 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
     const uint64_t seed = parser.get<uint64_t>("--seed");
     std::mt19937_64 rng(seed);
 
+    const bool compress = parse_bool_arg(parser.get<std::string>("--compress"));
     std::vector<uint64_t> key_lens = parser.get<std::vector<uint64_t>>("--string-lens");
     std::set<ByteString> keys;
     std::vector<ByteString> keys_vec;
@@ -504,11 +532,11 @@ void standard_string_bench(argparse::ArgumentParser& parser) {
         const std::string emails_str = "emails.txt";
         const std::string quotes_str = "quotes.txt";
         if (std::equal(enwiki_str.rbegin(), enwiki_str.rend(), key_file.rbegin()))
-            keys_vec = read_enwiki_data_txt(key_file);
+            keys_vec = read_enwiki_data_txt(key_file, compress);
         else if (std::equal(emails_str.rbegin(), emails_str.rend(), key_file.rbegin()))
-            keys_vec = read_emails_data_txt(key_file);
+            keys_vec = read_emails_data_txt(key_file, compress);
         else if (std::equal(quotes_str.rbegin(), quotes_str.rend(), key_file.rbegin()))
-            keys_vec = read_quotes_data_txt(key_file);
+            keys_vec = read_quotes_data_txt(key_file, compress);
         else {
             keys = read_data_binary<ByteString>(key_file);
             keys_vec = {keys.begin(), keys.end()};
@@ -617,6 +645,7 @@ void adapt_string_bench(argparse::ArgumentParser& parser) {
     const uint64_t seed = parser.get<uint64_t>("--seed");
     std::mt19937_64 rng(seed);
 
+    const bool compress = parse_bool_arg(parser.get<std::string>("--compress"));
     std::vector<uint64_t> key_lens = parser.get<std::vector<uint64_t>>("--string-lens");
     std::set<ByteString> keys;
     std::vector<ByteString> keys_vec, keys_vec_bulk;
@@ -634,11 +663,11 @@ void adapt_string_bench(argparse::ArgumentParser& parser) {
         const std::string emails_str = "emails.txt";
         const std::string quotes_str = "quotes.txt";
         if (std::equal(enwiki_str.rbegin(), enwiki_str.rend(), key_file.rbegin()))
-            keys_vec = read_enwiki_data_txt(key_file);
+            keys_vec = read_enwiki_data_txt(key_file, compress);
         else if (std::equal(emails_str.rbegin(), emails_str.rend(), key_file.rbegin()))
-            keys_vec = read_emails_data_txt(key_file);
+            keys_vec = read_emails_data_txt(key_file, compress);
         else if (std::equal(quotes_str.rbegin(), quotes_str.rend(), key_file.rbegin()))
-            keys_vec = read_quotes_data_txt(key_file);
+            keys_vec = read_quotes_data_txt(key_file, compress);
         else {
             keys = read_data_binary<ByteString>(key_file);
             keys_vec = {keys.begin(), keys.end()};
@@ -1490,6 +1519,12 @@ int main(int argc, char const *argv[]) {
             .default_value(default_string_lens)
             .required()
             .scan<'u', uint64_t>();
+
+    parser.add_argument("-C", "--compress")
+            .help("Whether to compress the string datasets via Mehlhorn encoding (true | false)")
+            .nargs(1)
+            .required()
+            .default_value(std::string("true"));
 
     parser.add_argument("-n", "--n-keys")
             .help("The number of input keys")

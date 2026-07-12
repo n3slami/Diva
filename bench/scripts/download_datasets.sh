@@ -106,7 +106,18 @@ for dataset in ${!string_urls[@]}; do
         continue
     fi
 
-    gzip -d < ${FILE_ARCHIVE} > "${FILE_TXT}"
+    if [ "${dataset}" == "emails" ]; then
+        # The Enron corpus is a gzipped tarball that decompresses to a 'maildir'
+        # tree of raw email messages, so it needs to be de-tarred and then have
+        # its email addresses extracted (one per line) to match the .txt format
+        # consumed by the workload generator.
+        echo "Decompressing and de-tarring '${dataset}'..."
+        tar -xzf ${FILE_ARCHIVE} -C ${DIR_DATA}
+        echo "Extracting email addresses into '${FILE_TXT}'..."
+        grep -rhoE '[A-Za-z0-9.,_+-]+@[A-Za-z0-9.,_+-]+\.[A-Za-z0-9.,_+-]{2,}' ${DIR_DATA}/maildir | sort -u > "${FILE_TXT}"
+    else
+        gzip -d < ${FILE_ARCHIVE} > "${FILE_TXT}"
+    fi
 done
 cat ${DIR_DATA}/quotes_*.txt > ${DIR_DATA}/quotes.txt
 
