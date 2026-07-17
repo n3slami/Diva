@@ -158,7 +158,8 @@ def construction_bench():
                 execute_benchmark(build_dir, output_base, workload_subdir, workload, filter, bpk)
 
 def wiredtiger_bench():
-    filters = ["diva", "diva_int", "memento_expandable", "base"]
+    filters = ["diva", "diva_int", "diva_binary_trie", "memento_expandable",
+               "base"]
     memory_footprints = [16]
     workload_subdir = "wiredtiger_bench"
     output_base = Path(f"./{output_prefix}/{workload_subdir}/")
