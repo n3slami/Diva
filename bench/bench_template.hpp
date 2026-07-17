@@ -33,6 +33,7 @@
 #include <thread>
 #include <tuple>
 #include <vector>
+#include <x86intrin.h>
 #include "bench_utils.hpp"
 
 #define pass_fun(f) ([](auto... args){ return f(args...); })

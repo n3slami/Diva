@@ -531,7 +531,7 @@ __attribute__((always_inline))
 inline void write_varlen_counter_to_bitmap(uint64_t *bitmap, int32_t bitmap_pos, uint64_t counter, const uint32_t counter_fragment_len) {
     const uint64_t varlen_counter_encoding_base = 1UL << counter_fragment_len;
     uint32_t digit_count = 1;
-    for (uint64_t pw = varlen_counter_encoding_base; pw < counter; pw *= varlen_counter_encoding_base)
+    for (uint64_t pw = varlen_counter_encoding_base; pw <= counter; pw *= varlen_counter_encoding_base)
         digit_count++;
     uint32_t bit_pos = digit_count + 1;
     uint64_t counter_encoding = 1ULL << digit_count;

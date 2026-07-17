@@ -21,6 +21,10 @@
 #include <cstdint>
 #include "diva.hpp"
 
+static const uint32_t max_thread_count = 1024;
+static const uint32_t rng_seed = 1024;
+static inline std::mt19937_64 rngs[max_thread_count];
+
 template <typename t_itr>
 inline diva::Diva<diva::DivaType::BinaryTrie> *init(const t_itr begin, const t_itr end, const double bpk) {
     const uint32_t rng_seed = 1024;
@@ -38,6 +42,13 @@ inline void insert(diva::Diva<diva::DivaType::BinaryTrie> *filter,
                    const uint8_t *key, uint16_t key_length) {
     filter->Insert(key, key_length);
 }
+
+inline void insert_concurrent(diva::Diva<diva::DivaType::BinaryTrie> *filter,
+                              const uint8_t * key, uint16_t key_length,
+                              uint32_t thread_id) {
+    filter->Insert(key, key_length, nullptr, rngs[thread_id]());
+}
+
 
 inline void del(diva::Diva<diva::DivaType::BinaryTrie> *filter,
                 const uint8_t *key, uint16_t key_length) {
@@ -79,12 +90,23 @@ int main(int argc, char const *argv[]) {
         std::exit(1);
     }
     memory_budget = parser.get<double>("arg");
+    const uint32_t num_threads = parser.get<int>("--num-threads");
+    concurrency_mode = num_threads != 0;
     read_workload(parser.get<std::string>("--workload"));
 
-    if (parser.get<bool>("--disable-adaptations"))
-        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt_noop), pass_fun(query), pass_fun(size));
-    else
-        experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
+    if (!concurrency_mode) {
+        if (parser.get<bool>("--disable-adaptations"))
+            experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt_noop), pass_fun(query), pass_fun(size));
+        else
+            experiment_string(pass_fun(init), pass_fun(insert), pass_fun(del), pass_fun(adapt), pass_fun(query), pass_fun(size));
+    }
+    else {
+        if (num_threads > max_thread_count)
+            throw std::runtime_error("Number of threads requested exceed the maximum of 1024");
+        for (int32_t i = 0; i < num_threads; i++)
+            rngs[i].seed(rng_seed + i);
+        experiment_concurrency_string(num_threads, pass_fun(init), pass_fun(insert_concurrent), pass_fun(query), pass_fun(size));
+    }
 
     std::cerr << "stats: num_duplicate_infixes=" << diva::stats_num_duplicate_infixes << std::endl;
     std::cerr << "       total_trie_count=" << diva::stats_total_trie_count << std::endl;
