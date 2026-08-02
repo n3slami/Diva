@@ -5547,7 +5547,7 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
             const int32_t runstart_pos = std::max<int32_t>(rank ? SelectRunends(store, rank - 1) : -1,
                                                            FindEmptySlotBefore(store, runend_pos)) + 1;
             if constexpr (diva_type == DivaType::BinaryTrie) {
-                for (int32_t pos = runstart_pos; pos < runend_pos; pos++) {
+                for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
                     const uint64_t current_slot = GetSlot(store, pos);
                     const uint64_t current_slot_r = current_slot | (current_slot - 1);
                     if (SlotHasTrie(store, pos, runend_pos)) {

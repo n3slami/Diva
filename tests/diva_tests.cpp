@@ -3957,6 +3957,41 @@ public:
     }
 
 
+    // Minimal key sets for which RangeQuery returned a false negative (hex).
+    static void BinaryTrieRangeQueryRegressions() {
+        struct Case {
+            const char *description;
+            uint32_t infix_size;
+            uint32_t seed;
+            std::vector<const char *> keys;  // sorted, unique
+            const char *l;
+            const char *r;
+        };
+        const std::vector<Case> cases = {
+            {"scan of l's run must include the run's last slot", 12, 22,
+                 {"8c9dd316abba20c72df8ac072de089e15b86012682a81331",
+                  "bcd4d68c577d87b3cb31c4e5f4f06b62dd2f26a09f6925",
+                  "e2ed40d279e1ec09568bdc444b513e9d99b4fbbace9b"},
+                 "bcd4d68c577d87b3cb31c4e5f4f06b",
+                 "e2ed40d279e1ec09568bdc444b513e9d99b4fbb9ce9b"},
+        };
+        const auto from_hex = [](const char *hex) {
+            std::string res;
+            for (const char *p = hex; p[0] != '\0' && p[1] != '\0'; p += 2)
+                res.push_back(static_cast<char>(std::stoi(std::string(p, 2), nullptr, 16)));
+            return res;
+        };
+        for (const Case& c : cases) {
+            INFO(c.description);
+            BinaryTrieDiva s(c.infix_size, c.seed, 0.95f);
+            for (const char *key : c.keys)
+                s.BulkLoadStreaming(from_hex(key));
+            s.BulkLoadStreamingFinish();
+            CHECK(s.RangeQuery(from_hex(c.l), from_hex(c.r)));
+        }
+    }
+
+
     static void BinaryTrieDelete() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4575,6 +4610,7 @@ TEST_SUITE("binary trie") {
 
     TEST_CASE("range query") {
         DivaTests::BinaryTrieRangeQuery();
+        DivaTests::BinaryTrieRangeQueryRegressions();
     }
 
     TEST_CASE("delete") {
