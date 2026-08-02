@@ -332,7 +332,7 @@ private:
                    const uint32_t size_grade, const uint32_t payload_size=0) {
             SetSizeGrade(size_grade);
             const uint64_t word_count = GetPtrWordCount(slot_count, slot_size, payload_size);
-            rwlock.store(0, std::memory_order::memory_order_release);
+            rwlock.store(0, std::memory_order_release);
             ptr = new uint64_t[word_count];
             memset(ptr, 0, sizeof(uint64_t) * word_count);
         }
@@ -343,7 +343,7 @@ private:
                     num_sample_payloads(other.num_sample_payloads),
                     rwlock(0),
                     ptr(other.ptr) { 
-            rwlock.store(0, std::memory_order::memory_order_release);
+            rwlock.store(0, std::memory_order_release);
         }
         InfixStore(InfixStore &&other) = default;
         InfixStore &operator=(const InfixStore &other) = default;

@@ -562,10 +562,10 @@ inline void cpu_pause() {
 
 __attribute__((always_inline))
 inline bool rwlock_trylock_read(std::atomic<lock_t>& lock) {
-    if ((lock.fetch_add(1, std::memory_order::memory_order_acquire) & rwlock_write_bit) == 0)
+    if ((lock.fetch_add(1, std::memory_order_acquire) & rwlock_write_bit) == 0)
         return true;
     else {
-        lock.fetch_sub(1, std::memory_order::memory_order_relaxed);
+        lock.fetch_sub(1, std::memory_order_relaxed);
         return false;
     }
 }
@@ -579,21 +579,21 @@ inline void rwlock_lock_read(std::atomic<lock_t>& lock) {
 #pragma nounroll
         do {
             cpu_pause();
-        } while (lock.load(std::memory_order::memory_order_acquire) & rwlock_write_bit);
+        } while (lock.load(std::memory_order_acquire) & rwlock_write_bit);
     } while (true);
 }
 
 __attribute__((always_inline))
 inline void rwlock_unlock_read(std::atomic<lock_t>& lock) {
-    lock.fetch_sub(1, std::memory_order::memory_order_release);
+    lock.fetch_sub(1, std::memory_order_release);
 }
 
 __attribute__((always_inline))
 inline bool rwlock_trylock_write(std::atomic<lock_t>& lock) {
-    lock_t v0 = lock.load(std::memory_order::memory_order_acquire);
+    lock_t v0 = lock.load(std::memory_order_acquire);
     if (v0 == rwlock_no_access && lock.compare_exchange_weak(v0, rwlock_write_bit,
-                                                             std::memory_order::memory_order_acquire,
-                                                             std::memory_order::memory_order_relaxed)) {
+                                                             std::memory_order_acquire,
+                                                             std::memory_order_relaxed)) {
         return true;
     }
     else {
@@ -610,13 +610,13 @@ inline void rwlock_lock_write(std::atomic<lock_t>& lock) {
 #pragma nounroll
         do {
             cpu_pause();
-        } while (lock.load(std::memory_order::memory_order_acquire));
+        } while (lock.load(std::memory_order_acquire));
     } while (true);
 }
 
 __attribute__((always_inline))
 inline void rwlock_unlock_write(std::atomic<lock_t>& lock) {
-    lock.fetch_sub(rwlock_write_bit, std::memory_order::memory_order_release);
+    lock.fetch_sub(rwlock_write_bit, std::memory_order_release);
 }
 
 
