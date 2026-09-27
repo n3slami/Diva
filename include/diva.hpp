@@ -3830,11 +3830,13 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
             }
         }
         if constexpr (diva_type == DivaType::BinaryTrie) {
-            infix_vec.emplace_back(infix_list[last_infix_pos]);
-            if (bulk_load_streaming_ind_ - last_infix_pos > 1) {
-                infix_vec.back().BuildTrieAndSuffixes(bulk_load_key_list_ + last_infix_pos,
-                        bulk_load_streaming_ind_ - last_infix_pos, key_start_bit, infix_size_,
-                        false, false, true);
+            if (bulk_load_streaming_ind_ > 0) {
+                infix_vec.emplace_back(infix_list[last_infix_pos]);
+                if (bulk_load_streaming_ind_ - last_infix_pos > 1) {
+                    infix_vec.back().BuildTrieAndSuffixes(bulk_load_key_list_ + last_infix_pos,
+                            bulk_load_streaming_ind_ - last_infix_pos, key_start_bit, infix_size_,
+                            false, false, true);
+                }
             }
             last_infix_pos = bulk_load_streaming_ind_;
         }
