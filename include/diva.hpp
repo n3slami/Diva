@@ -5570,7 +5570,7 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                 uint8_t one_key[one_key_max_len];
                                 memset(one_key, 0xFF, one_key_max_len);
                                 if (infix.QueryTrie(original_l_key, 
-                                            {one_key, one_key_max_len},
+                                            {one_key, 8 * one_key_max_len},
                                             original_key_start_bit + infix_size_ - mask_size,
                                             infix_size_))
                                     return true;
@@ -5613,19 +5613,19 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                         infix_size_);
                 if (current_slot_r >= l_explicit_part && current_slot_l <= r_explicit_part - 1) {
                     const uint32_t max_key_len = (original_key_start_bit + infix_size_
-                            + infix.num_trie_bits_ + infix.num_suffix_bits_) / 8;
+                            + infix.num_trie_bits_ + infix.num_suffix_bits_ + 7) / 8 + 1;
                     const uint32_t mask_size = lowbit_pos(infix.infix_) + 1;
                     uint8_t zeros[max_key_len];
                     memset(zeros, 0x00, max_key_len);
                     InfiniteByteString trie_l_key = 
                         (l_explicit_part | BITMASK(mask_size)) < (current_slot | BITMASK(mask_size)) 
-                            ? InfiniteByteString(zeros, max_key_len) : original_l_key;
+                            ? InfiniteByteString(zeros, 8 * max_key_len) : original_l_key;
 
                     uint8_t ones[max_key_len];
                     memset(ones, 0xFF, max_key_len);
                     InfiniteByteString trie_r_key = 
                         (current_slot | BITMASK(mask_size)) < (r_explicit_part | BITMASK(mask_size)) 
-                            ? InfiniteByteString(ones, max_key_len) : original_r_key;
+                            ? InfiniteByteString(ones, 8 * max_key_len) : original_r_key;
 
                     if (infix.QueryTrie(trie_l_key, trie_r_key,
                                 original_key_start_bit + infix_size_ - mask_size,

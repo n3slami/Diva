@@ -3996,6 +3996,13 @@ public:
                   "e2ed40d279e1ec09568bdc444b513e9d99b4fbbace9b"},
                  "bcd4d68c577d87b3cb31c4e5f4f06b",
                  "e2ed40d279e1ec09568bdc444b513e9d99b4fbb9ce9b"},
+            {"-inf / +inf stand-in bounds must use a length in bits", 3, 21,
+                 {"616161",
+                  "6161616262616161",
+                  "616161626261626162626161",
+                  "626262616162616162626161626161"},
+                 "6161616162626161616162626262",
+                 "61626261616261"},
         };
         const auto from_hex = [](const char *hex) {
             std::string res;
