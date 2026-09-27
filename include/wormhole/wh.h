@@ -11,6 +11,21 @@
 extern "C" {
 #endif
 
+// global slabs
+#ifdef WORMHOLE_GLOBAL_SLAB
+extern struct slab* g_hmap0_slab1;
+extern struct slab* g_hmap0_slab2;
+extern struct slab* g_hmap1_slab1;
+extern struct slab* g_hmap1_slab2;
+extern struct slab* g_slab_leaf;
+extern long g_slab_ref_counter;
+extern pthread_mutex_t g_slab_mutex;
+
+void global_slab_acquire(void);
+
+void global_slab_release(void);
+#endif
+
 struct wormhole;
 struct wormref;
 
