@@ -556,7 +556,7 @@ private:
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
     std::atomic<uint64_t> n_keys_ = 0;
 
-    uint32_t bulk_load_streaming_ind_, bulk_load_streaming_max_len_;
+    uint32_t bulk_load_streaming_ind_ = 0, bulk_load_streaming_max_len_ = 0;
     InfiniteByteString bulk_load_left_key_, bulk_load_key_list_[infix_store_target_size];
     uint64_t *bulk_load_left_payload_ = nullptr, *bulk_load_payload_list_ = nullptr;
 
@@ -2441,7 +2441,7 @@ inline uint32_t Diva<diva_type, payload_type>::DeserializeMetadata(const char *d
     rng_.seed(rng_seed_);
 
     uint64_t n_keys_val;
-    memcpy(&n_keys_val, deser_buf + res, sizeof(rng_seed_));
+    memcpy(&n_keys_val, deser_buf + res, sizeof(n_keys_val));
     res += sizeof(n_keys_val);
     n_keys_.store(n_keys_val, std::memory_order_release);
 
@@ -3785,6 +3785,8 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
 
 template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
+    if (bulk_load_left_key_.str == nullptr)
+        return;
     uint8_t *key_copy = new uint8_t[bulk_load_streaming_max_len_];
     const auto tree_key_absent = [&](const uint8_t *k, const uint32_t len) {
         if constexpr (diva_type == DivaType::Int)
@@ -3799,7 +3801,14 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
     if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
         AddTreeKey(key_copy, bulk_load_streaming_max_len_);
 
-    if (bulk_load_streaming_ind_ > 0) {
+    if (bulk_load_streaming_ind_ == 0) {
+        if (tree_key_absent(bulk_load_left_key_.str, bulk_load_left_key_.length)) {
+            if constexpr (payload_type == PayloadType::FixedLength)
+                AddTreeKey(bulk_load_left_key_.str, bulk_load_left_key_.length, bulk_load_left_payload_);
+            else
+                AddTreeKey(bulk_load_left_key_.str, bulk_load_left_key_.length);
+        }
+    } else if (bulk_load_streaming_ind_ > 0) {
         const InfiniteByteString bulk_load_right_key = bulk_load_key_list_[bulk_load_streaming_ind_ - 1];
         bulk_load_key_list_[bulk_load_streaming_ind_ - 1] = {};
         bulk_load_streaming_ind_--;

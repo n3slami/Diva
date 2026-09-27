@@ -3772,6 +3772,30 @@ public:
     }
 
 
+    static void BinaryTrieBulkLoadStreamingBoundary() {
+        const uint32_t infix_size = 9;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+
+        // T = 1024: 1, T + 1 and 2T + 1 keys.
+        for (const uint32_t n_keys : {1U, 1025U, 2049U}) {
+            INFO("n_keys=" << n_keys);
+            BinaryTrieDiva s(infix_size, seed, load_factor);
+            std::vector<std::string> keys;
+            keys.reserve(n_keys);
+            for (uint64_t i = 0; i < n_keys; ++i) {
+                const uint64_t encoded = to_big_endian_order(i + 1);
+                keys.emplace_back(reinterpret_cast<const char *>(&encoded),
+                                  sizeof(encoded));
+                s.BulkLoadStreaming(keys.back());
+            }
+            s.BulkLoadStreamingFinish();
+            for (const std::string& key : keys)
+                CHECK(s.PointQuery(key));
+        }
+    }
+
+
     static void BinaryTrieInsert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4628,6 +4652,7 @@ TEST_SUITE("binary trie") {
         DivaTests::BinaryTrieBulkLoad();
         DivaTests::BinaryTrieBulkLoadStreaming();
         DivaTests::BinaryTrieBulkLoadStreamingSentinels();
+        DivaTests::BinaryTrieBulkLoadStreamingBoundary();
     }
 
     TEST_CASE("insert") {
