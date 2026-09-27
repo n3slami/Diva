@@ -3750,6 +3750,28 @@ public:
     }
 
 
+    static void BinaryTrieBulkLoadStreamingSentinels() {
+        const uint32_t infix_size = 8;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 3000;
+
+        // The first key (eight 0x00 bytes) equals the all-zero sentinel.
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        std::vector<std::string> keys;
+        keys.reserve(n_keys);
+        for (uint64_t i = 0; i < n_keys; ++i) {
+            const uint64_t encoded = to_big_endian_order(i);
+            keys.emplace_back(reinterpret_cast<const char *>(&encoded),
+                              sizeof(encoded));
+            s.BulkLoadStreaming(keys.back());
+        }
+        s.BulkLoadStreamingFinish();
+        for (const std::string& key : keys)
+            CHECK(s.PointQuery(key));
+    }
+
+
     static void BinaryTrieInsert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4598,6 +4620,7 @@ TEST_SUITE("binary trie") {
     TEST_CASE("bulk load") {
         DivaTests::BinaryTrieBulkLoad();
         DivaTests::BinaryTrieBulkLoadStreaming();
+        DivaTests::BinaryTrieBulkLoadStreamingSentinels();
     }
 
     TEST_CASE("insert") {

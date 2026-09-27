@@ -3786,10 +3786,18 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
 template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
     uint8_t *key_copy = new uint8_t[bulk_load_streaming_max_len_];
+    const auto tree_key_absent = [&](const uint8_t *k, const uint32_t len) {
+        if constexpr (diva_type == DivaType::Int)
+            return !wh_int_probe(better_tree_int_, k, len);
+        else
+            return !wh_probe(better_tree_, k, len);
+    };
     memset(key_copy, 0x00, bulk_load_streaming_max_len_);
-    AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+    if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
     memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
-    AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+    if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
 
     if (bulk_load_streaming_ind_ > 0) {
         const InfiniteByteString bulk_load_right_key = bulk_load_key_list_[bulk_load_streaming_ind_ - 1];
