@@ -5544,6 +5544,8 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                 infix_store_target_size + store_size + infix_size_ * runstart_pos,
                                 infix_size_);
                         const uint32_t mask_size = lowbit_pos(infix_to_query.infix_) + 1;
+                        if ((current_slot | BITMASK(mask_size)) < (r_explicit_part | BITMASK(mask_size)))
+                            return true;
                         const uint8_t zero_key[1] = {0};
                         if (infix_to_query.QueryTrie({zero_key, 1},
                                     original_r_key,
@@ -5575,6 +5577,8 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                 infix_size_);
                         if (current_slot_r >= l_explicit_part) {
                                 const uint32_t mask_size = lowbit_pos(infix.infix_) + 1;
+                                if ((l_explicit_part | BITMASK(mask_size)) < (current_slot | BITMASK(mask_size)))
+                                    return true;
                                 const uint32_t one_key_max_len = (original_key_start_bit + (infix.GetNumSlots(infix_size_) + 1) * infix_size_ + 7) / 8;
                                 uint8_t one_key[one_key_max_len];
                                 memset(one_key, 0xFF, one_key_max_len);
