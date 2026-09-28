@@ -7304,7 +7304,8 @@ QueryTrieDivergedPathRetry:
         if (it.depth_branch_.empty())
             break;
         auto [depth, children] = it.depth_branch_.back();
-        if (last_depth >= depth)
+        const bool revisit_diverge_node = second_path && depth == diverge_depth;
+        if (!revisit_diverge_node && last_depth >= depth)
             last_depth = it.depth_branch_[it.depth_branch_.size() - 2].first;
 
         bool l_key_dont_care = l_key_dont_care_depth <= depth || second_path;
@@ -7312,7 +7313,7 @@ QueryTrieDivergedPathRetry:
         
         // Compare l_key to path, or ignore
         const int32_t current_str_bit_pos = key_start_bit + last_depth + 1;
-        const uint32_t compare_len = depth - last_depth - 1;
+        const uint32_t compare_len = revisit_diverge_node ? 0 : depth - last_depth - 1;
         const uint32_t compare_len_l = std::min<int32_t>(compare_len,
                         std::max<int32_t>(0, l_key.length - last_depth));
         const int32_t compare_l = l_key_dont_care ? 0
@@ -7332,6 +7333,7 @@ QueryTrieDivergedPathRetry:
                     return true;
                 else if (it.depth_branch_.back().first == diverge_depth) {
                     second_path = true;
+                    last_depth = diverge_depth;
                     if (it.AtLeaf())
                         break;
                     continue;
@@ -7410,6 +7412,7 @@ QueryTrieAfterLoop:
     if (check_l || check_r) {
         if (diverge_depth < depth && !second_path) {    // Still have to check the key on the other path
             second_path = true;
+            last_depth = diverge_depth;
             goto QueryTrieDivergedPathRetry;
         }
         return false;
@@ -7433,6 +7436,7 @@ QueryTrieAfterLoop:
             if (check_l || check_r) {
                 if (diverge_depth < depth && !second_path) {    // Still have to check the key on the other path
                     second_path = true;
+                    last_depth = diverge_depth;
                     goto QueryTrieDivergedPathRetry;
                 }
                 return false;
