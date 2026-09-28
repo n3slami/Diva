@@ -557,6 +557,7 @@ private:
     std::atomic<uint64_t> n_keys_ = 0;
 
     uint32_t bulk_load_streaming_ind_ = 0, bulk_load_streaming_max_len_ = 0;
+    bool bulk_load_first_key_is_min_ = false;
     InfiniteByteString bulk_load_left_key_, bulk_load_key_list_[infix_store_target_size];
     uint64_t *bulk_load_left_payload_ = nullptr, *bulk_load_payload_list_ = nullptr;
 
@@ -3694,6 +3695,8 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
         if constexpr (payload_type == PayloadType::FixedLength)
             copy_bitmap_to_bitmap(payload, 0, bulk_load_left_payload_, 0, payload_size_);
         bulk_load_streaming_max_len_ = key_len;
+        bulk_load_first_key_is_min_ = std::all_of(key, key + key_len,
+                                                  [](const uint8_t b) { return b == 0; });
         return;
     }
     bulk_load_streaming_max_len_ = std::max(bulk_load_streaming_max_len_, key_len);
@@ -3795,7 +3798,7 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
             return !wh_probe(better_tree_, k, len);
     };
     memset(key_copy, 0x00, bulk_load_streaming_max_len_);
-    if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
+    if (!bulk_load_first_key_is_min_ && tree_key_absent(key_copy, bulk_load_streaming_max_len_))
         AddTreeKey(key_copy, bulk_load_streaming_max_len_);
     memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
     if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
