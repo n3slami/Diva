@@ -3750,6 +3750,113 @@ public:
     }
 
 
+    static void BinaryTrieBulkLoadStreamingSentinels() {
+        const uint32_t infix_size = 8;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 3000;
+
+        // The first key (eight 0x00 bytes) equals the all-zero sentinel.
+        BinaryTrieDiva s(infix_size, seed, load_factor);
+        std::vector<std::string> keys;
+        keys.reserve(n_keys);
+        for (uint64_t i = 0; i < n_keys; ++i) {
+            const uint64_t encoded = to_big_endian_order(i);
+            keys.emplace_back(reinterpret_cast<const char *>(&encoded),
+                              sizeof(encoded));
+            s.BulkLoadStreaming(keys.back());
+        }
+        s.BulkLoadStreamingFinish();
+        for (const std::string& key : keys)
+            CHECK(s.PointQuery(key));
+    }
+
+
+    static void BinaryTrieBulkLoadStreamingAllZeroFirstKey() {
+        const uint32_t infix_size = 8;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 3000;
+
+        // The first key is all 0x00 bytes and shorter than the longest key.
+        for (const uint32_t zero_len : {1U, 2U, 8U}) {
+            INFO("zero_len=" << zero_len);
+            BinaryTrieDiva s(infix_size, seed, load_factor);
+            std::vector<std::string> keys;
+            keys.reserve(n_keys + 1);
+            keys.emplace_back(zero_len, '\0');
+            for (uint32_t i = 0; i < n_keys; ++i) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "key%06u", i);
+                keys.emplace_back(buf);
+            }
+            for (const std::string& key : keys)
+                s.BulkLoadStreaming(key);
+            s.BulkLoadStreamingFinish();
+            for (const std::string& key : keys)
+                CHECK(s.PointQuery(key));
+        }
+    }
+
+
+    static void BinaryTrieAllZeroQueryBelowMinimum() {
+        const uint32_t infix_size = 8;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 3000;
+        const std::string z0, z1(1, '\0'), z2(2, '\0'), z8(8, '\0');
+
+        // All-zero query keys shorter than the minimum boundary.
+        for (const bool zero_first_key : {false, true}) {
+            INFO("zero_first_key=" << zero_first_key);
+            BinaryTrieDiva s(infix_size, seed, load_factor);
+            if (zero_first_key)
+                s.BulkLoadStreaming(z2);
+            for (uint32_t i = 0; i < n_keys; ++i) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "key%06u", i);
+                s.BulkLoadStreaming(std::string_view(buf));
+            }
+            s.BulkLoadStreamingFinish();
+            s.PointQuery(z0);
+            s.PointQuery(z1);
+            s.PointQuery(z8);
+            CHECK(s.RangeQuery(z0, std::string_view("key000005")));
+            CHECK(s.RangeQuery(z1, std::string_view("key000005")));
+            CHECK(s.RangeQuery(z8, std::string_view("key000005")));
+            if (zero_first_key) {
+                CHECK(s.PointQuery(z2));
+                CHECK(s.RangeQuery(z0, z2));
+                CHECK(s.RangeQuery(z1, z2));
+            }
+        }
+    }
+
+
+    static void BinaryTrieBulkLoadStreamingBoundary() {
+        const uint32_t infix_size = 9;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+
+        // T = 1024: 1, T + 1 and 2T + 1 keys.
+        for (const uint32_t n_keys : {1U, 1025U, 2049U}) {
+            INFO("n_keys=" << n_keys);
+            BinaryTrieDiva s(infix_size, seed, load_factor);
+            std::vector<std::string> keys;
+            keys.reserve(n_keys);
+            for (uint64_t i = 0; i < n_keys; ++i) {
+                const uint64_t encoded = to_big_endian_order(i + 1);
+                keys.emplace_back(reinterpret_cast<const char *>(&encoded),
+                                  sizeof(encoded));
+                s.BulkLoadStreaming(keys.back());
+            }
+            s.BulkLoadStreamingFinish();
+            for (const std::string& key : keys)
+                CHECK(s.PointQuery(key));
+        }
+    }
+
+
     static void BinaryTrieInsert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -3953,6 +4060,95 @@ public:
             const uint8_t query_r_key[4] = {0b00110001, 0b01011010, 0b01111111, 0b11111111};
             REQUIRE_FALSE(s.RangeQuery(query_l_key, sizeof(query_l_key),
                                        query_r_key, sizeof(query_r_key)));
+        }
+    }
+
+
+    // Minimal key sets for which RangeQuery returned a false negative (hex).
+    static void BinaryTrieRangeQueryRegressions() {
+        struct Case {
+            const char *description;
+            uint32_t infix_size;
+            uint32_t seed;
+            std::vector<const char *> keys;  // sorted, unique
+            const char *l;
+            const char *r;
+        };
+        const std::vector<Case> cases = {
+            {"scan of l's run must include the run's last slot", 12, 22,
+                 {"8c9dd316abba20c72df8ac072de089e15b86012682a81331",
+                  "bcd4d68c577d87b3cb31c4e5f4f06b62dd2f26a09f6925",
+                  "e2ed40d279e1ec09568bdc444b513e9d99b4fbbace9b"},
+                 "bcd4d68c577d87b3cb31c4e5f4f06b",
+                 "e2ed40d279e1ec09568bdc444b513e9d99b4fbb9ce9b"},
+            {"-inf / +inf stand-in bounds must use a length in bits", 3, 21,
+                 {"616161",
+                  "6161616262616161",
+                  "616161626261626162626161",
+                  "626262616162616162626161626161"},
+                 "6161616162626161616162626262",
+                 "61626261616261"},
+            {"r's zero padding must not override a decided comparison", 3, 42,
+                 {"61616161",
+                  "61616261616162616162",
+                  "61616261626162626261616161626261",
+                  "616261616161616161"},
+                 "6161616262616261616161616262",
+                 "61616262"},
+            {"infix strictly below r's must be a positive without its trie", 8, 9,
+                 {"6b657930303138363635353038",
+                  "6b657930303230333034353131",
+                  "6b657930303230363433363139",
+                  "6b657930303939303839303436"},
+                 "6b6579303032",
+                 "6b6579303032303931303539"},
+            {"infix strictly above l's must be a positive without its trie", 3, 21,
+                 {"6161",
+                  "616161",
+                  "616162626262626262",
+                  "626262616162616162626161626161"},
+                 "616147",
+                 "6161d1"},
+            {"second path must not re-compare the divergence node's edge", 12, 29,
+                 {"0000030000011939",
+                  "00000400000079d6",
+                  "00000400000132a3",
+                  "00000e0000016c5c"},
+                 "000004000000cb46",
+                 "0000040000017f15"},
+            {"second path must not re-compare the divergence node's edge (2)", 8, 43,
+                 {"0000000000e700f3",
+                  "00000002a03a48a4",
+                  "00000010afe6736d",
+                  "0000019904bdb0b1",
+                  "000002e83310f4cb",
+                  "08f6cdc04518e0d7"},
+                 "0000000fafe6736d",
+                 "00000010afe6736d"},
+            {"second path must start its edge at the divergence node", 3, 45,
+                 {"6b657930303635313236363631",
+                  "6b657930303635313535393438",
+                  "6b657930303635323530343934",
+                  "6b657930303635323733383435",
+                  "6b657930303635373233343036",
+                  "6b657930303635373534363031",
+                  "6b657930303733303132373632"},
+                 "6b657930303635333136343133",
+                 "6b657930303635373635323632"},
+        };
+        const auto from_hex = [](const char *hex) {
+            std::string res;
+            for (const char *p = hex; p[0] != '\0' && p[1] != '\0'; p += 2)
+                res.push_back(static_cast<char>(std::stoi(std::string(p, 2), nullptr, 16)));
+            return res;
+        };
+        for (const Case& c : cases) {
+            INFO(c.description);
+            BinaryTrieDiva s(c.infix_size, c.seed, 0.95f);
+            for (const char *key : c.keys)
+                s.BulkLoadStreaming(from_hex(key));
+            s.BulkLoadStreamingFinish();
+            CHECK(s.RangeQuery(from_hex(c.l), from_hex(c.r)));
         }
     }
 
@@ -4563,6 +4759,10 @@ TEST_SUITE("binary trie") {
     TEST_CASE("bulk load") {
         DivaTests::BinaryTrieBulkLoad();
         DivaTests::BinaryTrieBulkLoadStreaming();
+        DivaTests::BinaryTrieBulkLoadStreamingSentinels();
+        DivaTests::BinaryTrieBulkLoadStreamingAllZeroFirstKey();
+        DivaTests::BinaryTrieAllZeroQueryBelowMinimum();
+        DivaTests::BinaryTrieBulkLoadStreamingBoundary();
     }
 
     TEST_CASE("insert") {
@@ -4575,6 +4775,7 @@ TEST_SUITE("binary trie") {
 
     TEST_CASE("range query") {
         DivaTests::BinaryTrieRangeQuery();
+        DivaTests::BinaryTrieRangeQueryRegressions();
     }
 
     TEST_CASE("delete") {

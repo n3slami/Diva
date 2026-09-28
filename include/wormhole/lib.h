@@ -198,6 +198,7 @@ crc32c_inc(const u8 * buf, u32 nr, u32 crc);
 // }}} crc32c
 
 // debug {{{
+#ifndef WORMHOLE_NO_DEBUG
   extern void
 debug_break(void);
 
@@ -206,6 +207,7 @@ debug_backtrace(void);
 
   extern void
 watch_u64_usr1(u64 * const ptr);
+#endif  // #ifndef WORMHOLE_NO_DEBUG
 
 #ifndef NDEBUG
   extern void
@@ -214,6 +216,7 @@ debug_assert(const bool v);
 #define debug_assert(expr) ((void)0)
 #endif
 
+#ifndef WORMHOLE_NO_DEBUG
 __attribute__((noreturn))
   extern void
 debug_die(void);
@@ -227,6 +230,9 @@ debug_dump_maps(FILE * const out);
 
   extern bool
 debug_perf_switch(void);
+#else
+#define debug_die()
+#endif  // #ifndef WORMHOLE_NO_DEBUG
 // }}} debug
 
 // mm {{{

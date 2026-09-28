@@ -311,6 +311,7 @@ crc32c_inc(const u8 * buf, u32 nr, u32 crc)
 }
 // }}} crc32c
 
+#ifndef WORMHOLE_NO_DEBUG
 // debug {{{
   void
 debug_break(void)
@@ -440,6 +441,9 @@ debug_wait_gdb(void * const bt_state)
   while (atomic_load_explicit(&v, MO_CONSUME))
     sleep(1);
 }
+#else
+#define debug_wait_gdb(...)
+#endif  // #ifndef WORMHOLE_NO_DEBUG
 
 #ifndef NDEBUG
   void
@@ -450,6 +454,7 @@ debug_assert(const bool v)
 }
 #endif
 
+#ifndef WORMHOLE_NO_DEBUG
 __attribute__((noreturn))
   void
 debug_die(void)
@@ -570,6 +575,7 @@ debug_perf_switch(void)
   }
 }
 // }}} debug
+#endif  // #ifndef WORMHOLE_NO_DEBUG
 
 // mm {{{
 #ifdef ALLOCFAIL
@@ -669,7 +675,11 @@ pages_unmap(void * const ptr, const size_t size)
   void
 pages_lock(void * const ptr, const size_t size)
 {
+#ifdef WORMHOLE_DISABLE_MLOCK
+  static bool use_mlock = false;
+#else
   static bool use_mlock = true;
+#endif
   if (use_mlock) {
     const int ret = mlock(ptr, size);
     if (ret != 0) {
@@ -1676,7 +1686,9 @@ co_init(struct co * const co, void * func, void * priv, u64 * const host,
   u64 * rsp = ((u64 *)co) - 4;
   rsp[0] = (u64)func;
   rsp[1] = (u64)func_exit;
+#ifndef WORMHOLE_NO_DEBUG
   rsp[2] = (u64)debug_die;
+#endif
   rsp[3] = 0;
 
   rsp -= CO_CONTEXT_SIZE;
@@ -2905,6 +2917,55 @@ struct qsbr {
   } shards[QSBR_SHARD_NR];
 };
 
+#ifdef WORMHOLE_DISABLE_QSBR
+
+extern struct qsbr *
+qsbr_create(void) {
+  return NULL;
+}
+
+extern bool
+qsbr_register(struct qsbr * const q, struct qsbr_ref * const qref) {
+  (void) q;
+  (void) qref;
+  return true;
+}
+
+extern void
+qsbr_unregister(struct qsbr * const q, struct qsbr_ref * const qref) {
+  (void) q;
+  (void) qref;
+}
+
+extern void
+qsbr_update(struct qsbr_ref * const qref, const u64 v) {
+  (void) qref;
+  (void) v;
+}
+
+extern void
+qsbr_park(struct qsbr_ref * const qref) {
+  (void) qref;
+}
+
+extern void
+qsbr_resume(struct qsbr_ref * const qref) {
+  (void) qref;
+}
+
+extern void
+qsbr_wait(struct qsbr * const q, const u64 target) {
+  (void) q;
+  (void) target;
+}
+
+extern void
+qsbr_destroy(struct qsbr * const q) {
+  (void) q;
+}
+
+#else
+
   struct qsbr *
 qsbr_create(void)
 {
@@ -3041,7 +3102,7 @@ qsbr_wait(struct qsbr * const q, const u64 target)
         } else {
           au64 * pptr = &(shard->ptrs[__builtin_ctzl(bit)]);
           struct qsbr_ref_real * const ptr = (typeof(ptr))atomic_load_explicit(pptr, MO_RELAXED);
-          if (atomic_load_explicit(&(ptr->qstate), MO_CONSUME) == target)
+          if (atomic_load_explicit(&(ptr->qstate), MO_CONSUME) >= target)
             bms[i] &= ~bit;
         }
       }
@@ -3063,6 +3124,9 @@ qsbr_destroy(struct qsbr * const q)
   if (q)
     free(q);
 }
+
+#endif
+
 #undef QSBR_STATES_NR
 #undef QSBR_BITMAP_NR
 // }}} qsbr

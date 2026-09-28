@@ -332,7 +332,7 @@ private:
                    const uint32_t size_grade, const uint32_t payload_size=0) {
             SetSizeGrade(size_grade);
             const uint64_t word_count = GetPtrWordCount(slot_count, slot_size, payload_size);
-            rwlock.store(0, std::memory_order::memory_order_release);
+            rwlock.store(0, std::memory_order_release);
             ptr = new uint64_t[word_count];
             memset(ptr, 0, sizeof(uint64_t) * word_count);
         }
@@ -343,7 +343,7 @@ private:
                     num_sample_payloads(other.num_sample_payloads),
                     rwlock(0),
                     ptr(other.ptr) { 
-            rwlock.store(0, std::memory_order::memory_order_release);
+            rwlock.store(0, std::memory_order_release);
         }
         InfixStore(InfixStore &&other) = default;
         InfixStore &operator=(const InfixStore &other) = default;
@@ -556,7 +556,8 @@ private:
     uint64_t implicit_scalars_[infix_store_target_size / 2 + 1];
     std::atomic<uint64_t> n_keys_ = 0;
 
-    uint32_t bulk_load_streaming_ind_, bulk_load_streaming_max_len_;
+    uint32_t bulk_load_streaming_ind_ = 0, bulk_load_streaming_max_len_ = 0;
+    bool bulk_load_first_key_is_min_ = false;
     InfiniteByteString bulk_load_left_key_, bulk_load_key_list_[infix_store_target_size];
     uint64_t *bulk_load_left_payload_ = nullptr, *bulk_load_payload_list_ = nullptr;
 
@@ -999,6 +1000,7 @@ GetLowerUpperBoundsRetry:
         it.leaf = nullptr;
         it.is = 0;
         wh_iter_seek_pred(&it, key.str, key.length, write);
+        bool have_prev = false;
         while (true) {
             if (!unlock) {
                 const uint32_t prev_l_ind = l_ind == 2 ? 0 : l_ind + 1;
@@ -1033,10 +1035,11 @@ GetLowerUpperBoundsRetry:
                 break;
             }
 
-            if (key < next_key)
+            if (key < next_key && have_prev)
                 break;
             prev_key = next_key;
             infix_store_ptr = dummy_infix_store_ptr;
+            have_prev = true;
             wh_iter_skip1(&it, write, unlock);
         }
         // Increment to make sure `l_ind` points to the first pointer
@@ -1048,7 +1051,8 @@ GetLowerUpperBoundsRetry:
         OrderLeaves(leaves, l_ind, r_ind);
 
 #ifdef DEBUG
-    assert(prev_key <= key);
+    assert(prev_key <= key
+           || std::all_of(key.str, key.str + key.length, [](const uint8_t b) { return b == 0; }));
     assert(next_key.str == nullptr || (key < next_key || prev_key == next_key));
 #endif // DEBUG
 }
@@ -1355,7 +1359,7 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         }
     }
 
-    if (prev_key == l_key || (next_key.str != nullptr && next_key <= r_key)) {
+    if ((l_key <= prev_key && prev_key <= r_key) || (next_key.str != nullptr && next_key <= r_key)) {
         UnlockLeaves(leaves_to_unlock, it_write_lock);
         return true;
     }
@@ -2441,7 +2445,7 @@ inline uint32_t Diva<diva_type, payload_type>::DeserializeMetadata(const char *d
     rng_.seed(rng_seed_);
 
     uint64_t n_keys_val;
-    memcpy(&n_keys_val, deser_buf + res, sizeof(rng_seed_));
+    memcpy(&n_keys_val, deser_buf + res, sizeof(n_keys_val));
     res += sizeof(n_keys_val);
     n_keys_.store(n_keys_val, std::memory_order_release);
 
@@ -3694,6 +3698,8 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
         if constexpr (payload_type == PayloadType::FixedLength)
             copy_bitmap_to_bitmap(payload, 0, bulk_load_left_payload_, 0, payload_size_);
         bulk_load_streaming_max_len_ = key_len;
+        bulk_load_first_key_is_min_ = std::all_of(key, key + key_len,
+                                                  [](const uint8_t b) { return b == 0; });
         return;
     }
     bulk_load_streaming_max_len_ = std::max(bulk_load_streaming_max_len_, key_len);
@@ -3785,13 +3791,30 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreaming(const uint8_t *key,
 
 template <DivaType diva_type, PayloadType payload_type>
 inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
+    if (bulk_load_left_key_.str == nullptr)
+        return;
     uint8_t *key_copy = new uint8_t[bulk_load_streaming_max_len_];
+    const auto tree_key_absent = [&](const uint8_t *k, const uint32_t len) {
+        if constexpr (diva_type == DivaType::Int)
+            return !wh_int_probe(better_tree_int_, k, len);
+        else
+            return !wh_probe(better_tree_, k, len);
+    };
     memset(key_copy, 0x00, bulk_load_streaming_max_len_);
-    AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+    if (!bulk_load_first_key_is_min_ && tree_key_absent(key_copy, bulk_load_streaming_max_len_))
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
     memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
-    AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+    if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
+        AddTreeKey(key_copy, bulk_load_streaming_max_len_);
 
-    if (bulk_load_streaming_ind_ > 0) {
+    if (bulk_load_streaming_ind_ == 0) {
+        if (tree_key_absent(bulk_load_left_key_.str, bulk_load_left_key_.length)) {
+            if constexpr (payload_type == PayloadType::FixedLength)
+                AddTreeKey(bulk_load_left_key_.str, bulk_load_left_key_.length, bulk_load_left_payload_);
+            else
+                AddTreeKey(bulk_load_left_key_.str, bulk_load_left_key_.length);
+        }
+    } else if (bulk_load_streaming_ind_ > 0) {
         const InfiniteByteString bulk_load_right_key = bulk_load_key_list_[bulk_load_streaming_ind_ - 1];
         bulk_load_key_list_[bulk_load_streaming_ind_ - 1] = {};
         bulk_load_streaming_ind_--;
@@ -3822,11 +3845,13 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
             }
         }
         if constexpr (diva_type == DivaType::BinaryTrie) {
-            infix_vec.emplace_back(infix_list[last_infix_pos]);
-            if (bulk_load_streaming_ind_ - last_infix_pos > 1) {
-                infix_vec.back().BuildTrieAndSuffixes(bulk_load_key_list_ + last_infix_pos,
-                        bulk_load_streaming_ind_ - last_infix_pos, key_start_bit, infix_size_,
-                        false, false, true);
+            if (bulk_load_streaming_ind_ > 0) {
+                infix_vec.emplace_back(infix_list[last_infix_pos]);
+                if (bulk_load_streaming_ind_ - last_infix_pos > 1) {
+                    infix_vec.back().BuildTrieAndSuffixes(bulk_load_key_list_ + last_infix_pos,
+                            bulk_load_streaming_ind_ - last_infix_pos, key_start_bit, infix_size_,
+                            false, false, true);
+                }
             }
             last_infix_pos = bulk_load_streaming_ind_;
         }
@@ -5525,6 +5550,8 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                 infix_store_target_size + store_size + infix_size_ * runstart_pos,
                                 infix_size_);
                         const uint32_t mask_size = lowbit_pos(infix_to_query.infix_) + 1;
+                        if ((current_slot | BITMASK(mask_size)) < (r_explicit_part | BITMASK(mask_size)))
+                            return true;
                         const uint8_t zero_key[1] = {0};
                         if (infix_to_query.QueryTrie({zero_key, 1},
                                     original_r_key,
@@ -5547,7 +5574,7 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
             const int32_t runstart_pos = std::max<int32_t>(rank ? SelectRunends(store, rank - 1) : -1,
                                                            FindEmptySlotBefore(store, runend_pos)) + 1;
             if constexpr (diva_type == DivaType::BinaryTrie) {
-                for (int32_t pos = runstart_pos; pos < runend_pos; pos++) {
+                for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
                     const uint64_t current_slot = GetSlot(store, pos);
                     const uint64_t current_slot_r = current_slot | (current_slot - 1);
                     if (SlotHasTrie(store, pos, runend_pos)) {
@@ -5556,11 +5583,13 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                                 infix_size_);
                         if (current_slot_r >= l_explicit_part) {
                                 const uint32_t mask_size = lowbit_pos(infix.infix_) + 1;
+                                if ((l_explicit_part | BITMASK(mask_size)) < (current_slot | BITMASK(mask_size)))
+                                    return true;
                                 const uint32_t one_key_max_len = (original_key_start_bit + (infix.GetNumSlots(infix_size_) + 1) * infix_size_ + 7) / 8;
                                 uint8_t one_key[one_key_max_len];
                                 memset(one_key, 0xFF, one_key_max_len);
                                 if (infix.QueryTrie(original_l_key, 
-                                            {one_key, one_key_max_len},
+                                            {one_key, 8 * one_key_max_len},
                                             original_key_start_bit + infix_size_ - mask_size,
                                             infix_size_))
                                     return true;
@@ -5603,19 +5632,19 @@ inline bool Diva<diva_type, payload_type>::RangeQueryInfixStore(InfixStore &stor
                         infix_size_);
                 if (current_slot_r >= l_explicit_part && current_slot_l <= r_explicit_part - 1) {
                     const uint32_t max_key_len = (original_key_start_bit + infix_size_
-                            + infix.num_trie_bits_ + infix.num_suffix_bits_) / 8;
+                            + infix.num_trie_bits_ + infix.num_suffix_bits_ + 7) / 8 + 1;
                     const uint32_t mask_size = lowbit_pos(infix.infix_) + 1;
                     uint8_t zeros[max_key_len];
                     memset(zeros, 0x00, max_key_len);
                     InfiniteByteString trie_l_key = 
                         (l_explicit_part | BITMASK(mask_size)) < (current_slot | BITMASK(mask_size)) 
-                            ? InfiniteByteString(zeros, max_key_len) : original_l_key;
+                            ? InfiniteByteString(zeros, 8 * max_key_len) : original_l_key;
 
                     uint8_t ones[max_key_len];
                     memset(ones, 0xFF, max_key_len);
                     InfiniteByteString trie_r_key = 
                         (current_slot | BITMASK(mask_size)) < (r_explicit_part | BITMASK(mask_size)) 
-                            ? InfiniteByteString(ones, max_key_len) : original_r_key;
+                            ? InfiniteByteString(ones, 8 * max_key_len) : original_r_key;
 
                     if (infix.QueryTrie(trie_l_key, trie_r_key,
                                 original_key_start_bit + infix_size_ - mask_size,
@@ -7281,7 +7310,8 @@ QueryTrieDivergedPathRetry:
         if (it.depth_branch_.empty())
             break;
         auto [depth, children] = it.depth_branch_.back();
-        if (last_depth >= depth)
+        const bool revisit_diverge_node = second_path && depth == diverge_depth;
+        if (!revisit_diverge_node && last_depth >= depth)
             last_depth = it.depth_branch_[it.depth_branch_.size() - 2].first;
 
         bool l_key_dont_care = l_key_dont_care_depth <= depth || second_path;
@@ -7289,7 +7319,7 @@ QueryTrieDivergedPathRetry:
         
         // Compare l_key to path, or ignore
         const int32_t current_str_bit_pos = key_start_bit + last_depth + 1;
-        const uint32_t compare_len = depth - last_depth - 1;
+        const uint32_t compare_len = revisit_diverge_node ? 0 : depth - last_depth - 1;
         const uint32_t compare_len_l = std::min<int32_t>(compare_len,
                         std::max<int32_t>(0, l_key.length - last_depth));
         const int32_t compare_l = l_key_dont_care ? 0
@@ -7309,6 +7339,7 @@ QueryTrieDivergedPathRetry:
                     return true;
                 else if (it.depth_branch_.back().first == diverge_depth) {
                     second_path = true;
+                    last_depth = diverge_depth;
                     if (it.AtLeaf())
                         break;
                     continue;
@@ -7324,7 +7355,7 @@ QueryTrieDivergedPathRetry:
                 : CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_r,
                         r_key, current_str_bit_pos, 
                         compare_len_r);
-        if (compare_len_r < compare_len) {
+        if (!r_key_dont_care && compare_r == 0 && compare_len_r < compare_len) {
             uint8_t zeros[compare_len / 8 + 2] = {};
             compare_r = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len, 
                                               {zeros, compare_len / 8 + 2}, 0, 
@@ -7387,6 +7418,7 @@ QueryTrieAfterLoop:
     if (check_l || check_r) {
         if (diverge_depth < depth && !second_path) {    // Still have to check the key on the other path
             second_path = true;
+            last_depth = diverge_depth;
             goto QueryTrieDivergedPathRetry;
         }
         return false;
@@ -7410,6 +7442,7 @@ QueryTrieAfterLoop:
             if (check_l || check_r) {
                 if (diverge_depth < depth && !second_path) {    // Still have to check the key on the other path
                     second_path = true;
+                    last_depth = diverge_depth;
                     goto QueryTrieDivergedPathRetry;
                 }
                 return false;

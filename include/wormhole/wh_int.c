@@ -474,8 +474,13 @@ wormleaf_int_alloc(struct wormhole_int * const map, struct wormleaf_int * const 
   rwlock_init(&(leaf->leaflock));
   spinlock_init(&(leaf->sortlock));
 
+#ifdef WORMHOLE_GLOBAL_SLAB
+  // Shared freelist may return a leaf with another map's version.
+  atomic_store_explicit(&(leaf->lv), (u64)0, MO_RELEASE);
+#else
   // keep the old version; new version will be assigned by split functions
   //leaf->lv = 0;
+#endif
 
   leaf->prev = prev;
   leaf->next = next;
