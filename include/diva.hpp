@@ -7343,7 +7343,7 @@ QueryTrieDivergedPathRetry:
                 : CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len_r,
                         r_key, current_str_bit_pos, 
                         compare_len_r);
-        if (compare_len_r < compare_len) {
+        if (!r_key_dont_care && compare_r == 0 && compare_len_r < compare_len) {
             uint8_t zeros[compare_len / 8 + 2] = {};
             compare_r = CompareStringToBitmap(it.buf_, it.bit_pos_ - compare_len, 
                                               {zeros, compare_len / 8 + 2}, 0, 
