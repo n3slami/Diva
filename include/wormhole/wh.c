@@ -2015,7 +2015,7 @@ wormhole_jump_leaf_pred_read(struct wormref * const ref, const struct kref * con
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
             cmp = (int) key->len - (int) other->klen;
-        if (cmp < 0) {
+        if (cmp < 0 && leaf->prev != NULL) {
             memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
             if (retry_key_buf[leaf->anchor->klen - 1])  {
                 retry_key_buf[leaf->anchor->klen - 1]--;
@@ -2069,7 +2069,7 @@ wormhole_jump_leaf_pred_write(struct wormref * const ref, const struct kref * co
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
             cmp = (int) key->len - (int) other->klen;
-        if (cmp < 0) {
+        if (cmp < 0 && leaf->prev != NULL) {
             memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
             if (retry_key_buf[leaf->anchor->klen - 1])  {
                 retry_key_buf[leaf->anchor->klen - 1]--;
@@ -2123,7 +2123,7 @@ wormhole_jump_leaf_pred_read_strict(struct wormref * const ref, const struct kre
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
             cmp = (int) key->len - (int) other->klen;
-        if (cmp <= 0) {
+        if (cmp <= 0 && leaf->prev != NULL) {
             memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
             if (retry_key_buf[leaf->anchor->klen - 1])  {
                 retry_key_buf[leaf->anchor->klen - 1]--;
@@ -2177,7 +2177,7 @@ wormhole_jump_leaf_pred_write_strict(struct wormref * const ref, const struct kr
         int cmp = memcmp(key->ptr, other->kv, key->len < other->klen ? key->len : other->klen);
         if (cmp == 0)
             cmp = (int) key->len - (int) other->klen;
-        if (cmp <= 0) {
+        if (cmp <= 0 && leaf->prev != NULL) {
             memcpy(retry_key_buf, leaf->anchor->kv, leaf->anchor->klen);
             if (retry_key_buf[leaf->anchor->klen - 1])  {
                 retry_key_buf[leaf->anchor->klen - 1]--;

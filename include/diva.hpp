@@ -1000,6 +1000,7 @@ GetLowerUpperBoundsRetry:
         it.leaf = nullptr;
         it.is = 0;
         wh_iter_seek_pred(&it, key.str, key.length, write);
+        bool have_prev = false;
         while (true) {
             if (!unlock) {
                 const uint32_t prev_l_ind = l_ind == 2 ? 0 : l_ind + 1;
@@ -1034,10 +1035,11 @@ GetLowerUpperBoundsRetry:
                 break;
             }
 
-            if (key < next_key)
+            if (key < next_key && have_prev)
                 break;
             prev_key = next_key;
             infix_store_ptr = dummy_infix_store_ptr;
+            have_prev = true;
             wh_iter_skip1(&it, write, unlock);
         }
         // Increment to make sure `l_ind` points to the first pointer
@@ -1049,7 +1051,8 @@ GetLowerUpperBoundsRetry:
         OrderLeaves(leaves, l_ind, r_ind);
 
 #ifdef DEBUG
-    assert(prev_key <= key);
+    assert(prev_key <= key
+           || std::all_of(key.str, key.str + key.length, [](const uint8_t b) { return b == 0; }));
     assert(next_key.str == nullptr || (key < next_key || prev_key == next_key));
 #endif // DEBUG
 }
@@ -1356,7 +1359,7 @@ inline bool Diva<diva_type, payload_type>::RangeQuery(const uint8_t *input_l, co
         }
     }
 
-    if (prev_key == l_key || (next_key.str != nullptr && next_key <= r_key)) {
+    if ((l_key <= prev_key && prev_key <= r_key) || (next_key.str != nullptr && next_key <= r_key)) {
         UnlockLeaves(leaves_to_unlock, it_write_lock);
         return true;
     }

@@ -3799,6 +3799,40 @@ public:
     }
 
 
+    static void BinaryTrieAllZeroQueryBelowMinimum() {
+        const uint32_t infix_size = 8;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t n_keys = 3000;
+        const std::string z0, z1(1, '\0'), z2(2, '\0'), z8(8, '\0');
+
+        // All-zero query keys shorter than the minimum boundary.
+        for (const bool zero_first_key : {false, true}) {
+            INFO("zero_first_key=" << zero_first_key);
+            BinaryTrieDiva s(infix_size, seed, load_factor);
+            if (zero_first_key)
+                s.BulkLoadStreaming(z2);
+            for (uint32_t i = 0; i < n_keys; ++i) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "key%06u", i);
+                s.BulkLoadStreaming(std::string_view(buf));
+            }
+            s.BulkLoadStreamingFinish();
+            s.PointQuery(z0);
+            s.PointQuery(z1);
+            s.PointQuery(z8);
+            CHECK(s.RangeQuery(z0, std::string_view("key000005")));
+            CHECK(s.RangeQuery(z1, std::string_view("key000005")));
+            CHECK(s.RangeQuery(z8, std::string_view("key000005")));
+            if (zero_first_key) {
+                CHECK(s.PointQuery(z2));
+                CHECK(s.RangeQuery(z0, z2));
+                CHECK(s.RangeQuery(z1, z2));
+            }
+        }
+    }
+
+
     static void BinaryTrieBulkLoadStreamingBoundary() {
         const uint32_t infix_size = 9;
         const uint32_t seed = 1;
@@ -4727,6 +4761,7 @@ TEST_SUITE("binary trie") {
         DivaTests::BinaryTrieBulkLoadStreaming();
         DivaTests::BinaryTrieBulkLoadStreamingSentinels();
         DivaTests::BinaryTrieBulkLoadStreamingAllZeroFirstKey();
+        DivaTests::BinaryTrieAllZeroQueryBelowMinimum();
         DivaTests::BinaryTrieBulkLoadStreamingBoundary();
     }
 
