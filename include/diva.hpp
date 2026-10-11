@@ -2321,6 +2321,7 @@ inline Diva<diva_type, payload_type>::~Diva() {
         }
         if (it_int.leaf)
             wormleaf_int_unlock_write(it_int.leaf);
+        wh_int_unref(better_tree_int_);
         wh_int_destroy(wh_int_);
     }
     else {
@@ -2338,6 +2339,7 @@ inline Diva<diva_type, payload_type>::~Diva() {
         }
         if (it.leaf)
             wormleaf_unlock_write(it.leaf);
+        wh_unref(better_tree_);
         wh_destroy(wh_);
     }
 }
@@ -3806,6 +3808,7 @@ inline void Diva<diva_type, payload_type>::BulkLoadStreamingFinish() {
     memset(key_copy, 0xFF, bulk_load_streaming_max_len_);
     if (tree_key_absent(key_copy, bulk_load_streaming_max_len_))
         AddTreeKey(key_copy, bulk_load_streaming_max_len_);
+    delete[] key_copy;
 
     if (bulk_load_streaming_ind_ == 0) {
         if (tree_key_absent(bulk_load_left_key_.str, bulk_load_left_key_.length)) {

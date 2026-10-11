@@ -4328,7 +4328,7 @@ wh_create(void)
 {
   // kvmap_mm_ndf (kv.h) will let the caller allocate the kv when inserting
   // This can avoid a memcpy if the caller does not have the data in a struct kv
-  return wormhole_create(&kvmap_mm_dup);
+  return wormhole_create(&kvmap_mm_ndf);
 }
 
   struct wormref *
