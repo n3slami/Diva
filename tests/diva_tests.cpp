@@ -11,6 +11,7 @@
 #include <fstream>
 #include <limits>
 #include <random>
+#include <set>
 #include <string_view>
 #include <thread>
 #include <x86intrin.h>
@@ -3857,6 +3858,335 @@ public:
     }
 
 
+    static std::string HexString(const std::string& str) {
+        static constexpr char kHex[] = "0123456789abcdef";
+        std::string res;
+        res.reserve(2 * str.size());
+        for (unsigned char c : str) {
+            res.push_back(kHex[c >> 4]);
+            res.push_back(kHex[c & 0x0F]);
+        }
+        return res;
+    }
+
+
+    static bool KnownPrefixLessOrEqual(const std::string& lhs,
+                                       const uint32_t lhs_bits,
+                                       const std::string& rhs,
+                                       const uint32_t rhs_bits) {
+        const uint32_t common_bits = std::min(lhs_bits, rhs_bits);
+        const uint32_t full_bytes = common_bits / 8;
+        if (full_bytes > 0) {
+            const int cmp = memcmp(lhs.data(), rhs.data(), full_bytes);
+            if (cmp != 0)
+                return cmp < 0;
+        }
+        const uint32_t partial_bits = common_bits % 8;
+        if (partial_bits != 0) {
+            const uint8_t mask = BITMASK(partial_bits) << (8 - partial_bits);
+            const uint8_t lhs_byte = static_cast<uint8_t>(lhs[full_bytes]) & mask;
+            const uint8_t rhs_byte = static_cast<uint8_t>(rhs[full_bytes]) & mask;
+            if (lhs_byte != rhs_byte)
+                return lhs_byte < rhs_byte;
+        }
+        return lhs_bits <= rhs_bits;
+    }
+
+
+    static bool KnownPrefixNotBefore(const std::string& prev,
+                                     const uint32_t prev_bits,
+                                     const std::string& cur,
+                                     const uint32_t cur_bits) {
+        // Only a differing known bit can show `cur` before `prev`.
+        const uint32_t common_bits = std::min(prev_bits, cur_bits);
+        return KnownPrefixLessOrEqual(prev, common_bits, cur, common_bits);
+    }
+
+
+    static int CompareKnownPrefixToKey(const std::string& prefix,
+                                       const uint32_t known_bits,
+                                       const std::string& key) {
+        const uint32_t full_bytes = std::min<uint32_t>(known_bits / 8, key.size());
+        if (full_bytes > 0) {
+            const int cmp = memcmp(prefix.data(), key.data(), full_bytes);
+            if (cmp != 0)
+                return cmp;
+        }
+
+        if (known_bits / 8 >= key.size()) {
+            if (known_bits == 8 * key.size())
+                return 0;
+            return 1;
+        }
+
+        const uint32_t partial_bits = known_bits % 8;
+        if (partial_bits == 0)
+            return known_bits == 8 * key.size() ? 0 : -1;
+
+        const uint8_t mask = BITMASK(partial_bits) << (8 - partial_bits);
+        const uint8_t lhs_byte = static_cast<uint8_t>(prefix[full_bytes]) & mask;
+        const uint8_t rhs_byte = static_cast<uint8_t>(key[full_bytes]) & mask;
+        if (lhs_byte != rhs_byte)
+            return static_cast<int>(lhs_byte) - static_cast<int>(rhs_byte);
+
+        return -1;
+    }
+
+
+    static bool KnownLowerBoundCanPrecedeKey(const std::string& lower_bound,
+                                             const uint32_t known_bits,
+                                             const std::string& key) {
+        if (known_bits > 8 * lower_bound.size())
+            return false;
+        return CompareKnownPrefixToKey(lower_bound, known_bits, key) <= 0;
+    }
+
+
+    static uint32_t CountBinaryTrieSlots(BinaryTrieDiva& s) {
+        const bool check_it_write = false;
+        const bool check_it_unlock = true;
+        uint32_t trie_slot_count = 0;
+
+        const uint8_t *tree_key;
+        uint32_t tree_key_len, dummy;
+        typename BinaryTrieDiva::InfixStore *store;
+        wormhole_iter *it = wh_iter_create(s.better_tree_);
+        wh_iter_seek(it, nullptr, 0, check_it_write);
+        while (wh_iter_valid(it)) {
+            wh_iter_peek_ref(it, reinterpret_cast<const void **>(&tree_key), &tree_key_len,
+                             reinterpret_cast<void **>(&store), &dummy);
+            if (store != nullptr) {
+                const uint64_t *occupieds = store->ptr + BinaryTrieDiva::num_metadata_offset_words;
+                for (uint32_t implicit_part = 0;
+                     implicit_part < BinaryTrieDiva::infix_store_target_size;
+                     implicit_part++) {
+                    if (!get_bitmap_bit(occupieds, implicit_part))
+                        continue;
+                    const uint32_t rank = s.RankOccupieds(*store, implicit_part);
+                    const int32_t runend_pos = s.SelectRunends(*store, rank);
+                    const int32_t runstart_pos =
+                        std::max(rank ? static_cast<int32_t>(s.SelectRunends(*store, rank - 1)) : -1,
+                                 static_cast<int32_t>(s.FindEmptySlotBefore(*store, runend_pos))) + 1;
+                    for (int32_t pos = runstart_pos; pos <= runend_pos; pos++) {
+                        if (s.SlotHasTrie(*store, pos, runend_pos))
+                            trie_slot_count++;
+                    }
+                }
+            }
+            wh_iter_skip1(it, check_it_write, check_it_unlock);
+        }
+        wh_iter_destroy(it, check_it_write);
+
+        return trie_slot_count;
+    }
+
+
+    static std::vector<std::string> RandomNonZeroByteKeys(std::mt19937_64& rng,
+                                                          const uint32_t n_keys) {
+        // Few distinct bytes, so keys share prefixes and collide in infixes.
+        std::set<std::string> keys;
+        while (keys.size() < n_keys) {
+            std::string key(1 + rng() % 12, '\0');
+            for (char& c : key)
+                c = static_cast<char>(1 + rng() % (rng() % 4 == 0 ? 255 : 3));
+            keys.insert(key);
+        }
+        return {keys.begin(), keys.end()};
+    }
+
+
+    static void BinaryTrieBulkLoadIteratorOrder() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        const uint32_t infix_store_target_size =
+            BinaryTrieDiva::infix_store_target_size;
+        const uint32_t n_keys = 100 * infix_store_target_size;
+
+        auto check_iterator_order = [&](BinaryTrieDiva& s,
+                                        const std::vector<std::string>& string_keys) {
+            REQUIRE_GT(CountBinaryTrieSlots(s), 0);
+
+            std::string prev_lower_bound;
+            uint32_t prev_bits = 0;
+            uint32_t ind = 0;
+            for (auto it = s.GetIterator(string_keys[0]); it.IsValid(); ++it, ++ind) {
+                REQUIRE_LT(ind, n_keys);
+                auto [lower_bound, known_bits] = *it;
+                INFO("ind=", ind, " known_bits=", known_bits,
+                     " lower_bound=", HexString(lower_bound),
+                     " key=", HexString(string_keys[ind]),
+                     " prev_bits=", prev_bits,
+                     " prev_lower_bound=", HexString(prev_lower_bound));
+                REQUIRE(KnownLowerBoundCanPrecedeKey(lower_bound, known_bits,
+                                                     string_keys[ind]));
+                if (ind > 0) {
+                    REQUIRE(KnownPrefixNotBefore(prev_lower_bound, prev_bits,
+                                                 lower_bound, known_bits));
+                }
+                prev_lower_bound = std::move(lower_bound);
+                prev_bits = known_bits;
+            }
+            REQUIRE_EQ(ind, string_keys.size());
+        };
+
+        auto check_all_build_paths = [&](const std::vector<std::string>& string_keys) {
+            SUBCASE("bulk load") {
+                BinaryTrieDiva s(infix_size, string_keys.begin(), string_keys.end(),
+                                 seed, load_factor);
+                check_iterator_order(s, string_keys);
+            }
+
+            SUBCASE("streaming") {
+                BinaryTrieDiva s(infix_size, seed, load_factor);
+                for (const auto& key : string_keys)
+                    s.BulkLoadStreaming(key);
+                s.BulkLoadStreamingFinish();
+                check_iterator_order(s, string_keys);
+            }
+
+            SUBCASE("serialized streaming") {
+                BinaryTrieDiva s(infix_size, seed, load_factor);
+                for (const auto& key : string_keys)
+                    s.BulkLoadStreaming(key);
+                s.BulkLoadStreamingFinish();
+
+                std::vector<char> serialized(s.Size());
+                const uint32_t serialized_size = s.Serialize(serialized.data());
+                REQUIRE_EQ(serialized_size, serialized.size());
+
+                BinaryTrieDiva deserialized_s(serialized.data());
+                check_iterator_order(deserialized_s, string_keys);
+            }
+        };
+
+        SUBCASE("fixed length") {
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+            std::vector<uint64_t> keys;
+            keys.reserve(n_keys);
+            for (uint32_t i = 0; i < n_keys; i++)
+                keys.push_back(rng());
+            std::sort(keys.begin(), keys.end());
+
+            std::vector<std::string> string_keys;
+            string_keys.reserve(n_keys);
+            for (uint32_t i = 0; i < n_keys; i++) {
+                const uint64_t value = to_big_endian_order(keys[i]);
+                string_keys.emplace_back(reinterpret_cast<const char *>(&value), 8);
+            }
+            check_all_build_paths(string_keys);
+        }
+
+        SUBCASE("variable length") {
+            const uint32_t rng_seed = 2;
+            std::mt19937_64 rng(rng_seed);
+            std::string valid_ascii_characters = "";
+            for (char c = 'A'; c <= 'Z'; c++)
+                valid_ascii_characters += c;
+            for (char c = 'a'; c <= 'z'; c++)
+                valid_ascii_characters += c;
+            for (char c = '0'; c <= '9'; c++)
+                valid_ascii_characters += c;
+
+            std::vector<std::string> string_keys;
+            string_keys.reserve(n_keys);
+            for (uint32_t i = 0; i < n_keys; i++) {
+                string_keys.push_back("");
+                const uint32_t current_key_length = 6 + rng() % 3;
+                for (uint32_t j = 0; j < current_key_length; j++)
+                    string_keys.back() += valid_ascii_characters[rng() % valid_ascii_characters.size()];
+            }
+            std::sort(string_keys.begin(), string_keys.end());
+            check_all_build_paths(string_keys);
+        }
+    }
+
+
+    static void BinaryTrieIteratorFirstEntryBoundsSeekTarget() {
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        std::mt19937_64 rng(3);
+        for (const uint32_t infix_size : {3U, 5U, 10U}) {
+            const std::vector<std::string> keys = RandomNonZeroByteKeys(rng, 5000);
+            BinaryTrieDiva built(infix_size, seed, load_factor);
+            for (const auto& key : keys)
+                built.BulkLoadStreaming(key);
+            built.BulkLoadStreamingFinish();
+            REQUIRE_GT(CountBinaryTrieSlots(built), 0);
+            std::vector<char> serialized(built.Size());
+            built.Serialize(serialized.data());
+            BinaryTrieDiva s(serialized.data());
+
+            std::vector<std::string> targets;
+            for (uint32_t i = 0; i < 3000; i++) {
+                const std::string& key = keys[rng() % keys.size()];
+                switch (rng() % 4) {
+                    case 0: targets.push_back(key); break;
+                    case 1: targets.push_back(key.substr(0, 1 + rng() % key.size())); break;
+                    case 2: targets.push_back(key + static_cast<char>(1 + rng() % 255)); break;
+                    default: targets.push_back(RandomNonZeroByteKeys(rng, 1)[0]); break;
+                }
+            }
+            targets.push_back(keys.back() + "\xff");
+            for (const std::string& target : targets) {
+                const auto first = std::lower_bound(keys.begin(), keys.end(), target);
+                auto it = s.GetIterator(target, std::string_view());
+                INFO("infix_size=", infix_size, " target=", HexString(target));
+                if (!it.IsValid()) {
+                    REQUIRE(first == keys.end());
+                    continue;
+                }
+                if (first == keys.end())
+                    continue;
+                auto [lower_bound, known_bits] = *it;
+                INFO("lower_bound=", HexString(lower_bound), " known_bits=", known_bits,
+                     " first=", HexString(*first));
+                // Bits past the end of a shorter key are its zero padding.
+                while (known_bits > 0 &&
+                       !((static_cast<uint8_t>(lower_bound[(known_bits - 1) / 8]) >>
+                          (7 - (known_bits - 1) % 8)) & 1))
+                    known_bits--;
+                REQUIRE(KnownLowerBoundCanPrecedeKey(lower_bound, known_bits, *first));
+            }
+        }
+    }
+
+
+    static void BinaryTrieConcurrentQueries() {
+        const uint32_t infix_size = 5;
+        const uint32_t seed = 1;
+        const float load_factor = 0.95;
+        std::mt19937_64 rng(4);
+        const std::vector<std::string> keys = RandomNonZeroByteKeys(rng, 20000);
+        BinaryTrieDiva built(infix_size, seed, load_factor);
+        for (const auto& key : keys)
+            built.BulkLoadStreaming(key);
+        built.BulkLoadStreamingFinish();
+        REQUIRE_GT(CountBinaryTrieSlots(built), 0);
+        std::vector<char> serialized(built.Size());
+        built.Serialize(serialized.data());
+        BinaryTrieDiva s(serialized.data());
+
+        std::atomic<uint32_t> false_negatives = 0;
+        std::vector<std::thread> threads;
+        for (uint32_t t = 0; t < 8; t++) {
+            threads.emplace_back([&, t] {
+                for (uint32_t round = 0; round < 3; round++) {
+                    for (uint32_t i = t; i < keys.size(); i++) {
+                        const std::string_view key(keys[i]);
+                        if (!s.PointQuery(key) || !s.RangeQuery(key, key))
+                            false_negatives++;
+                    }
+                }
+            });
+        }
+        for (auto& thread : threads)
+            thread.join();
+        REQUIRE_EQ(false_negatives.load(), 0);
+    }
+
+
     static void BinaryTrieInsert() {
         const uint32_t infix_size = 5;
         const uint32_t seed = 1;
@@ -4763,6 +5093,18 @@ TEST_SUITE("binary trie") {
         DivaTests::BinaryTrieBulkLoadStreamingAllZeroFirstKey();
         DivaTests::BinaryTrieAllZeroQueryBelowMinimum();
         DivaTests::BinaryTrieBulkLoadStreamingBoundary();
+    }
+
+    TEST_CASE("bulk load iterator order") {
+        DivaTests::BinaryTrieBulkLoadIteratorOrder();
+    }
+
+    TEST_CASE("iterator first entry bounds seek target") {
+        DivaTests::BinaryTrieIteratorFirstEntryBoundsSeekTarget();
+    }
+
+    TEST_CASE("concurrent queries") {
+        DivaTests::BinaryTrieConcurrentQueries();
     }
 
     TEST_CASE("insert") {
